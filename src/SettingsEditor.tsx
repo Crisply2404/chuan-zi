@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Download, Eye, Save } from 'lucide-react';
-import { conditionTypes, type Appearance, type ConditionType, type Prompt, type RelationMode, type RulePresetId, type Settings } from '../shared/types';
+import { conditionTypes, modeIds, type Appearance, type ConditionType, type ModeId, type Prompt, type RelationMode, type Settings } from '../shared/types';
 import { settingsSchema } from '../shared/settings';
-import { getPresetSettings, presetDescriptions, presetLabels } from '../shared/presets';
+import { getModeSettings, modeColors, modeDescriptions, modeLabels } from '../shared/presets';
 import { PromptView } from './PromptView';
 
 export const conditionLabels: Record<ConditionType, string> = {
@@ -21,7 +21,8 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   value: Settings; onChange: (settings: Settings) => void; disabled: boolean; preview: Prompt | null;
   onPreview: () => void; onSave?: () => void; busy: boolean; fixedBestOf?: boolean;
 }) {
-  const [mode, setMode] = useState<RulePresetId>('custom');
+  const [mode, setMode] = useState<ModeId>(value.mode);
+  useEffect(() => setMode(value.mode), [value.mode]);
   const update = <K extends keyof Settings>(key: K, next: Settings[K]) => onChange({ ...value, [key]: next });
   const validate = settingsSchema.safeParse(value);
   const problems = validate.success ? [] : [...new Set(validate.error.issues.map(issue => issue.message))];
@@ -33,9 +34,9 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   ]);
   const active = conditionTypes.filter(type => value.appearance[type] !== 'off');
   const custom = mode === 'custom';
-  const selectPreset = (next: RulePresetId) => {
+  const selectMode = (next: ModeId) => {
     setMode(next);
-    if (next !== 'custom') onChange(getPresetSettings(next));
+    onChange(next === 'custom' ? { ...value, mode: 'custom' } : getModeSettings(next));
   };
   const exportRules = () => {
     const file = new Blob([JSON.stringify(value, null, 2)], {type: 'application/json'});
@@ -50,8 +51,8 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     <fieldset disabled={disabled || busy}>
       <section className="settings-section">
         <h3>游戏模式</h3>
-        <div className="preset-row" aria-label="游戏模式">{(['simple', 'hard', 'featured', 'custom'] as RulePresetId[]).map(id => <button type="button" className="preset-button" aria-pressed={mode === id} key={id}
-          onClick={() => selectPreset(id)}>{id === 'custom' ? '自定义模式' : presetLabels[id]}</button>)}</div>
+        <div className="mode-grid" aria-label="游戏模式">{modeIds.map(id => <button type="button" className="mode-card" aria-label={modeLabels[id]} style={{'--mode-color': modeColors[id]} as CSSProperties} aria-pressed={mode === id} key={id}
+          onClick={() => selectMode(id)}><span>{modeLabels[id]}</span><small>{modeDescriptions[id]}</small></button>)}</div>
         {custom ? <><p className="settings-help">自定义模式可以逐项设置提示条件与条件关系。</p><div className="condition-controls">{conditionTypes.map(type => <div className="condition-row" key={type}>
           <span>{conditionLabels[type]}</span><div className="segments" role="group" aria-label={conditionLabels[type]}>{([
             ['off', '关闭'], ['random', '随机'], ['required', '必选'],
@@ -59,7 +60,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
             onClick={() => update('appearance', { ...value.appearance, [type]: appearance })}>{label}</button>)}</div>
         </div>)}</div>{value.appearance.tone !== 'off' && <label className="select-field"><span>声调位置</span><select value={value.toneScope} onChange={event => update('toneScope', event.target.value as Settings['toneScope'])}>
           <option value="one">一个汉字</option><option value="some">部分汉字</option><option value="all">全部汉字</option>
-        </select></label>}</> : <p className="settings-help">{presetDescriptions[mode]}</p>}
+        </select></label>}</> : <p className="settings-help">{modeDescriptions[mode]}</p>}
       </section>
       {custom && <>
         <section className="settings-section">

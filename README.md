@@ -15,7 +15,7 @@ npm run server
 npm run dev
 ```
 
-网页地址为 `http://localhost:5173/`，联机服务为 `ws://localhost:8787`。网页的服务设置可以修改连接地址；生产构建通过 `VITE_WS_URL` 设置默认地址。
+网页地址为 `http://localhost:5173/`，联机服务为 `ws://localhost:8787`。网页会根据当前网页地址自动连接同一主机的 `8787` 服务；生产构建通过 `VITE_WS_URL` 设置联机地址。
 
 ```sh
 npm run check

@@ -23,7 +23,7 @@ npm ci
 PORT=8787 HOST=0.0.0.0 ALLOWED_ORIGINS=https://crisply2404.github.io npm run server
 ```
 
-`ALLOWED_ORIGINS` 使用逗号分隔多个网页来源，来源包含协议与域名。项目子目录属于同一个来源。默认允许本地开发来源和 `https://crisply2404.github.io`。
+`ALLOWED_ORIGINS` 使用逗号分隔多个网页来源，来源包含协议与域名。项目子目录属于同一个来源。默认允许本地开发来源、`http://100.97.0.41:5173` 和 `https://crisply2404.github.io`。通过 Tailscale 地址访问本地网页时，使用默认配置启动服务即可；手动设置 `ALLOWED_ORIGINS` 时需要同时加入 `http://100.97.0.41:5173`。
 
 `/health` 提供 JSON 健康检查。部署平台需要允许 WebSocket upgrade 并提供 HTTPS。使用自有服务器时，`deploy/Caddyfile` 可以配置证书与反向代理，`GAME_HOST` 设置为自己的服务域名。
 

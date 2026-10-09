@@ -20,12 +20,14 @@ const commandSchema = z.discriminatedUnion('type', [
   z.object({id: identifier, type: z.literal('hello'), data: z.object({nickname, token: identifier.optional()}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('create'), data: z.object({name: z.string().trim().max(40), password, listed: z.boolean().optional().default(true), settings: settingsSchema}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('join'), data: z.object({roomId: identifier, password}).strict()}).strict(),
+  z.object({id: identifier, type: z.literal('joinByLink'), data: z.object({token: z.string().trim().min(16).max(128), password}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('joinByCode'), data: z.object({code: z.string().trim().min(1).max(100), password}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('leave'), data: empty}).strict(),
   z.object({id: identifier, type: z.literal('ready'), data: z.object({ready: z.boolean()}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('settings'), data: z.object({settings: settingsSchema}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('rename'), data: z.object({name: z.string().trim().min(1).max(40)}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('visibility'), data: z.object({listed: z.boolean()}).strict()}).strict(),
+  z.object({id: identifier, type: z.literal('metadata'), data: z.object({name: z.string().trim().max(40), listed: z.boolean(), password: password.optional()}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('addCpu'), data: empty}).strict(),
   z.object({id: identifier, type: z.literal('removeCpu'), data: empty}).strict(),
   z.object({id: identifier, type: z.literal('start'), data: empty}).strict(),
@@ -125,7 +127,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
 
   function snapshot(room: Room): RoomView {
     return {
-      id: room.id, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
+      id: room.id, shareToken: room.shareToken, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
       hostId: room.hostId, protected: room.passwordHash !== null, listed: room.listed, phase: room.phase,
       settings: structuredClone(room.settings), players: room.players.map(player => ({
         id: player.id, nickname: player.nickname, online: player.online, ready: player.ready,
@@ -143,9 +145,10 @@ export async function createGameServer(options: GameServerOptions = {}) {
     return [...rooms.values()].filter(room => room.listed && now - room.lastActivity < idleMs)
       .sort((first, second) => second.createdAt - first.createdAt || second.creationOrder - first.creationOrder)
       .map(room => ({
-        id: room.id, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
+        id: room.id, shareToken: room.shareToken, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
         playerCount: room.players.length, maxPlayers: room.settings.maxPlayers,
         protected: room.passwordHash !== null, listed: room.listed, phase: room.phase,
+        mode: room.settings.mode,
         conditions: conditionTypes.filter(type => room.settings.appearance[type] !== 'off'),
       }));
   }
@@ -423,7 +426,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
     const settings = structuredClone(requestedSettings);
     const salt = passwordValue ? randomBytes(16) : null;
     const room: Room = {
-      id: randomUUID(), roomKey: code.roomKey, roomPinyin: code.roomPinyin, name: requestedName || code.roomKey, createdAt: now, creator: session.nickname,
+      id: randomUUID(), shareToken: randomBytes(32).toString('base64url'), roomKey: code.roomKey, roomPinyin: code.roomPinyin, name: requestedName || code.roomKey, createdAt: now, creator: session.nickname,
       hostId: session.id, listed, phase: 'waiting', settings,
       players: [session], round: 0, suddenDeath: false, currentPlayerId: null,
       prompt: null, deadline: null, history: [], chat: [], lastWinnerId: null, winnerIds: [],
@@ -471,6 +474,11 @@ export async function createGameServer(options: GameServerOptions = {}) {
         if (session.roomId) throw new BusinessError('请离开当前房间后加入');
         return joinRoom(session, rooms.get(request.data.roomId), request.data.password);
       }
+      case 'joinByLink': {
+        if (session.roomId) throw new BusinessError('请离开当前房间后加入');
+        const room = [...rooms.values()].find(item => item.shareToken === request.data.token);
+        return joinRoom(session, room, request.data.password);
+      }
       case 'joinByCode': {
         if (session.roomId) throw new BusinessError('请离开当前房间后加入');
         const code = request.data.code.trim().toLowerCase();
@@ -501,6 +509,19 @@ export async function createGameServer(options: GameServerOptions = {}) {
       case 'rename':
         requireHost(session, room);
         room.name = request.data.name;
+        touch(room);
+        return {};
+      case 'metadata':
+        requireHost(session, room);
+        if (room.phase === 'playing') throw new BusinessError('本局游戏期间不能修改房间信息');
+        if (request.data.password !== undefined) {
+          const nextPassword = request.data.password;
+          const salt = nextPassword ? randomBytes(16) : null;
+          room.passwordSalt = salt;
+          room.passwordHash = salt ? scryptSync(nextPassword, salt, 64) : null;
+        }
+        room.name = request.data.name.trim() || '击鼓传字房间';
+        room.listed = request.data.listed;
         touch(room);
         return {};
       case 'visibility':
@@ -576,7 +597,11 @@ export async function createGameServer(options: GameServerOptions = {}) {
         if (room.phase !== 'playing' || room.currentPlayerId !== session.id) throw new BusinessError('当前回合属于其他玩家');
         session.draft = request.data.word;
         broadcastRoom(room);
-        return {};
+        {
+          const rules = await getRules();
+          const result = rules.draft(request.data.word, room.prompt!, room.settings, room.used);
+          return {word: request.data.word, promptId: room.prompt!.id, offset: result.offset ?? null};
+        }
       case 'chat':
         room.chat.push({id: randomUUID(), nickname: session.nickname, text: request.data.text, at: Date.now()});
         room.chat = room.chat.slice(-100);

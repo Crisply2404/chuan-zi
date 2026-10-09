@@ -3,6 +3,8 @@ export type ConditionType = typeof conditionTypes[number];
 export type Appearance = 'off' | 'random' | 'required';
 export type RelationMode = 'free' | 'same' | 'different';
 export type ToneScope = 'one' | 'some' | 'all';
+export const modeIds = ['initial-tone', 'radical', 'character', 'tone-only', 'custom'] as const;
+export type ModeId = typeof modeIds[number];
 export type RulePresetId = 'simple' | 'hard' | 'featured' | 'custom';
 
 export interface Relation {
@@ -12,6 +14,7 @@ export interface Relation {
 }
 
 export interface Settings {
+  mode: ModeId;
   dictionary: 'idioms' | 'words' | 'all';
   minLength: number;
   maxLength: number;
@@ -35,6 +38,7 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
+  mode: 'initial-tone',
   dictionary: 'idioms', minLength: 4, maxLength: 8, promptLength: 2, hiddenCount: 0,
   appearance: { initial: 'required', final: 'off', tone: 'random', radical: 'off', component: 'off', contains: 'off' },
   relations: [], toneScope: 'one', minAnswers: 2, maxAnswers: 20000,
@@ -61,6 +65,8 @@ export interface PromptCell {
 }
 export interface Prompt { cells: PromptCell[]; answerCount: number; id: string }
 export interface MatchResult { valid: boolean; reason?: string; reading?: Reading; offset?: number }
+export interface DraftMatch { word: string; promptId: string | null; offset: number | null }
+export interface AnswerResult { accepted: boolean }
 
 export interface PlayerView {
   id: string; nickname: string; online: boolean; ready: boolean;
@@ -70,7 +76,7 @@ export interface PlayerView {
 export interface HistoryItem { playerId: string; nickname: string; word: string; at: number }
 export interface ChatMessage { id: string; nickname: string; text: string; at: number }
 export interface RoomView {
-  id: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string;
+  id: string; shareToken: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string;
   hostId: string; protected: boolean; listed: boolean;
   phase: 'waiting' | 'playing' | 'between' | 'finished';
   settings: Settings; players: PlayerView[];
@@ -80,7 +86,7 @@ export interface RoomView {
   lastWinnerId: string | null; winnerIds: string[];
 }
 export interface LobbyRoom {
-  id: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string;
+  id: string; shareToken: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string; mode: ModeId;
   playerCount: number; maxPlayers: number; protected: boolean; listed: boolean;
   phase: RoomView['phase']; conditions: ConditionType[];
 }
@@ -88,12 +94,14 @@ export type ClientCommand =
   | {type: 'hello'; data: {nickname: string; token?: string}}
   | {type: 'create'; data: {name: string; password: string; listed?: boolean; settings: Settings}}
   | {type: 'join'; data: {roomId: string; password: string}}
+  | {type: 'joinByLink'; data: {token: string; password: string}}
   | {type: 'joinByCode'; data: {code: string; password: string}}
   | {type: 'leave'; data: Record<string, never>}
   | {type: 'ready'; data: {ready: boolean}}
   | {type: 'settings'; data: {settings: Settings}}
   | {type: 'rename'; data: {name: string}}
   | {type: 'visibility'; data: {listed: boolean}}
+  | {type: 'metadata'; data: {name: string; listed: boolean; password?: string}}
   | {type: 'addCpu'; data: Record<string, never>}
   | {type: 'removeCpu'; data: Record<string, never>}
   | {type: 'start'; data: Record<string, never>}
@@ -111,4 +119,5 @@ export type ServerMessage =
   | {type: 'session'; playerId: string; token: string}
   | {type: 'lobby'; rooms: LobbyRoom[]}
   | {type: 'state'; room: RoomView | null}
+  | {type: 'draft'; result: DraftMatch}
   | {type: 'notice'; text: string};

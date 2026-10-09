@@ -45,6 +45,18 @@ export class WordRules {
     return this.matchEntry(entry, prompt) ?? { valid: false, reason: '答案没有满足当前提示' };
   }
 
+  draft(word: string, prompt: Prompt, settings: Settings, used = new Set<string>()): MatchResult {
+    if (!word) return { valid: false };
+    const exact = this.entries.get(word);
+    if (exact && !used.has(word) && this.allowed(exact, settings)) return this.matchEntry(exact, prompt) ?? { valid: false };
+    for (const entry of this.data.words) {
+      if (used.has(entry.word) || !this.allowed(entry, settings) || !entry.word.startsWith(word)) continue;
+      const match = this.matchEntry(entry, prompt);
+      if (match) return match;
+    }
+    return { valid: false };
+  }
+
   private allowed(entry: WordEntry, settings: Settings): boolean {
     const length = [...entry.word].length;
     return length >= settings.minLength && length <= settings.maxLength && (settings.dictionary === 'all' || (settings.dictionary === 'idioms' ? entry.idiom : !entry.idiom));

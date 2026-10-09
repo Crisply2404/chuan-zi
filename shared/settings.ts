@@ -1,10 +1,11 @@
 import { z } from 'zod';
-import { conditionTypes } from './types';
+import { conditionTypes, modeIds } from './types';
 
 const appearance = z.enum(['off', 'random', 'required']);
 const conditionType = z.enum(conditionTypes);
 
 export const settingsSchema = z.object({
+  mode: z.enum(modeIds),
   dictionary: z.enum(['idioms', 'words', 'all']),
   minLength: z.number().int().min(2).max(9),
   maxLength: z.number().int().min(2).max(9),

@@ -91,6 +91,26 @@ test('大厅提供创建顺序、密码、房主转移和空房删除', async t 
   await second.wait(message => message.type === 'lobby' && message.rooms.length === 0, start);
 });
 
+test('分享令牌加入隐藏房间并支持房主修改元数据', async t => {
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '分享房主');
+  const guest = await Client.connect(server.address, '分享玩家');
+  t.after(() => host.close());
+  t.after(() => guest.close());
+  await host.request({type: 'create', data: {name: '', password: '', listed: true, settings: defaultSettings}});
+  const token = host.room!.shareToken;
+  assert.ok(token.length >= 40);
+  assert.equal((await host.request({type: 'metadata', data: {name: '隐藏房间', listed: false, password: '分享密码'}})).ok, true);
+  assert.equal(host.room!.name, '隐藏房间');
+  assert.equal(host.room!.listed, false);
+  assert.equal((await guest.request({type: 'joinByLink', data: {token, password: '错误密码'}})).ok, false);
+  assert.equal((await guest.request({type: 'joinByLink', data: {token, password: '分享密码'}})).ok, true);
+  assert.equal(guest.room!.id, host.room!.id);
+  const lobby = guest.messages.filter(message => message.type === 'lobby').at(-1);
+  if (lobby?.type === 'lobby') assert.equal(lobby.rooms.some(room => room.id === host.room!.id), false);
+});
+
 test('不活跃房间隐藏，聊天恢复展示，心跳保持隐藏', async t => {
   const server = await createGameServer({port: 0, host: '127.0.0.1', idleMs: 120});
   t.after(() => server.close());
@@ -149,14 +169,19 @@ test('错误 JSON 和无效输入通过协议返回明确结果', async t => {
   assert.equal((await fetch(server.address.replace('ws:', 'http:') + '/health')).status, 200);
 });
 
-test('Origin 允许列表允许 GitHub Pages 并拒绝其他网页', async t => {
-  const server = await createGameServer({port: 0, host: '127.0.0.1', allowedOrigins: ['https://crisply2404.github.io']});
+test('Origin 允许列表允许 GitHub Pages 和 Tailscale 页面并拒绝其他网页', async t => {
+  const server = await createGameServer({port: 0, host: '127.0.0.1', allowedOrigins: ['https://crisply2404.github.io', 'http://100.97.0.41:5173']});
   t.after(() => server.close());
   const allowed = new WebSocket(server.address, {origin: 'https://crisply2404.github.io'});
   await once(allowed, 'open');
   const closed = once(allowed, 'close');
   allowed.close();
   await closed;
+  const tailscale = new WebSocket(server.address, {origin: 'http://100.97.0.41:5173'});
+  await once(tailscale, 'open');
+  const tailscaleClosed = once(tailscale, 'close');
+  tailscale.close();
+  await tailscaleClosed;
   const rejected = new WebSocket(server.address, {origin: 'https://unrelated.example'});
   const [error] = await once(rejected, 'error');
   assert.match(error.message, /403/);
