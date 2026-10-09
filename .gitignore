@@ -1,0 +1,9 @@
+.scratch/
+.research/
+node_modules/
+dist/
+.env
+.env.local
+playwright-report/
+test-results/
+public/licenses/

@@ -1,0 +1,38 @@
+{
+  "version": "2026-10-09",
+  "wordCount": 88614,
+  "idiomCount": 7133,
+  "sources": [
+    {
+      "name": "CC-CEDICT contributors / cedict-json 1.3.20251213",
+      "license": "CC-BY-SA-4.0",
+      "url": "https://cc-cedict.org/wiki/"
+    },
+    {
+      "name": "THUOCL / THUNLP",
+      "license": "MIT",
+      "url": "https://github.com/thunlp/THUOCL"
+    },
+    {
+      "name": "Unicode Unihan 18.0.0",
+      "license": "Unicode-3.0",
+      "url": "https://www.unicode.org/Public/18.0.0/ucd/Unihan.zip"
+    },
+    {
+      "name": "Make Me a Hanzi / bddc96d41bef78427ed0e034e9f7e31d71fd1b92",
+      "license": "LGPL-3.0-or-later",
+      "url": "https://github.com/skishore/makemeahanzi/tree/bddc96d41bef78427ed0e034e9f7e31d71fd1b92"
+    }
+  ],
+  "thuoclCount": 8519,
+  "thuoclWithCompleteReadings": 5042,
+  "characterCount": 5947,
+  "componentCharacterCount": 9574,
+  "modifications": [
+    "词语与长度筛选",
+    "排除专名及指定释义",
+    "完整读音去重",
+    "Unihan 部首映射",
+    "IDS 字形部件递归整理"
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "excludedWords": [],
+  "excludedDefinitionPatterns": [
+    "\\b(vulgar|obscene|offensive|derogatory|slur|curse|profanity|pornograph|sexual intercourse)\\b",
+    "\\b(surname|given name|personal name|place name|county|prefecture|township|province|city in|district in|river in|mountain in|brand name|company name)\\b",
+    "^(old variant|variant of|erroneous variant|archaic variant)"
+  ]
+}
