@@ -15,7 +15,7 @@ npm run server
 npm run dev
 ```
 
-网页地址为 `http://localhost:5173/`，联机服务为 `ws://localhost:8787`。网页会根据当前网页地址自动连接同一主机的 `8787` 服务；生产构建通过 `VITE_WS_URL` 设置联机地址。
+网页地址为 `http://localhost:5173/`。开发网页使用同源 `/ws` 路径，由 Vite 代理到本机 `127.0.0.1:8787`；手机访问电脑网页时会沿用同一个网页地址。生产构建通过 `VITE_WS_URL` 设置 `wss` 联机地址。
 
 ```sh
 npm run check

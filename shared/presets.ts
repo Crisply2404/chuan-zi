@@ -28,21 +28,21 @@ export function getModeSettings(id: Exclude<ModeId, 'custom'>): Settings {
   const base = structuredClone(defaultSettings);
   base.mode = id;
   if (id === 'initial-tone') {
-    return {...base, dictionary: 'idioms', promptLength: 2, hiddenCount: 0,
+    return {...base, dictionary: 'all', minLength: 2, promptLength: 2, hiddenCount: 0,
       appearance: {initial: 'required', final: 'off', tone: 'required', radical: 'off', component: 'off', contains: 'off'},
       relations: [], toneScope: 'one', minAnswers: 2, maxAnswers: 20000};
   }
   if (id === 'radical') {
-    return {...base, dictionary: 'all', promptLength: 1, hiddenCount: 0,
+    return {...base, dictionary: 'all', minLength: 2, promptLength: 1, hiddenCount: 0,
       appearance: {initial: 'off', final: 'off', tone: 'off', radical: 'required', component: 'off', contains: 'off'},
       relations: [], minAnswers: 2, maxAnswers: 20000};
   }
   if (id === 'character') {
-    return {...base, dictionary: 'all', promptLength: 1, hiddenCount: 0,
+    return {...base, dictionary: 'all', minLength: 2, promptLength: 1, hiddenCount: 0,
       appearance: {initial: 'off', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'required'},
       relations: [], minAnswers: 2, maxAnswers: 20000};
   }
-  return {...base, dictionary: 'all', promptLength: 3, hiddenCount: 0,
+  return {...base, dictionary: 'all', minLength: 2, promptLength: 2, hiddenCount: 0,
     appearance: {initial: 'off', final: 'off', tone: 'required', radical: 'off', component: 'off', contains: 'off'},
     relations: [], toneScope: 'all', minAnswers: 2, maxAnswers: 20000};
 }
@@ -64,7 +64,7 @@ export function getPresetSettings(id: Exclude<RulePresetId, 'custom'>): Settings
   if (id === 'simple') {
     return {
       ...base,
-      dictionary: 'idioms', promptLength: 2, hiddenCount: 0,
+      dictionary: 'all', minLength: 2, promptLength: 2, hiddenCount: 0,
       appearance: {initial: 'required', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'off'},
       relations: [], toneScope: 'one', minAnswers: 2, maxAnswers: 20000,
       timerMode: 'fixed', initialSeconds: 20,
@@ -73,7 +73,7 @@ export function getPresetSettings(id: Exclude<RulePresetId, 'custom'>): Settings
   if (id === 'hard') {
     return {
       ...base,
-      dictionary: 'all', minLength: 3, maxLength: 8, promptLength: 3, hiddenCount: 1,
+      dictionary: 'all', minLength: 2, maxLength: 9, promptLength: 2, hiddenCount: 1,
       appearance: {initial: 'required', final: 'required', tone: 'required', radical: 'off', component: 'off', contains: 'off'},
       relations: [{first: 'initial', second: 'final', mode: 'same'}], toneScope: 'all', minAnswers: 1, maxAnswers: 200,
       timerMode: 'random', randomMinSeconds: 10, randomMaxSeconds: 24, minimumSeconds: 5,
@@ -81,7 +81,7 @@ export function getPresetSettings(id: Exclude<RulePresetId, 'custom'>): Settings
   }
   return {
     ...base,
-    dictionary: 'idioms', minLength: 4, maxLength: 8, promptLength: 2, hiddenCount: 0,
+    dictionary: 'all', minLength: 2, maxLength: 9, promptLength: 2, hiddenCount: 0,
     appearance: {initial: 'random', final: 'off', tone: 'random', radical: 'random', component: 'off', contains: 'required'},
     relations: [], toneScope: 'one', minAnswers: 2, maxAnswers: 500,
     timerMode: 'fixed', initialSeconds: 18, minimumSeconds: 5,

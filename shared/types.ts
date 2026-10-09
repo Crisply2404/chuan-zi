@@ -39,7 +39,7 @@ export interface Settings {
 
 export const defaultSettings: Settings = {
   mode: 'initial-tone',
-  dictionary: 'idioms', minLength: 4, maxLength: 8, promptLength: 2, hiddenCount: 0,
+  dictionary: 'all', minLength: 2, maxLength: 9, promptLength: 2, hiddenCount: 0,
   appearance: { initial: 'required', final: 'off', tone: 'random', radical: 'off', component: 'off', contains: 'off' },
   relations: [], toneScope: 'one', minAnswers: 2, maxAnswers: 20000,
   startingLives: 3, maxLives: 5, timerMode: 'fixed', initialSeconds: 20,
@@ -65,7 +65,7 @@ export interface PromptCell {
 }
 export interface Prompt { cells: PromptCell[]; answerCount: number; id: string }
 export interface MatchResult { valid: boolean; reason?: string; reading?: Reading; offset?: number }
-export interface DraftMatch { word: string; promptId: string | null; offset: number | null }
+export interface DraftMatch { word: string; promptId: string | null; offset: number | null; reading?: Reading }
 export interface AnswerResult { accepted: boolean }
 
 export interface PlayerView {

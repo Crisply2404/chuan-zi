@@ -49,11 +49,6 @@ export class WordRules {
     if (!word) return { valid: false };
     const exact = this.entries.get(word);
     if (exact && !used.has(word) && this.allowed(exact, settings)) return this.matchEntry(exact, prompt) ?? { valid: false };
-    for (const entry of this.data.words) {
-      if (used.has(entry.word) || !this.allowed(entry, settings) || !entry.word.startsWith(word)) continue;
-      const match = this.matchEntry(entry, prompt);
-      if (match) return match;
-    }
     return { valid: false };
   }
 

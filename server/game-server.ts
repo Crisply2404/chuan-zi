@@ -1,4 +1,4 @@
-import { randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { createHmac, randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -50,7 +50,7 @@ interface Session extends PlayerView {
   reconnectTimer?: ReturnType<typeof setTimeout>;
 }
 
-interface Room extends Omit<RoomView, 'players' | 'protected' | 'serverTime'> {
+interface Room extends Omit<RoomView, 'players' | 'protected' | 'serverTime' | 'shareToken'> {
   players: Session[];
   passwordSalt: Buffer | null;
   passwordHash: Buffer | null;
@@ -86,6 +86,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
   const allowedOrigins = options.allowedOrigins;
   let closing = false;
   let creationOrder = 0;
+  const linkSecret = randomBytes(32);
   let rulesPromise: Promise<WordRules> | undefined;
   let loadedRules: WordRules | undefined;
 
@@ -127,7 +128,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
 
   function snapshot(room: Room): RoomView {
     return {
-      id: room.id, shareToken: room.shareToken, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
+      id: room.id, shareToken: makeShareToken(room.id), roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
       hostId: room.hostId, protected: room.passwordHash !== null, listed: room.listed, phase: room.phase,
       settings: structuredClone(room.settings), players: room.players.map(player => ({
         id: player.id, nickname: player.nickname, online: player.online, ready: player.ready,
@@ -145,12 +146,27 @@ export async function createGameServer(options: GameServerOptions = {}) {
     return [...rooms.values()].filter(room => room.listed && now - room.lastActivity < idleMs)
       .sort((first, second) => second.createdAt - first.createdAt || second.creationOrder - first.creationOrder)
       .map(room => ({
-        id: room.id, shareToken: room.shareToken, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
+        id: room.id, shareToken: makeShareToken(room.id), roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
         playerCount: room.players.length, maxPlayers: room.settings.maxPlayers,
         protected: room.passwordHash !== null, listed: room.listed, phase: room.phase,
         mode: room.settings.mode,
         conditions: conditionTypes.filter(type => room.settings.appearance[type] !== 'off'),
       }));
+  }
+
+  function makeShareToken(roomId: string) {
+    const signature = createHmac('sha256', linkSecret).update(roomId).digest();
+    return Buffer.concat([Buffer.from(roomId), signature]).toString('base64url');
+  }
+
+  function findRoomByShareToken(token: string) {
+    const decoded = Buffer.from(token, 'base64url');
+    if (decoded.length !== 36 + 32) return undefined;
+    const roomId = decoded.subarray(0, 36).toString();
+    const signature = decoded.subarray(36);
+    const expected = createHmac('sha256', linkSecret).update(roomId).digest();
+    if (!timingSafeEqual(signature, expected)) return undefined;
+    return rooms.get(roomId);
   }
 
   function broadcastLobby() {
@@ -213,6 +229,13 @@ export async function createGameServer(options: GameServerOptions = {}) {
     clearTimeout(room.turnTimer);
     if (room.deadline === null || room.phase !== 'playing') return;
     room.turnTimer = setTimeout(() => timeoutTurn(room), Math.max(1, room.deadline - Date.now()));
+  }
+
+  function penalizeInvalidAnswer(room: Room) {
+    if (room.deadline === null) return;
+    room.deadline = Math.max(Date.now(), room.deadline - 1000);
+    armDeadline(room);
+    touch(room);
   }
 
   function finishRound(room: Room, winnerId: string | null) {
@@ -426,7 +449,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
     const settings = structuredClone(requestedSettings);
     const salt = passwordValue ? randomBytes(16) : null;
     const room: Room = {
-      id: randomUUID(), shareToken: randomBytes(32).toString('base64url'), roomKey: code.roomKey, roomPinyin: code.roomPinyin, name: requestedName || code.roomKey, createdAt: now, creator: session.nickname,
+      id: randomUUID(), roomKey: code.roomKey, roomPinyin: code.roomPinyin, name: requestedName || code.roomKey, createdAt: now, creator: session.nickname,
       hostId: session.id, listed, phase: 'waiting', settings,
       players: [session], round: 0, suddenDeath: false, currentPlayerId: null,
       prompt: null, deadline: null, history: [], chat: [], lastWinnerId: null, winnerIds: [],
@@ -476,7 +499,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
       }
       case 'joinByLink': {
         if (session.roomId) throw new BusinessError('请离开当前房间后加入');
-        const room = [...rooms.values()].find(item => item.shareToken === request.data.token);
+        const room = findRoomByShareToken(request.data.token);
         return joinRoom(session, room, request.data.password);
       }
       case 'joinByCode': {
@@ -589,7 +612,10 @@ export async function createGameServer(options: GameServerOptions = {}) {
         if (request.data.promptId !== room.prompt!.id) throw new BusinessError('提示已经更新');
         const rules = await getRules();
         const result = rules.match(request.data.word, room.prompt!, room.settings, room.used);
-        if (!result.valid) throw new BusinessError(result.reason ?? '答案未满足条件');
+        if (!result.valid) {
+          penalizeInvalidAnswer(room);
+          throw new BusinessError(result.reason ?? '答案未满足条件');
+        }
         acceptWord(room, session, request.data.word, rules);
         return {word: request.data.word};
       }
@@ -600,7 +626,14 @@ export async function createGameServer(options: GameServerOptions = {}) {
         {
           const rules = await getRules();
           const result = rules.draft(request.data.word, room.prompt!, room.settings, room.used);
-          return {word: request.data.word, promptId: room.prompt!.id, offset: result.offset ?? null};
+          const offset = result.offset ?? null;
+          const reading = result.reading && offset !== null ? {
+            syllables: result.reading.syllables.slice(offset, offset + room.prompt!.cells.length),
+            initials: result.reading.initials.slice(offset, offset + room.prompt!.cells.length),
+            finals: result.reading.finals.slice(offset, offset + room.prompt!.cells.length),
+            tones: result.reading.tones.slice(offset, offset + room.prompt!.cells.length),
+          } : undefined;
+          return {word: request.data.word, promptId: room.prompt!.id, offset, reading};
         }
       case 'chat':
         room.chat.push({id: randomUUID(), nickname: session.nickname, text: request.data.text, at: Date.now()});

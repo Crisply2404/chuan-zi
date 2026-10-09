@@ -3,12 +3,28 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { RuleError, WordRules } from '../shared/rules';
 import { formatPinyin } from '../shared/pinyin';
-import { getPresetSettings } from '../shared/presets';
+import { getModeSettings, getPresetSettings } from '../shared/presets';
 import { defaultSettings, type DictionaryData, type Prompt } from '../shared/types';
 
 const data = JSON.parse(readFileSync('data/dictionary.json', 'utf8')) as DictionaryData;
 const rules = new WordRules(data);
 const prompt = (cells: Prompt['cells']): Prompt => ({ id: 'public-rule-test', cells, answerCount: 0 });
+
+test('默认设置使用全部词语并允许两个汉字答案', () => {
+  assert.equal(defaultSettings.dictionary, 'all');
+  assert.equal(defaultSettings.minLength, 2);
+  for (const mode of ['initial-tone', 'radical', 'character', 'tone-only'] as const) {
+    const settings = getModeSettings(mode);
+    assert.equal(settings.dictionary, 'all');
+    assert.equal(settings.minLength, 2);
+  }
+});
+
+test('草稿只在完整合法词语匹配提示后返回附着位置', () => {
+  const settings = { ...defaultSettings, dictionary: 'words' as const, minLength: 2 };
+  assert.equal(rules.draft('清', prompt([{ initial: 'q' }]), settings).valid, false);
+  assert.equal(rules.draft('清澈', prompt([{ initial: 'q' }]), settings).valid, true);
+});
 
 test('真实成语按隐藏位置与连续声母序列接受答案', () => {
   const settings = { ...defaultSettings, promptLength: 4, hiddenCount: 1 };
@@ -47,7 +63,7 @@ test('声调提示只展示拼音符号', () => {
 });
 
 test('生成提示保留指定隐藏数量且开启字段覆盖其余位置', () => {
-  const settings = { ...defaultSettings, promptLength: 4, hiddenCount: 1, appearance: { ...defaultSettings.appearance, tone: 'off' as const } };
+  const settings = { ...defaultSettings, minLength: 4, promptLength: 4, hiddenCount: 1, appearance: { ...defaultSettings.appearance, tone: 'off' as const } };
   const result = rules.generate(settings);
   assert.equal(result.cells.filter(cell => !Object.keys(cell).length).length, 1);
   assert.equal(result.cells.filter(cell => cell.initial !== undefined).length, 3);
@@ -74,7 +90,7 @@ test('交叉条件关系同时支持同字与不同字', () => {
 });
 
 test('全部声调范围覆盖每个显示汉字并保留隐藏位置', () => {
-  const settings = { ...defaultSettings, promptLength: 4, hiddenCount: 1, minAnswers: 1, toneScope: 'all' as const,
+  const settings = { ...defaultSettings, minLength: 4, promptLength: 4, hiddenCount: 1, minAnswers: 1, toneScope: 'all' as const,
     appearance: { initial: 'off' as const, final: 'off' as const, tone: 'required' as const, radical: 'off' as const, component: 'off' as const, contains: 'off' as const } };
   const result = rules.generate(settings);
   assert.equal(result.cells.filter(cell => cell.tone !== undefined).length, 3);

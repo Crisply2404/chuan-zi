@@ -22,12 +22,14 @@ export function useGameConnection(url: string, nickname: string) {
   const pendingRef = useRef(new Map<string, PendingRequest>());
   const generationRef = useRef(0);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestSequence = useRef(0);
   const [revision, setRevision] = useState(0);
 
   const send = useCallback(<T = unknown>(command: ClientCommand): Promise<T> => {
     const socket = socketRef.current;
     if (!socket || socket.readyState !== WebSocket.OPEN) return Promise.reject(new ConnectionError('联机连接尚未建立'));
-    const id = crypto.randomUUID();
+    requestSequence.current += 1;
+    const id = `${Date.now().toString(36)}-${requestSequence.current.toString(36)}`;
     const request = { ...command, id } as Request;
     return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {

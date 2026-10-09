@@ -234,7 +234,7 @@ test('服务器验证真实词语，共享计时、规则锁定、声母奖励�
   const invalid = await host.request({type: 'submit', data: {word: '这段内容没有收录为有效词语', promptId: prompt.id}});
   assert.equal(invalid.ok, false);
   assert.equal(host.room!.currentPlayerId, host.playerId);
-  assert.equal(host.room!.deadline, deadline);
+  assert.ok(host.room!.deadline! <= deadline - 1000);
   const answer = dictionary.words.find(entry => {
     const match = rules.match(entry.word, prompt, settings);
     return match.valid && match.reading?.initials.includes('b');
@@ -242,7 +242,7 @@ test('服务器验证真实词语，共享计时、规则锁定、声母奖励�
   assert.ok(answer, '真实词库含有符合提示和奖励声母的答案');
   assert.equal((await host.request({type: 'submit', data: {word: answer.word, promptId: prompt.id}})).ok, true);
   assert.equal(host.room!.currentPlayerId, guest.playerId);
-  assert.equal(host.room!.deadline, deadline);
+  assert.ok(host.room!.deadline! <= deadline - 1000);
   assert.equal(host.room!.history[0].word, answer.word);
   assert.equal(host.room!.players.find(player => player.id === host.playerId)!.lives, lives + 1);
   assert.deepEqual(host.room!.players.find(player => player.id === host.playerId)!.collected, []);
@@ -314,7 +314,7 @@ test('真实答案全部使用后中止本局，接受最终答案并允许修�
   const idioms = dictionary.words.filter(entry => entry.idiom && [...entry.word].length === 2);
   assert.equal(idioms.length, 5);
   const settings: Settings = {
-    ...structuredClone(defaultSettings), minLength: 2, maxLength: 2, promptLength: 2,
+    ...structuredClone(defaultSettings), dictionary: 'idioms', minLength: 2, maxLength: 2, promptLength: 2,
     minAnswers: 1, initialSeconds: 20, bonusInitials: ['b'],
     appearance: {initial: 'off', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'required'},
   };

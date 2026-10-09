@@ -83,7 +83,26 @@ h3 { font-size: 13px; font-weight: 600; }
 .room-tabs { display: flex; gap: 27px; border-bottom: 1px solid #ddd; margin-bottom: 26px; }
 .room-tabs button { min-height: 37px; border-radius: 0; font-size: 12px; padding: 0 2px 12px; color: #8d8d8d; }
 .room-tabs button[aria-selected='true'] { color: #222; border-bottom: 2px solid #222; }
-.room-layout { display: grid; grid-template-columns: minmax(192px, 220px) minmax(0, 1fr) minmax(208px, 250px); gap: 28px; align-items: stretch; }
+.room-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(208px, 250px); gap: 28px; align-items: stretch; }
+.topology-area { min-width: 0; }
+.topology-heading { height: 35px; display: flex; justify-content: space-between; align-items: flex-start; color: #777; font-size: 11px; }
+.player-topology { display: flex; justify-content: center; align-items: center; min-height: 280px; padding: 8px 0 22px; }
+.topology-ring { position: relative; width: min(100%, 420px); aspect-ratio: 1; border: 1px solid #e1e1e1; border-radius: 50%; }
+.topology-ring::before { content: ''; position: absolute; inset: 13%; border: 1px dashed #e6e6e6; border-radius: 50%; }
+.topology-center { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 5px; color: #555; font-size: 11px; z-index: 3; }
+.topology-center svg { color: #9b3d35; }
+.topology-arrow { position: absolute; left: calc(50% - 1px); bottom: 50%; width: 2px; height: 40%; background: #9b3d35; transform-origin: 50% 100%; transform: rotate(var(--arrow-angle)); z-index: 1; transition: transform .3s ease; }
+.topology-arrow::after { content: ''; position: absolute; left: 50%; top: -1px; width: 8px; height: 8px; border-top: 2px solid #9b3d35; border-right: 2px solid #9b3d35; transform: translate(-50%, -1px) rotate(45deg); }
+.topology-player { position: absolute; transform: translate(-50%, -50%); min-width: 68px; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 4px; color: #777; font-size: 10px; z-index: 2; transition: color .2s, transform .2s; }
+.topology-player > span { max-width: 88px; overflow-wrap: anywhere; text-align: center; }
+.topology-player small { color: #aaa; font-size: 9px; }
+.topology-avatar { width: 31px; height: 31px; display: flex; align-items: center; justify-content: center; border: 1px solid #d5d5d5; border-radius: 50%; background: #fff; font-size: 11px; }
+.topology-player-current { color: #222; transform: translate(-50%, -50%) scale(1.08); }
+.topology-player-current .topology-avatar { color: #fff; border-color: #262626; background: #262626; }
+.topology-player-current small { color: #555; }
+.topology-player-disconnected { opacity: .5; }
+.topology-controls { display: inline-flex; gap: 0; }
+.topology-controls .icon-button { width: 19px; height: 20px; }
 .players-area { min-width: 0; }
 .section-heading { height: 35px; display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 1px solid var(--line); }
 .section-heading h2 { font-size: 12px; }
@@ -125,17 +144,25 @@ h3 { font-size: 13px; font-weight: 600; }
 .timer-track > span { display: block; height: 100%; background: #595959; transition: width .1s linear; }
 .timer-urgent { font-weight: 600; }
 .timer-urgent + .timer-track > span { background: #202020; }
-.live-prompt { margin-top: 34px; margin-bottom: 30px; min-height: 133px; display: flex; align-items: center; justify-content: center; }
+.live-prompt { margin-top: 22px; margin-bottom: 25px; min-height: 190px; display: flex; align-items: center; justify-content: center; }
 .prompt { width: 100%; display: flex; flex-direction: column; align-items: center; }
-.prompt-cells { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; width: 100%; }
+.prompt-layer { position: relative; z-index: 1; transition: transform .38s cubic-bezier(.22,.75,.3,1); }
+.prompt-layer-attached { z-index: 3; transform: translate(var(--prompt-shift), 78px); }
+.prompt-cells, .answer-cells { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px; width: 100%; }
 .prompt-cell { flex: 0 0 62px; width: 62px; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; flex-direction: column; border: 1px solid #bdbdbd; background: #fff; padding: 5px; gap: 3px; transition: border-color .18s, background .18s, transform .18s; }
-.prompt-outline { border-style: dashed; border-color: #d0d0d0; background: #fcfcfc; }
 .prompt-input-character { min-height: 27px; font-size: 25px; line-height: 1.1; font-family: 'Noto Serif SC', 'Songti SC', serif; }
 .prompt-hint { min-height: 16px; display: flex; align-items: center; justify-content: center; gap: 3px; max-width: 100%; color: #656565; font-size: 12px; line-height: 1.2; overflow-wrap: anywhere; text-align: center; }
 .prompt-pinyin { font-size: 16px; font-family: 'Noto Sans SC', sans-serif; text-align: center; line-height: 1.25; max-width: 100%; overflow-wrap: anywhere; }
 .prompt-pinyin-long { font-size: 12px; }
 .prompt-hidden { background: #fafafa; border-color: #cfcfcf; }
 .prompt-star { color: #999; font-size: 18px; }
+.prompt-attached-cell { border-color: #9b3d35; background: #fff; }
+.prompt-origin { color: #9b3d35; }
+.prompt-supplement { color: #587044; }
+.answer-cells { position: relative; z-index: 1; min-height: 69px; margin-top: 18px; }
+.answer-cell { flex: 0 0 62px; width: 62px; aspect-ratio: 1; display: flex; justify-content: center; align-items: center; border: 1px dashed #cfcfcf; background: #fcfcfc; }
+.answer-character { min-height: 27px; font-size: 25px; line-height: 1.1; font-family: 'Noto Serif SC', 'Songti SC', serif; color: #333; }
+.answer-cell-attached { border-style: solid; border-color: #b7c1ad; background: #f9fbf8; }
 .prompt-feedback { animation: prompt-shake .34s ease-in-out; border-color: #9b3d35; background: #fff8f7; }
 @keyframes prompt-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
 .prompt-count { font-size: 10px; margin-top: 15px; color: #707070; }
@@ -218,7 +245,7 @@ h3 { font-size: 13px; font-weight: 600; }
 .field-errors { font-size: 11px; line-height: 1.8; margin-top: 15px; padding: 10px 13px; background: #f6f6f6; border-left: 2px solid #888; }
 .field-error { font-size: 12px; line-height: 1.6; color: #444; }
 .preview-area { margin-top: 25px; padding: 22px 0 5px; border-top: 1px solid var(--line); }
-.prompt-compact .prompt-cell { flex-basis: 57px; width: 57px; }
+.prompt-compact .prompt-cell, .prompt-compact .answer-cell { flex-basis: 57px; width: 57px; }
 .prompt-compact .prompt-pinyin { font-size: 14px; }
 .prompt-compact .prompt-pinyin-long { font-size: 11px; }
 .prompt-compact .prompt-input-character { font-size: 20px; }
@@ -256,7 +283,7 @@ h3 { font-size: 13px; font-weight: 600; }
 .dialog-form input::placeholder { color: #777; }
 @media (max-width: 1000px) {
   .mode-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .room-layout { grid-template-columns: 175px minmax(0, 1fr); gap: 22px; }
+  .room-layout { grid-template-columns: minmax(0, 1fr) minmax(208px, 250px); gap: 22px; }
   .game-area { border-right: 0; }
   .activity-area { grid-column: 1 / -1; border-top: 1px solid var(--line); padding-top: 22px; max-height: 260px; }
   .history-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; column-gap: 22px; min-height: 120px; }
@@ -301,25 +328,20 @@ h3 { font-size: 13px; font-weight: 600; }
   .room-heading-tools { gap: 3px; }
   .room-tabs { margin-bottom: 20px; }
   .room-layout { display: flex; flex-direction: column; gap: 22px; }
-  .players-area { order: 2; }
   .game-area { order: 1; border: 0; border-bottom: 1px solid var(--line); padding: 0 0 23px; min-height: 380px; }
-  .activity-area { order: 3; border-top: 0; padding-top: 0; max-height: 290px; }
+  .activity-area { order: 2; border-top: 0; padding-top: 0; max-height: 290px; }
   .section-heading { height: 29px; }
-  .player-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 18px; }
-  .player-row { min-height: 65px; padding: 12px 0; gap: 8px; }
-  .player-avatar { width: 25px; height: 25px; font-size: 10px; }
-  .player-name { font-size: 11px; gap: 4px; }
-  .player-state { font-size: 9px; }
-  .player-tools { flex-direction: column; }
-  .player-tools .icon-button { width: 19px; height: 20px; }
-  .player-tools .icon-button > svg { width: 12px; height: 12px; }
-  .match-summary { padding: 13px 0 0; font-size: 10px; }
+  .topology-heading { height: 30px; }
+  .player-topology { min-height: 250px; padding-bottom: 12px; }
+  .topology-ring { width: min(100%, 310px); }
   .game-topline { font-size: 10px; height: 28px; }
   .timer-area { margin-top: 15px; max-width: 210px; }
   .timer > span { font-size: 32px; }
   .timer-track { margin-top: 10px; }
-  .live-prompt { margin-top: 26px; margin-bottom: 25px; min-height: 115px; }
+  .live-prompt { margin-top: 20px; margin-bottom: 22px; min-height: 170px; }
   .prompt-cell { flex-basis: 56px; width: 56px; }
+  .answer-cell { flex-basis: 56px; width: 56px; }
+  .prompt-layer-attached { transform: translate(var(--prompt-shift), 70px); }
   .prompt-pinyin { font-size: 14px; }
   .prompt-pinyin-long { font-size: 11px; }
   .prompt-input-character { font-size: 22px; }

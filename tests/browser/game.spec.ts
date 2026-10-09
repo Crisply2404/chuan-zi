@@ -70,12 +70,15 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
     await expect(host.getByLabel('当前提示')).toBeVisible();
     await expect(host.getByLabel('输入答案')).toHaveCount(1);
     await expect.poll(() => hostState.room?.settings.maxLength).toBeGreaterThan(0);
-    expect(await host.locator('.prompt-cell').count()).toBe(hostState.room!.settings.maxLength);
+    expect(await host.locator('.prompt-cell').count()).toBe(hostState.room!.settings.promptLength);
+    expect(await host.locator('.answer-cells').count()).toBe(0);
     const current = hostState.room!.currentPlayerId;
     const active = current === hostState.room!.players.find(player => player.nickname === '电脑玩家')?.id ? host : guest;
     const state = hostState.room!;
     const answer = data.words.find(entry => rules.match(entry.word, state.prompt!, state.settings).valid)!.word;
     await active.getByLabel('输入答案').fill(answer);
+    await expect(active.locator('.answer-cells')).toBeVisible();
+    await expect(active.locator('.prompt-layer-attached')).toBeVisible();
     await active.getByRole('button', { name: '提交答案', exact: true }).click();
     await expect.poll(() => hostState.room?.history.length).toBe(1);
     await expect.poll(() => guestState.room?.history.length).toBe(1);

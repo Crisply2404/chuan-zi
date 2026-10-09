@@ -24,6 +24,11 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   const [mode, setMode] = useState<ModeId>(value.mode);
   useEffect(() => setMode(value.mode), [value.mode]);
   const update = <K extends keyof Settings>(key: K, next: Settings[K]) => onChange({ ...value, [key]: next });
+  const updateDictionary = (next: Settings['dictionary']) => onChange({
+    ...value,
+    dictionary: next,
+    minLength: next === 'idioms' ? Math.max(4, value.minLength) : value.minLength,
+  });
   const validate = settingsSchema.safeParse(value);
   const problems = validate.success ? [] : [...new Set(validate.error.issues.map(issue => issue.message))];
   const relation = (first: ConditionType, second: ConditionType): RelationMode => value.relations.find(item =>
@@ -60,7 +65,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
             onClick={() => update('appearance', { ...value.appearance, [type]: appearance })}>{label}</button>)}</div>
         </div>)}</div>{value.appearance.tone !== 'off' && <label className="select-field"><span>声调位置</span><select value={value.toneScope} onChange={event => update('toneScope', event.target.value as Settings['toneScope'])}>
           <option value="one">一个汉字</option><option value="some">部分汉字</option><option value="all">全部汉字</option>
-        </select></label>}</> : <p className="settings-help">{modeDescriptions[mode]}</p>}
+        </select></label>}</> : null}
       </section>
       {custom && <>
         <section className="settings-section">
@@ -73,7 +78,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
         </section>
         <section className="settings-section">
           <h3>词库与难度</h3>
-          <label className="select-field"><span>答案词库</span><select value={value.dictionary} onChange={event => update('dictionary', event.target.value as Settings['dictionary'])}>
+          <label className="select-field"><span>答案词库</span><select value={value.dictionary} onChange={event => updateDictionary(event.target.value as Settings['dictionary'])}>
             <option value="idioms">成语</option><option value="words">普通词语</option><option value="all">全部词语</option>
           </select></label>
           <div className="number-grid">
@@ -113,10 +118,10 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
       </>}
     </fieldset>
     {problems.length > 0 && <div className="field-errors" role="alert">{problems.map(problem => <p key={problem}>{problem}</p>)}</div>}
-    <div className="settings-actions"><button type="button" className="secondary-button" disabled={!validate.success || busy} onClick={onPreview}><Eye size={16} />预览提示</button>
-      <button type="button" className="secondary-button" disabled={!validate.success || busy} onClick={exportRules}><Download size={16} />导出规则</button>
-      {onSave && <button type="button" className="primary-button" disabled={disabled || !validate.success || busy} onClick={onSave}><Save size={16} />保存规则</button>}
-    </div>
-    {preview && <div className="preview-area"><PromptView prompt={preview} compact /></div>}
+    {custom && <><div className="settings-actions"><button type="button" className="secondary-button" disabled={!validate.success || busy} onClick={onPreview}><Eye size={16} />预览提示</button>
+        <button type="button" className="secondary-button" disabled={!validate.success || busy} onClick={exportRules}><Download size={16} />导出规则</button>
+        {onSave && <button type="button" className="primary-button" disabled={disabled || !validate.success || busy} onClick={onSave}><Save size={16} />保存规则</button>}
+      </div>
+      {preview && <div className="preview-area"><PromptView prompt={preview} compact /></div>}</>}
   </div>;
 }

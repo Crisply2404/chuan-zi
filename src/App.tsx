@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, Heart, LockKeyhole, LogOut, MessageCircle, Pencil, Plus, RefreshCw, Send, Settings2, Trophy, UserRound, Users, Wifi, WifiOff, X } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, Heart, LockKeyhole, LogOut, MessageCircle, Pencil, Plus, RefreshCw, Send, Settings2, UserRound, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { defaultSettings, type ClientCommand, type DraftMatch, type LobbyRoom, type PlayerView, type Prompt, type RoomView, type Settings } from '../shared/types';
 import { ConnectionError, useGameConnection } from './network';
 import { conditionLabels, SettingsEditor } from './SettingsEditor';
@@ -10,11 +10,13 @@ const connectionLabels = { idle: '未连接', connecting: '正在连接', connec
 function defaultWebSocketUrl() {
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
   const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const port = ['5173', '4173', ''].includes(location.port) ? '8787' : location.port;
-  return `${protocol}//${location.hostname}${port ? `:${port}` : ''}`;
+  return `${protocol}//${location.host}/ws`;
 }
 const initialUrl = defaultWebSocketUrl();
 const initialNickname = localStorage.getItem('chuan-zi:nickname') || '无名';
+function confirmedAnswer(value: string) {
+  return [...value].filter(character => /\p{Script=Han}/u.test(character)).join('').slice(0, 9);
+}
 
 function IconButton({ label, children, onClick, disabled = false, className = '' }: {
   label: string; children: ReactNode; onClick: () => void; disabled?: boolean; className?: string;
@@ -145,7 +147,7 @@ export default function App() {
       <div className="room-tabs" role="tablist"><button type="button" role="tab" aria-selected={roomTab === 'game'} onClick={() => setRoomTab('game')}>游戏</button>
         <button type="button" role="tab" aria-selected={roomTab === 'settings'} onClick={() => setRoomTab('settings')}>规则设置</button></div>
       {roomTab === 'game' ? <RoomGame room={room} self={self} isHost={Boolean(isHost)} busy={busy} connected={connected} act={act} send={connection.send} setError={setError} />
-        : <div className="room-settings-layout"><SettingsEditor value={settings} onChange={setSettings} disabled={!isHost || room.phase === 'playing'}
+        : <div className="room-settings-layout"><SettingsEditor value={settings} onChange={next => { setSettings(next); setPreview(null); }} disabled={!isHost || room.phase === 'playing'}
           fixedBestOf={room.phase === 'between'} preview={preview} busy={busy} onPreview={previewSettings}
           onSave={isHost ? () => act({ type: 'settings', data: { settings } }) : undefined} />
           <aside className="settings-room-info"><h3>房间</h3><p>{room.players.length} / {room.settings.maxPlayers} 人</p><p>{phaseLabels[room.phase]}</p>
@@ -213,6 +215,39 @@ function MetadataForm({ name, listed, busy, onSave }: { name: string; listed: bo
 function SaveIcon() { return <Check size={17} />; }
 
 type Act = <T = unknown>(command: ClientCommand, done?: (result: T) => void, failed?: (error: ConnectionError) => void) => Promise<void>;
+function PlayerTopology({ room, self, isHost, busy, connected, act }: {
+  room: RoomView; self?: PlayerView; isHost: boolean; busy: boolean; connected: boolean; act: Act;
+}) {
+  const currentIndex = room.players.findIndex(player => player.id === room.currentPlayerId);
+  const currentAngle = currentIndex < 0 ? 0 : (currentIndex / Math.max(1, room.players.length)) * 360 - 90;
+  return <section className="topology-area" aria-label="玩家拓扑图">
+    <div className="topology-heading"><span>{room.players.length} / {room.settings.maxPlayers} 位玩家</span>
+      {isHost && room.phase !== 'playing' && <button type="button" className="cpu-button" disabled={busy || !connected} onClick={() => act({ type: room.players.some(player => player.cpu) ? 'removeCpu' : 'addCpu', data: {} })}><Bot size={14} />{room.players.some(player => player.cpu) ? '移除电脑' : '添加电脑'}</button>}
+    </div>
+    <div className="player-topology">
+      <div className="topology-ring" style={{'--player-count': room.players.length} as CSSProperties}>
+        <div className="topology-arrow" style={{'--arrow-angle': `${currentAngle + 90}deg`} as CSSProperties} aria-hidden="true" />
+        {room.players.map((player, index) => {
+          const angle = (index / Math.max(1, room.players.length)) * 360 - 90;
+          const radians = angle * Math.PI / 180;
+          return <div className={`topology-player ${player.id === room.currentPlayerId ? 'topology-player-current' : ''} ${!player.online ? 'topology-player-disconnected' : ''}`} style={{left: `${50 + Math.cos(radians) * 40}%`, top: `${50 + Math.sin(radians) * 40}%`} as CSSProperties} key={player.id}>
+            <div className="topology-avatar">{index + 1}</div><span>{player.nickname}</span>
+            <small>{room.phase === 'playing' && player.role === 'player' ? `生命 ${player.lives}` : player.role === 'spectator' ? '观战' : player.ready ? '已准备' : '等待准备'}</small>
+            {player.id === room.hostId && <Crown size={12} aria-label="房主" />}
+            {isHost && player.id !== self?.id && <span className="topology-controls">
+              {player.cpu ? <IconButton label="移除电脑" disabled={busy || room.phase === 'playing'} onClick={() => act({ type: 'removeCpu', data: {} })}><X size={13} /></IconButton> : <>
+                <IconButton label={`转移房主给 ${player.nickname}`} disabled={busy} onClick={() => act({ type: 'transfer', data: { playerId: player.id } })}><Crown size={13} /></IconButton>
+                <IconButton label={`移除 ${player.nickname}`} disabled={busy} onClick={() => act({ type: 'kick', data: { playerId: player.id } })}><X size={13} /></IconButton>
+              </>}
+            </span>}
+          </div>;
+        })}
+        <div className="topology-center"><DrumMark size={48} /><span>{room.currentPlayerId ? room.players.find(player => player.id === room.currentPlayerId)?.nickname : '击鼓传字'}</span></div>
+      </div>
+    </div>
+  </section>;
+}
+
 function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: {
   room: RoomView; self?: PlayerView; isHost: boolean; busy: boolean; connected: boolean; act: Act;
   send: <T = unknown>(command: ClientCommand) => Promise<T>; setError: (message: string) => void;
@@ -230,7 +265,6 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const chatList = useRef<HTMLDivElement>(null);
   const historyList = useRef<HTMLDivElement>(null);
   const [sideTab, setSideTab] = useState<'history' | 'chat'>('history');
-  const currentPlayer = room.players.find(player => player.id === room.currentPlayerId);
   const isTurn = room.phase === 'playing' && self?.id === room.currentPlayerId && self.role === 'player';
   const deadlineOffset = room.serverTime - Date.now();
   const serverOffset = useRef(deadlineOffset);
@@ -258,28 +292,15 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   };
   const lastWinner = room.players.find(player => player.id === room.lastWinnerId);
   const winners = room.players.filter(player => room.winnerIds.includes(player.id));
-  return <div className="room-layout">
-    <aside className="players-area"><div className="section-heading"><h2>玩家</h2><div className="section-heading-tools"><span>{room.players.length} / {room.settings.maxPlayers}</span>{isHost && room.phase !== 'playing' && <button type="button" className="cpu-button" disabled={busy || !connected} onClick={() => act({ type: room.players.some(player => player.cpu) ? 'removeCpu' : 'addCpu', data: {} })}><Bot size={14} />{room.players.some(player => player.cpu) ? '移除电脑' : '添加电脑'}</button>}</div></div>
-      <div className="player-list">{room.players.map((player, index) => <div className={`player-row ${player.id === room.currentPlayerId ? 'player-current' : ''} ${!player.online ? 'player-disconnected' : ''}`} key={player.id}>
-        <div className="player-avatar">{index + 1}</div><div className="player-details"><div className="player-name"><span>{player.nickname}</span>
-          {player.id === room.hostId && <Crown size={13} aria-label="房主" />}{player.id === self?.id && <small>你</small>}</div>
-          <div className="player-state">{!player.online ? '暂时离线' : player.role === 'spectator' ? '观战' : room.phase === 'playing' ? <span className="player-lives"><Heart size={12} fill="currentColor" />{player.lives}</span> : player.ready ? <><Check size={12} />已准备</> : '等待准备'}
-            <span className="player-wins"><Trophy size={11} />{player.wins}</span></div>
-          {room.phase === 'playing' && player.id === room.currentPlayerId && player.draft && <div className="player-draft">{player.draft}</div>}
-        </div>{isHost && player.id !== self?.id && (player.cpu ? <div className="player-tools"><IconButton label="移除电脑" disabled={busy || room.phase === 'playing'} onClick={() => act({ type: 'removeCpu', data: {} })}><X size={14} /></IconButton></div> : <div className="player-tools"><IconButton label={`转移房主给 ${player.nickname}`} disabled={busy} onClick={() => act({ type: 'transfer', data: { playerId: player.id } })}><Crown size={14} /></IconButton>
-          <IconButton label={`移除 ${player.nickname}`} disabled={busy} onClick={() => act({ type: 'kick', data: { playerId: player.id } })}><X size={14} /></IconButton></div>)}
-      </div>)}</div>
-      <div className="match-summary"><span>{room.suddenDeath ? '加赛' : `第 ${room.round || 1} 局`}</span><span>{room.settings.bestOf} 局比赛</span></div>
-    </aside>
-    <section className="game-area"><div className="game-topline"><span>{room.suddenDeath ? '加赛' : `第 ${room.round || 1} 局`}</span></div>
+  return <div className="room-layout room-layout-centered">
+    <section className="game-area"><PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} />
       {room.phase === 'playing' && room.prompt ? <>
         <div className="timer-area"><div className={`timer ${seconds <= 5 ? 'timer-urgent' : ''}`} aria-label="剩余时间"><span>{seconds.toFixed(1)}</span><small>秒</small></div>
           <div className="timer-track"><span style={{ width: `${Math.min(100, seconds / initial * 100)}%` }} /></div></div>
-        <div className="transfer-stage"><div className={`transfer-token ${isTurn ? 'transfer-token-active' : ''}`}><DrumMark size={48} /><span>{currentPlayer?.nickname || '等待传递'}</span></div></div>
-        <div className="live-prompt"><PromptView prompt={room.prompt} maxLength={room.settings.maxLength} draft={word} draftMatch={draftMatch} feedback={feedback} /></div>
+        <div className="live-prompt"><PromptView prompt={room.prompt} draft={word} draftMatch={draftMatch} feedback={feedback} /></div>
         <form className={`answer-form ${isTurn ? 'answer-active' : ''} ${feedback ? 'answer-feedback' : ''}`} onSubmit={submit}><input ref={input} aria-label="输入答案" value={word} maxLength={9} autoComplete="off" autoCorrect="off" spellCheck={false}
           disabled={!isTurn || !connected} placeholder={isTurn ? '输入词语或成语' : self?.role === 'spectator' ? '正在观战' : '等待你的回合'}
-          onChange={event => setWord(event.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; composedAt.current = Date.now(); }}
+          onChange={event => { if (!composing.current) setWord(confirmedAnswer(event.target.value)); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={event => { composing.current = false; setWord(confirmedAnswer(event.currentTarget.value)); composedAt.current = Date.now(); }}
           onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || composing.current || event.keyCode === 229 || Date.now() - composedAt.current < 120)) event.preventDefault(); }} />
           <button type="submit" className="submit-button" title="提交答案" aria-label="提交答案" disabled={!isTurn || !connected || busy || !word.trim()}><ArrowRight size={23} /></button></form>
         {self && <div className="bonus-progress"><div><span>奖励生命</span><Heart size={13} /></div><div className="bonus-letters">{room.settings.bonusInitials.map(initial =>
