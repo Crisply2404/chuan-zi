@@ -2,7 +2,7 @@
 
 ## GitHub Pages
 
-Vite 使用相对资源路径。将 `dist/` 的全部内容放到现有 GitHub Pages 仓库的 `chuan-zi/` 目录，可以从该子目录访问游戏。房间链接使用 `?room=<pinyin>` 查询参数，直接打开房间地址可以加载静态入口。
+Vite 使用相对资源路径。将 `dist/` 的全部内容放到现有 GitHub Pages 仓库的 `chuan-zi/` 目录，可以从该子目录访问游戏。房间分享链接使用 `?room=<opaque-token>` 查询参数，直接打开分享地址可以加载静态入口。
 
 先为联机服务准备公开的 HTTPS/WSS 地址，在本地使用该地址生成网页：
 
@@ -10,7 +10,7 @@ Vite 使用相对资源路径。将 `dist/` 的全部内容放到现有 GitHub P
 VITE_WS_URL=wss://game.example.com npm run build
 ```
 
-构建输出位于 `dist/`。把输出内容发布到 GitHub Pages 的对应目录。网页服务设置也可以输入 WSS 地址，设置保存在当前浏览器。
+构建输出位于 `dist/`。把输出内容发布到 GitHub Pages 的对应目录。网页根据构建时的 `VITE_WS_URL` 自动连接 WSS 地址；开发页面根据当前主机自动推断联机服务端口。
 
 GitHub Pages 提供静态文件，持续运行的房间、共享计时和 WebSocket 连接由独立 Node.js 服务处理。HTTPS 网页连接 WSS 服务；`localhost` 开发页面可以连接本地 WS 服务。
 

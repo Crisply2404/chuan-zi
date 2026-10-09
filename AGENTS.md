@@ -22,6 +22,8 @@
 - 使用或讨论 `THUOCL_chengyu.txt` 时，完整阅读 `docs/thuocl-audit.md`；随 THUOCL 数据保留 `licenses/THUOCL.txt` 中的版权声明和许可文本。
 - 发布网页或联机服务时，阅读 `docs/deployment.md`；GitHub Pages 静态网页连接独立 WSS 服务。词库维护与授权以 `data/README.md` 和 `data/sources.json` 为依据。
 - 产生中间文件时，使用本目录中被 `.gitignore` 忽略的 `.scratch/` 或 `.research/`。
+- 处理 2026-10-09 的自动连接、分享链接、规则模式、回合反馈、传递物或方格界面要求时，先阅读 `docs/spec-draft-2026-10-09.md` 和 `docs/project-discussion.md`；用户核对规格前不得实现产品代码。
+- 用户消息中的图片附件、BombParty 动画和汉兜页面资料位于 `reference-assets/`，只能用于研究与核对。
 
 ## Agent skills
 
