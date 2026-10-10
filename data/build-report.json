@@ -1,6 +1,6 @@
 {
-  "version": "2026-10-09",
-  "wordCount": 88613,
+  "version": "2026-10-11",
+  "wordCount": 88177,
   "idiomCount": 7133,
   "sources": [
     {
@@ -12,6 +12,11 @@
       "name": "THUOCL / THUNLP",
       "license": "MIT",
       "url": "https://github.com/thunlp/THUOCL"
+    },
+    {
+      "name": "jieba / Sun Junyi",
+      "license": "MIT",
+      "url": "https://github.com/fxsjy/jieba/tree/67fa2e36e72f69d9134b8a1037b83fbb070b9775"
     },
     {
       "name": "Unicode Unihan 18.0.0",
@@ -26,7 +31,7 @@
   ],
   "thuoclCount": 8519,
   "thuoclWithCompleteReadings": 5042,
-  "characterCount": 5947,
+  "characterCount": 5937,
   "componentCharacterCount": 9574,
   "modifications": [
     "词语与长度筛选",

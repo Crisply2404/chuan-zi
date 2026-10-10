@@ -19,7 +19,7 @@ export function splitPinyin(value: string): PinyinParts {
 export function formatPinyin(initial?: string, final?: string, tone?: number): string {
   const body = `${initial ?? ''}${final ?? ''}`;
   if (!body) return tone ? ['', 'ˉ', 'ˊ', 'ˇ', 'ˋ', '·'][tone] : '';
-  if (tone && !final) return `${body}${['', 'ˉ', 'ˊ', 'ˇ', 'ˋ', '·'][tone]}`;
+  if (tone && final === undefined) return `${body}${['', 'ˉ', 'ˊ', 'ˇ', 'ˋ', '·'][tone]}`;
   return tone ? numberToMark(`${body}${tone}`) : body;
 }
 

@@ -46,8 +46,12 @@ docker run --name chuan-zi -p 8787:8787 -e ALLOWED_ORIGINS=https://crisply2404.g
 
 本项目提供网页构建与可运行的 Node.js 服务端。公开 WSS 服务尚未部署；发布者取得服务地址后，通过 `VITE_WS_URL` 构建网页。玩家打开网页即可自动连接。
 
-## Cloudflare 部署建议
+## Render 部署建议
 
-用户目前没有公开服务器。建议使用 Cloudflare Workers Free 与 SQLite Durable Objects 提供联机服务，使用 WebSocket Hibernation 保持空闲连接。免费额度、官方来源、持久计时和服务适配范围见 [Cloudflare 联机服务研究](cloudflare-deployment-research-2026-10-11.md)。Cloudflare 服务适配属于待确认的开发工作，当前 Node.js 服务继续用于本地联机。
+用户目前没有公开服务器。当前推荐 Render Free 运行已有 Node.js 服务：它支持公网 WSS，网页可以通过构建时的 `VITE_WS_URL` 自动连接，玩家无需填写服务地址。部署参数、免费实例限制和微信小程序条件见 [联机服务研究](multiplayer-hosting-research-2026-10-11.md)。Render 免费实例重启后会清除内存房间，适合网页测试；公开发布前需要接受这个条件或迁移到持久化服务。
 
-发布到个人网站时，只更新 `chuan-zi/` 目录中的构建产物。公开页面所需的服务地址由发布者配置。独立 Worker 服务发布后，使用其公开 `/ws` 地址重新生成 `dist`；Cloudflare 账户凭据保留在发布环境。
+Cloudflare Workers 与 Durable Objects 可以提供持久化房间，但当前 Node.js `ws` 服务需要重新实现 WebSocket、SQLite 和 alarm 调度，当前词库索引也超过 Workers 单个 isolate 的内存限制。它保留为后续平台方案。
+
+`render.yaml` 提供免费 Web Service 的 Blueprint 配置。用户登录 Render 后连接保存服务源码的仓库并创建 Blueprint，平台读取该文件部署；等待 `/health` 返回 `ok: true` 后，使用公开服务地址生成网页，例如 `VITE_WS_URL=wss://chuan-zi-server.onrender.com npm run build`。实际子域名以 Render 为准。
+
+发布到个人网站时，只更新 `chuan-zi/` 目录中的构建产物。公开页面所需的服务地址由发布者配置，账户凭据保留在发布环境。

@@ -183,7 +183,7 @@ export default function App() {
       act({ type: 'joinByCode', data: { code: joining.code, password } })} /></Modal>}
     {modal === 'metadata' && room && <Modal title="房间设置" onClose={closeModal} error={error}><MetadataForm name={room.name} listed={room.listed} busy={busy} onSave={(name, listed, password) => act({ type: 'metadata', data: { name, listed, password } }, () => setModal(null))} /></Modal>}
     {modal === 'licenses' && <Modal title="数据与许可" onClose={closeModal}><div className="license-list"><p>成语候选与文档频次：THUOCL · MIT</p>
-      <p>普通词语与读音：CC-CEDICT · CC BY-SA 4.0</p><p>部首：Unicode Unihan · Unicode License v3</p>
+      <p>普通词语与读音：CC-CEDICT · CC BY-SA 4.0</p><p>电脑常见程度：jieba · MIT</p><p>部首：Unicode Unihan · Unicode License v3</p>
       <p>字形部件：Make Me a Hanzi · LGPL</p><p>界面图标：Lucide · ISC</p>
       <a href={`${import.meta.env.BASE_URL}licenses.html`} target="_blank" rel="noreferrer">完整来源与许可<ArrowRight size={15} /></a></div></Modal>}
   </div>;

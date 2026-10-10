@@ -14,6 +14,7 @@ const hanWord = /^\p{Script=Han}+$/u;
 const provenance = [
   { name: 'CC-CEDICT contributors / cedict-json 1.3.20251213', license: 'CC-BY-SA-4.0', url: 'https://cc-cedict.org/wiki/' },
   { name: 'THUOCL / THUNLP', license: 'MIT', url: 'https://github.com/thunlp/THUOCL' },
+  { name: 'jieba / Sun Junyi', license: 'MIT', url: 'https://github.com/fxsjy/jieba/tree/67fa2e36e72f69d9134b8a1037b83fbb070b9775' },
   { name: 'Unicode Unihan 18.0.0', license: 'Unicode-3.0', url: 'https://www.unicode.org/Public/18.0.0/ucd/Unihan.zip' },
   { name: `Make Me a Hanzi / ${componentVersion}`, license: 'LGPL-3.0-or-later', url: `https://github.com/skishore/makemeahanzi/tree/${componentVersion}` },
 ];
@@ -23,8 +24,17 @@ if (createHash('sha256').update(thuoclRaw).digest('hex') !== 'c339d5d6e37d4f8ecd
   throw new Error('THUOCL 原始数据校验失败');
 }
 const frequency = new Map<string, number>(csv(thuoclRaw, { delimiter: '\t', trim: true, skip_empty_lines: true }).map((row: string[]) => [row[0], Number(row[1])]));
-const policy = JSON.parse(await readFile('data/policy.json', 'utf8')) as { excludedWords: string[]; excludedDefinitionPatterns: string[] };
+const jiebaRaw = await readFile('data/sources/jieba-dict.txt');
+if (createHash('sha256').update(jiebaRaw).digest('hex') !== '7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8') throw new Error('jieba 原始数据校验失败');
+const everydayFrequency = new Map<string, number>(csv(jiebaRaw, { delimiter: ' ', trim: true, skip_empty_lines: true }).map((row: string[]) => {
+  const value = Number(row[1]);
+  if (row.length !== 3 || !Number.isInteger(value) || value < 0) throw new Error(`jieba 词频字段无效：${row[0]}`);
+  return [row[0], value];
+}));
+const policy = JSON.parse(await readFile('data/policy.json', 'utf8')) as { excludedWords: string[]; retainedEverydayWords: string[]; specialistDefinitionPatterns: string[]; excludedDefinitionPatterns: string[] };
 const excluded = new Set(policy.excludedWords);
+const retained = new Set(policy.retainedEverydayWords);
+const specialistDefinitions = policy.specialistDefinitionPatterns.map(pattern => new RegExp(pattern, 'i'));
 const excludedDefinitions = policy.excludedDefinitionPatterns.map(pattern => new RegExp(pattern, 'i'));
 const entries = new Map<string, WordEntry>();
 for (const item of cedict) {
@@ -32,6 +42,8 @@ for (const item of cedict) {
   if (length < 2 || length > 9 || !hanWord.test(item.simplified) || excluded.has(item.simplified)) continue;
   const definitions = item.english.join('; ');
   if (excludedDefinitions.some(pattern => pattern.test(definitions))) continue;
+  const substantiveDefinitions = item.english.filter(definition => !/^(CL:|see also |also written |also pr\.)/i.test(definition));
+  if (!retained.has(item.simplified) && substantiveDefinitions.length && substantiveDefinitions.every(definition => specialistDefinitions.some(pattern => pattern.test(definition)))) continue;
   const syllables = item.pinyin.trim().split(/\s+/);
   if (syllables.length !== length || syllables.some(value => !/^[a-züv:]+[1-5]$/i.test(value))) continue;
   if (syllables.some(value => /^[A-Z]/.test(value))) continue;
@@ -42,7 +54,9 @@ for (const item of cedict) {
   };
   let entry = entries.get(item.simplified);
   if (!entry) {
-    entry = { word: item.simplified, readings: [], idiom: frequency.has(item.simplified) || /\(idiom\)/i.test(definitions), df: frequency.get(item.simplified) ?? 0, source: frequency.has(item.simplified) ? ['CC-CEDICT', 'THUOCL'] : ['CC-CEDICT'] };
+    entry = { word: item.simplified, readings: [], idiom: frequency.has(item.simplified) || /\(idiom\)/i.test(definitions), df: frequency.get(item.simplified) ?? 0,
+      frequency: everydayFrequency.get(item.simplified) ?? 0,
+      source: ['CC-CEDICT', ...(frequency.has(item.simplified) ? ['THUOCL'] : []), ...(everydayFrequency.has(item.simplified) ? ['jieba'] : [])] };
     entries.set(entry.word, entry);
   }
   if (!entry.readings.some(value => value.syllables.join(' ') === reading.syllables.join(' '))) entry.readings.push(reading);
@@ -89,7 +103,7 @@ for (const [character, info] of Object.entries(characters)) {
 }
 
 const words = [...entries.values()].sort((first, second) => first.word.localeCompare(second.word, 'zh-Hans'));
-const data: DictionaryData = { words, characters, metadata: { version: '2026-10-09', wordCount: words.length, idiomCount: words.filter(entry => entry.idiom).length, sources: provenance } };
+const data: DictionaryData = { words, characters, metadata: { version: '2026-10-11', wordCount: words.length, idiomCount: words.filter(entry => entry.idiom).length, sources: provenance } };
 await mkdir('data/sources', { recursive: true });
 await writeFile('data/dictionary.json', `${JSON.stringify(data)}\n`);
 await writeFile('data/components.json', `${JSON.stringify(Object.fromEntries([...componentMap]), null, 2)}\n`);

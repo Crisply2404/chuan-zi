@@ -342,7 +342,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
     room.cpuTurnTimer = setTimeout(async () => {
       if (room.phase !== 'playing' || room.currentPlayerId !== player.id || !room.prompt) return;
       const rules = await getRules();
-      const answer = rules.examples(room.prompt, room.settings, room.used, 1)[0];
+      const answer = rules.cpuAnswer(room.prompt, room.settings, room.used);
       if (!answer) {
         timeoutTurn(room);
         return;

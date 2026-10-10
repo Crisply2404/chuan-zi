@@ -3,6 +3,8 @@ import { validateSettings } from './settings';
 
 export class RuleError extends Error {}
 
+export const commonRadicals = new Set(['氵', '扌', '忄', '艹', '宀', '讠', '纟', '钅', '灬', '辶', '阝', '犭', '饣', '衤', '礻', '冫', '疒', '亻', '刂', '囗', '⺮']);
+
 export class WordRules {
   private readonly entries: Map<string, WordEntry>;
   private readonly index = new Map<string, Set<WordEntry>>();
@@ -26,7 +28,7 @@ export class WordRules {
       }
       for (const letter of letters) {
         keys.add(`contains:${letter}`);
-        for (const radical of data.characters[letter]?.radicals ?? []) keys.add(`radical:${radical}`);
+        for (const radical of this.radicalsFor(letter)) keys.add(`radical:${radical}`);
         for (const component of data.characters[letter]?.components ?? []) keys.add(`component:${component}`);
       }
       for (const key of keys) {
@@ -57,6 +59,10 @@ export class WordRules {
     return length >= settings.minLength && length <= settings.maxLength && (settings.dictionary === 'all' || (settings.dictionary === 'idioms' ? entry.idiom : !entry.idiom));
   }
 
+  private radicalsFor(letter: string): string[] {
+    return (this.data.characters[letter]?.radicals ?? []).filter(radical => commonRadicals.has(radical) && letter !== radical);
+  }
+
   private matchEntry(entry: WordEntry, prompt: Prompt): MatchResult | undefined {
     const letters = [...entry.word];
     for (const reading of entry.readings) {
@@ -67,7 +73,7 @@ export class WordRules {
           return (cell.initial === undefined || reading.initials[position] === cell.initial)
             && (cell.final === undefined || reading.finals[position] === cell.final)
             && (cell.tone === undefined || reading.tones[position] === cell.tone)
-            && (cell.radical === undefined || character?.radicals.includes(cell.radical))
+            && (cell.radical === undefined || this.radicalsFor(letters[position]).includes(cell.radical))
             && (cell.component === undefined || character?.components.includes(cell.component))
             && (cell.contains === undefined || letters.slice(position, position + [...cell.contains].length).join('') === cell.contains);
         })) return { valid: true, reading, offset };
@@ -130,8 +136,9 @@ export class WordRules {
           if (type === 'final') cell.final = reading.finals[absolute];
           if (type === 'tone') cell.tone = reading.tones[absolute];
           if (type === 'radical') {
-            if (!character?.radicals.length) complete = false;
-            else cell.radical = character.radicals[Math.floor(Math.random() * character.radicals.length)];
+            const radicals = this.radicalsFor([...candidate.word][absolute]);
+            if (!radicals.length) complete = false;
+            else cell.radical = radicals[Math.floor(Math.random() * radicals.length)];
           }
           if (type === 'component') {
             if (!character?.components.length) complete = false;
@@ -174,6 +181,11 @@ export class WordRules {
       if (result.length >= limit) break;
     }
     return result;
+  }
+
+  cpuAnswer(prompt: Prompt, settings: Settings, used = new Set<string>()): WordEntry | undefined {
+    return this.examples(prompt, settings, used, Infinity).sort((first, second) =>
+      (second.frequency ?? 0) - (first.frequency ?? 0) || second.df - first.df || first.word.length - second.word.length)[0];
   }
 
   private shuffle<T>(values: T[]): T[] {

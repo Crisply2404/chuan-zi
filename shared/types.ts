@@ -49,7 +49,7 @@ export const defaultSettings: Settings = {
 
 export interface CharacterData { radicals: string[]; components: string[] }
 export interface Reading { syllables: string[]; initials: string[]; finals: string[]; tones: number[] }
-export interface WordEntry { word: string; readings: Reading[]; idiom: boolean; df: number; source: string[] }
+export interface WordEntry { word: string; readings: Reading[]; idiom: boolean; df: number; frequency?: number; source: string[] }
 export interface DictionaryData {
   words: WordEntry[];
   characters: Record<string, CharacterData>;

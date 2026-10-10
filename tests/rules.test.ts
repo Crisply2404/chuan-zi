@@ -37,6 +37,32 @@ test('真实答案在任意相邻窗口满足部首与声调组合', () => {
   assert.equal(rules.match('森林', prompt([{ component: '木' }]), settings).valid, true);
 });
 
+test('部首提示使用常见部件形态且要求答案汉字包含其他笔画', () => {
+  const settings = getModeSettings('radical');
+  assert.equal(rules.match('夕阳', prompt([{ radical: '夕' }]), settings).valid, false);
+  assert.equal(rules.match('清澈', prompt([{ radical: '氵' }]), settings).valid, true);
+  for (let index = 0; index < 20; index++) {
+    const generated = rules.generate(settings);
+    assert.ok(generated.cells.every(cell => cell.radical === undefined || ['氵', '扌', '忄', '艹', '宀', '讠', '纟', '钅', '灬', '辶', '阝', '犭', '饣', '衤', '礻', '冫', '疒', '亻', '刂', '囗', '⺮'].includes(cell.radical)));
+    assert.ok(rules.examples(generated, settings).every(entry => rules.match(entry.word, generated, settings).valid));
+  }
+});
+
+test('游戏词库按日常使用范围保留名称并排除专业词语', () => {
+  assert.equal(rules.match('边缘性人格障碍', prompt([{ initial: 'b' }]), defaultSettings).valid, false);
+  for (const word of ['乙酰胆碱', '二甲基亚砜', '精索静脉曲张', '苯丙酮尿症', '氰化钾', '乙二醇', '胰腺炎', '躁郁症']) assert.equal(data.words.some(entry => entry.word === word), false, word);
+  for (const word of ['人工智能', '咖啡', '冰淇淋', '组织', '培养', '活泼', '新陈代谢', '药片', '流食', '呼吸机', '留观', '心律', '化学式']) assert.equal(data.words.some(entry => entry.word === word), true, word);
+});
+
+test('电脑优先使用常见合法词语并继续遵守已使用答案集合', () => {
+  const challenge = prompt([{ contains: '知' }]);
+  assert.equal(rules.cpuAnswer(challenge, defaultSettings)?.word, '知道');
+  const next = rules.cpuAnswer(challenge, defaultSettings, new Set(['知道']));
+  assert.ok(next);
+  assert.notEqual(next.word, '知道');
+  assert.equal(rules.match(next.word, challenge, defaultSettings).valid, true);
+});
+
 test('同字关系要求两种条件覆盖相同汉字位置', () => {
   const settings = { ...defaultSettings, dictionary: 'words' as const, minLength: 2, relations: [{ first: 'initial' as const, second: 'final' as const, mode: 'same' as const }] };
   assert.equal(rules.match('清澈', prompt([{ initial: 'q' }, { final: 'e' }]), settings).valid, false);
@@ -60,6 +86,9 @@ test('声调提示只展示拼音符号', () => {
   assert.equal(formatPinyin(undefined, undefined, 1), 'ˉ');
   assert.equal(formatPinyin('t', 'ian', 1), 'tiān');
   assert.equal(formatPinyin('sh', undefined, 4), 'shˋ');
+  assert.equal(formatPinyin('m', '', 1), 'm̄');
+  assert.equal(formatPinyin('m', '', 2), 'ḿ');
+  assert.equal(rules.match('姆妈', prompt([{ initial: 'm', final: '', tone: 1 }]), defaultSettings).valid, true);
 });
 
 test('生成提示保留指定隐藏数量且开启字段覆盖其余位置', () => {

@@ -1,5 +1,10 @@
 {
-  "excludedWords": ["八大工业国组织"],
+  "excludedWords": ["八大工业国组织", "边缘性人格障碍", "氰化钾", "乙二醇", "胰腺炎", "躁郁症"],
+  "retainedEverydayWords": ["人工智能", "咖啡", "冰淇淋", "细胞", "化合物", "溶液", "服用", "碱性", "炼制", "休克", "水肿", "非金属", "微量元素", "青霉素", "糖类", "结石", "稀土", "直肠", "生物界", "人工呼吸", "低血糖", "洗胃", "口服液", "携带者", "劳损", "耳道", "阑尾炎", "腹股沟", "抗药性", "胃镜", "生理盐水", "肺活量", "叶黄素", "点痣", "药片", "流食", "半流食", "呼吸机", "呼吸器", "留观", "彩超", "心律", "皮试", "高发人群", "元素周期表", "化学式", "制取", "萃取", "甲状腺"],
+  "specialistDefinitionPatterns": [
+    "\\((chemistry|chem|biochemistry|organic chemistry|medicine|medical|anatomy|biology|pharmacology)\\)",
+    "\\b(chemical compound|chemical formula|personality disorder|syndrome|acetylcholine|schizophrenia)\\b"
+  ],
   "excludedDefinitionPatterns": [
     "\\b(vulgar|obscene|offensive|derogatory|slur|curse|profanity|pornograph|sexual intercourse)\\b",
     "\\b(surname|given name|personal name|place name|county|prefecture|township|province|city in|district in|river in|mountain in|brand name|company name)\\b",

@@ -27,15 +27,18 @@ async function connect(page: Page, nickname: string) {
 
 async function sampleMotion(page: Page, action: () => Promise<unknown>) {
   await page.evaluate(() => {
-    const samples: { y: number; alpha: number; newCellAlpha: number }[] = [];
+    const samples: { y: number; alpha: number; newCellAlpha: number; originConnected: boolean; originScale: number; answerY: number; time: number }[] = [];
     Object.assign(window, { motionSamples: samples, motionFinished: false });
     const started = performance.now();
+    const origin = document.querySelector('.prompt-part.prompt-origin');
     const sample = () => {
       const prompt = document.querySelector('.prompt-layer')!;
       const supplement = document.querySelector('.prompt-complete .prompt-supplement');
       const newCell = document.querySelector('.answer-cell:nth-child(2) .answer-cell-surface');
       samples.push({ y: prompt.getBoundingClientRect().y, alpha: supplement ? Number(getComputedStyle(supplement).opacity) : 0,
-        newCellAlpha: newCell ? Number(getComputedStyle(newCell).opacity) : 0 });
+        newCellAlpha: newCell ? Number(getComputedStyle(newCell).opacity) : 0, originConnected: origin?.isConnected ?? false,
+        originScale: origin ? new DOMMatrix(getComputedStyle(origin).transform).m11 : 0,
+        answerY: document.querySelector('.answer-cell')!.getBoundingClientRect().y, time: performance.now() - started });
       if (performance.now() - started < 1100) requestAnimationFrame(sample);
       else Object.assign(window, { motionFinished: true });
     };
@@ -43,7 +46,7 @@ async function sampleMotion(page: Page, action: () => Promise<unknown>) {
   });
   await action();
   await page.waitForFunction(() => Reflect.get(window, 'motionFinished'));
-  return page.evaluate(() => Reflect.get(window, 'motionSamples') as { y: number; alpha: number; newCellAlpha: number }[]);
+  return page.evaluate(() => Reflect.get(window, 'motionSamples') as { y: number; alpha: number; newCellAlpha: number; originConnected: boolean; originScale: number; answerY: number; time: number }[]);
 }
 
 async function assertLayout(page: Page) {
@@ -165,11 +168,30 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
     expect(new Set(mergeFrames.map(frame => Math.round(frame.y))).size).toBeGreaterThan(5);
     expect(mergeFrames.some(frame => frame.alpha > 0 && frame.alpha < 1)).toBe(true);
     expect(mergeFrames.some(frame => frame.newCellAlpha > 0 && frame.newCellAlpha < 1)).toBe(true);
+    expect(mergeFrames.every(frame => frame.originConnected)).toBe(true);
+    expect(new Set(mergeFrames.map(frame => frame.originScale.toFixed(3))).size).toBeGreaterThan(5);
+    expect(new Set(mergeFrames.map(frame => Math.round(frame.answerY))).size).toBeGreaterThan(5);
+    const motionStart = mergeFrames.findIndex(frame => frame.y - mergeFrames[0].y > .3);
+    const motionFrames = mergeFrames.slice(motionStart);
+    const firstMotion = motionFrames[0];
+    const earlyMotion = motionFrames.find(frame => frame.time - firstMotion.time >= 180)!;
+    const lateMotion = motionFrames.find(frame => frame.time - firstMotion.time >= 550)!;
+    expect(earlyMotion.y - firstMotion.y).toBeGreaterThan((lateMotion.y - firstMotion.y) * .65);
     await expect(active.locator('.answer-cells')).toBeVisible();
     await expect(active.locator('.prompt-layer-attached')).toBeVisible();
     await expect(active.locator('.prompt-origin').first()).toHaveCSS('color', 'rgb(34, 34, 34)');
-    await expect(active.locator('.prompt-supplement').first()).toHaveCSS('color', 'rgb(177, 94, 33)');
-    await expect.poll(() => active.locator('.answer-cell-attached').first().evaluate(element => new DOMMatrix(getComputedStyle(element).transform).m42)).toBeLessThan(-20);
+    await expect(active.locator('.prompt-supplement').first()).toHaveCSS('color', 'rgb(255, 173, 50)');
+    for (const [index, cell] of state.prompt!.cells.entries()) {
+      if (cell.tone !== undefined) await expect(active.locator('.prompt-cell').nth(index).locator('.prompt-part-tone')).toHaveCSS('color', 'rgb(34, 34, 34)');
+    }
+    await expect.poll(() => active.locator('.prompt-cell').evaluateAll(elements => elements.every(element => {
+      const tone = element.querySelector('.prompt-part-tone')!.getBoundingClientRect();
+      const target = element.querySelector('.prompt-complete-layout [data-field="tone"]')!.getBoundingClientRect();
+      return Math.abs(tone.x - target.x) < 1 && Math.abs(tone.y - target.y) < 1;
+    }))).toBe(true);
+    await expect.poll(() => active.locator('.answer-editor').evaluate(element => new DOMMatrix(getComputedStyle(element).transform).m42)).toBeLessThan(-20);
+    const answerTransforms = await active.locator('.answer-cell').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().y));
+    expect(Math.max(...answerTransforms) - Math.min(...answerTransforms)).toBeLessThan(1);
     await expect.poll(async () => active.locator('.prompt-cell').evaluateAll((elements, start) => {
       const answerCells = [...document.querySelectorAll('.answer-cell')];
       return elements.every((element, index) => {
@@ -265,7 +287,9 @@ test('组合提示附着后保留部首与字形部件', async ({ browser }) => 
     const active = room.players.find(player => player.id === room.currentPlayerId)!.nickname === '组合房主' ? host : guest;
     await active.getByLabel('输入答案', { exact: true }).fill(answer);
     await expect(active.locator('.prompt-layer-attached')).toBeVisible();
-    await expect(active.locator('.prompt-attached-hint')).toHaveText(`${cell.radical} ${cell.component}`);
+    await expect(active.locator('.prompt-part-radical')).toHaveText(cell.radical!);
+    await expect(active.locator('.prompt-part-component')).toHaveText(cell.component!);
+    await expect(active.locator('.prompt-part-radical')).toHaveCSS('color', 'rgb(34, 34, 34)');
     expect(state.errors).toEqual([]);
   } finally {
     await hostContext.close();

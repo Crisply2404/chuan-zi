@@ -1805,3 +1805,242 @@ Cloudflare Workers Free 配合 Durable Objects 适合目前的联机测试。Git
 “八大工业国组织”来自 CC-CEDICT，已经排除。普通词语建议采用 jieba 候选与 CC-CEDICT 完整读音交集，并维护收录文件；jieba 使用 MIT，允许免费商用。[词库研究](word-quality-research-2026-10-11.md)已保存，候选替换尚未执行。
 
 鼓的传递建议使用淡墨连线和橙色光点：从上一名玩家经过鼓，移动到当前玩家，倒计时减少时加快鼓的节奏。这项表现仍待确定。本轮新增 GIF 尚无可读取原始文件路径；聊天原文和当前决定已保存。
+
+## 用户消息 29
+
+日期：2026-10-11（Asia/Shanghai）。
+
+````text
+[$ask-matt](/Users/hco/.agents/skills/ask-matt/SKILL.md) 1.你提示格和虚格的运动和补全部分的显现和隐藏没有自然过渡的动画啊，全是突然变的，我要的是那种速度曲线类似指数函数一样先快后慢的。还有出现匹配的子串的时候不只是那个子串往上，而是所有虚格（玩家输入的词语往上），和往下的提示格相结合。还有我希望虚格和实格结合的时候实格内的提示部分能自然而然地变形到最终结合后的位置，就像flash补间动画那样，我不知道怎么形容，你可以帮我形容，或者你如果不懂我什么意思就向我问清楚。
+
+2.部首就应该有个部首的样子，部首应该只占普通字的一部分不是吗，而不是如图一就完全是个普通字给我，那我怎么办。
+
+3.如图2图3，你明明第二个字给了音调，但你结合后的音调居然不是黑色的，我都说了只有玩家带来的提示没有的部分才是橙色的。
+
+4.我认为橙色可以更明亮一点，亮橙色，可以比#F2A93B还亮。
+
+5.我没说过一定要用cloudflare，我只是提了一个可能性。你可以找更好的，如果你找得到的话。你可以选择一种最简单最实用效果好而且免费的办法。比如你可以看看我朋友做的[https://github.com/cyj-hashtag/cyj-hashtag.github.io/tree/main/partition-quiz](https://github.com/cyj-hashtag/cyj-hashtag.github.io/tree/main/partition-quiz)看看他用的什么联机方法，适不适合我们
+
+6.如图4，电脑选的词实在是有点偏，感觉正常人好像想不到，而且我希望把“边缘性人格障碍“这种专词剔除出词库。你能不能看看网上有没有已经剔除了专词的现成词库？
+
+用合适的matt skill执行。
+````
+
+附件顺序：图一部首提示；图二结合前拼音和音调；图三结合后的提示颜色；图四电脑答案记录。附件在会话中内嵌，原始文件路径尚未提供。
+
+## 用户消息 30
+
+````text
+<skill>
+<name>ask-matt</name>
+<path>/Users/hco/.agents/skills/ask-matt/SKILL.md</path>
+---
+name: ask-matt
+description: Ask which skill or flow fits your situation. A router over the skills in this repo.
+disable-model-invocation: true
+---
+
+# Ask Matt
+
+You don't remember every skill, so ask.
+
+A **flow** is a path through the skills. Most paths run along one **main flow**, and two **on-ramps** merge onto it. Everything else is standalone, or a vocabulary layer that runs underneath.
+
+## The main flow: idea → ship
+
+The route most work travels. You have an idea and want it built.
+
+1. **`/grill-with-docs`** sharpens the idea by interview. Start here whenever you are **working in a working directory**: it's stateful, retaining what it learns in `GLOSSARY.md` and ADRs. (No working directory? Use `/grill-me` instead, covered under Standalone. Both run the same `/grilling` primitive; `grill-with-docs` is the one that leaves a paper trail, which makes it the better of the two whenever a repo is there to leave it in.)
+2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype, bridged by **`/handoff`** in both directions (a prototype lives in its own directory, which is exactly what `/handoff` is for; see Phase boundaries):
+   - **`/handoff`** out, then open a fresh session against that file,
+   - **`/prototype`** to answer the question with throwaway code,
+   - **`/handoff`** back what you learned, and reference it from the original idea thread.
+3. **Branch: is this a multi-session build?**
+   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. Then work the tickets one of two ways:
+     - **`/implement`** per ticket, **`/clear`ing context between each one**. On a local tracker that's one file per ticket under `.scratch/<feature>/issues/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed. Each ticket is self-contained, so the last one's context is disposable.
+     - **`/implement-spec`** for the whole spec in one run. It reads the tickets as a **task graph**, runs implementer subagents across the ready **frontier** in parallel, and lands everything on one **integration branch**. Reach for it when you'd rather orchestrate the build than drive each ticket yourself.
+   - **No** → **`/implement`** right here, in the same context window.
+
+   Either way, the code gets built by driving **`/tdd`** (one red-green slice at a time) and closes out with **`/code-review`**, a two-axis review (Standards + Spec) of the diff. `/implement` runs both per ticket; `/implement-spec`'s implementers each drive `/tdd`, and it runs one `/code-review` over the integration branch. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review a branch or PR against a fixed point.
+
+   When the work goes up as a pull request, **`/pr`** shapes the body: the smallest visual that shows the change, before/after evidence that it works, and a one-way or two-way door call. It's model-invoked, so the agent reaches for it whenever it writes a PR.
+
+4. **`/retro`** closes the loop. After a build, and especially one that went sideways, it looks back over the session and suggests changes to the agent's **environment**, not the code: navigation pointers, automated checks, the coding standards `/code-review` enforces, steering files, tooling. Mechanical mistakes become deterministic checks; judgement calls become coding standards. The next build then starts from a better environment.
+
+### Context hygiene
+
+Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket. Run `/retro` in the session it's looking back on, before you clear; after clearing, point it at that session's log instead.
+
+The limit on this is the **[smart zone](https://www.aihero.dev/ai-coding-dictionary/smart-zone)**: the window (~150k tokens on state-of-the-art models) within which the model still reasons sharply. If a session approaches it before `/to-tickets`, don't push on degraded; `/compact` at the nearest phase boundary and carry on (see Phase boundaries).
+
+## On-ramps
+
+A starting situation that generates work, then merges onto the main flow.
+
+- **Bugs and requests piling up** → **`/triage`**. It moves issues through triage roles and produces agent-ready issues, which **`/implement`** later picks up.
+
+  Triage is only for issues **you didn't create**: bug reports, incoming feature requests, anything that arrives raw. Tickets that `/to-tickets` produced are already agent-ready, so **don't triage them**.
+
+- **Something's broken** → **`/diagnosing-bugs`**. For the hard ones: the bug that resists a first glance, the intermittent flake, the regression that crept in between two known-good states. It refuses to theorise until it has a **tight feedback loop** (one command that already goes red on *this* bug), then fixes with a regression test. Once the fix is in, run **`/retro`** in the same session to ask what would have prevented the bug; where the real finding is that there's no good seam to lock it down, that's a job for **`/improve-codebase-architecture`**.
+
+- **A huge, foggy effort: a greenfield project or a huge feature build, too big for one session** → **`/wayfinder`**, the most cognitively demanding flow here. When the way from here to the destination isn't visible yet, it charts a **shared map** of **decision tickets** on the issue tracker and resolves them one at a time, producing **decisions, not deliverables**, until the fog is pushed back and the way is clear. Where **`/grill-with-docs`** sharpens an idea you can hold in one session, wayfinder is for the idea you can't, and it's slower and denser, so save it for exactly that, never a well-scoped feature.
+
+  When the map clears, **it hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-tickets` and `/implement` as usual. Looping the map straight into `/implement` skips that collapse and throws the linked detail away, so go straight to `/implement` only when the effort turned out genuinely small.
+
+## Codebase health
+
+Not feature work, just upkeep.
+
+- **`/improve-codebase-architecture`** runs whenever you have a spare moment to keep the codebase good for agents to operate in. It surfaces **deepening opportunities**; picking one _generates an idea_ you can take into the main flow at `/grill-with-docs`. It's the survey that finds the candidates; **`/codebase-design`** (below) is the bench you design the chosen one on.
+
+## Vocabulary underneath
+
+Two model-invoked references that run *beneath* the other skills, each the single source of truth for its vocabulary. Reach for them directly when the **words**, not the process, are the problem; or let the skills above pull them in.
+
+- **`/domain-modeling`**: sharpen the project's *domain* language: challenge a fuzzy term, resolve an overloaded word ("account" doing three jobs), record a hard-to-reverse decision as an ADR. It's the active discipline `/grill-with-docs` drives to keep `GLOSSARY.md` a clean glossary.
+- **`/codebase-design`** is the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality) for designing a module's *shape*: a lot of behaviour behind a small interface at a clean seam. `/tdd` and `/improve-codebase-architecture` both speak it.
+
+## Phase boundaries
+
+A **phase** is a chunk of work inside a session: the grilling, the implementation, the QA. At the **boundary** between two of them you have five options, and picking between them is the fuzziest decision in this whole map:
+
+- **Continue**: stay put. Costs nothing, loses nothing.
+- **`/clear`**: empty the window, when nothing here matters to what's next.
+- **`/handoff`** writes a portable markdown file. Narrow: only for a **new harness**, a **new directory**, a **colleague**, or forking a side task **mid-phase**. What it buys is portability.
+- **Subagent**: send a tightly-scoped task to its own window and get a report back.
+- **`/compact`** compresses this context and seeds a fresh session with it. The **default**, at the bottom of the tree rather than the first reach.
+
+Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree: the five questions, the reasoning behind each branch, and why the primary-source cost makes **Continue** the one to rule out first. Make the decision **at** a boundary; mid-phase, continue or split the rest into subagents.
+
+## Standalone
+
+Off the main flow entirely.
+
+- **`/grill-me`**: the same relentless interview as `/grill-with-docs`, but **stateless**: it saves nothing locally and builds no `GLOSSARY.md`. Reach for it when you are **not working in a working directory** (sharpening a plan, a design, a piece of writing, anything with no repo under it). If you are in a working directory, use `/grill-with-docs` instead: it runs the same interview and leaves a paper trail, so it is strictly the better one.
+- **`/grilling`** is the interview primitive itself: rounds, the frontier, facts are the agent's job and decisions are yours. `/grill-me` and `/grill-with-docs` are the two named ways in, and `/triage`, `/wayfinder` and `/improve-codebase-architecture` all run it internally. Reach for it directly only when you want the interview with no wrapper around it.
+- **`/prototype`** is a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. Throwaway is a constraint on how the code is written, not a promise to destroy it: the answer folds into the real code, and the prototype itself is kept as a **primary source** on a `prototype/<name>` branch out of main, pointed at from the implementation issue. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
+- **`/research`**: delegate reading legwork to a **background agent**: it investigates a question against **primary sources**, then leaves a cited Markdown file in the repo. Keep working while it reads. The file it produces is something to take *into* the main flow at `/grill-with-docs`, since research feeds the thinking rather than replacing it.
+- **`/to-questionnaire`** comes in when the thing blocking you isn't in your head or the codebase but in **someone else's**, and it writes them a questionnaire to fill in. It's the inverse of `/grill-me`: instead of interviewing you about the subject, it interviews you about the **send** (who it's going to, what you need back) and aims the questions at the gap. What comes back is material for `/grill-with-docs` or `/to-spec`.
+- **`/wizard`** is for the steps only a **human** can take: provisioning infrastructure, setting up credentials or CI secrets, clicking through an unfamiliar third-party dashboard, running a one-off migration or cutover. It generates an interactive bash script that opens each URL, captures each value, and writes it into `.env` and GitHub secrets, so the procedure stops being something you re-explain to an agent every time. Model-invoked, so the agent reaches for it the moment it hits a wall only you can pass. If the agent could just do it itself, it should; this is for where a human is genuinely in the loop.
+- **`/wait-what`** is the corrective for a message that didn't land. Use it mid-conversation, inside any other skill, and the agent re-pitches what it just said with the context you were missing, in plain English, using the `GLOSSARY.md` vocabulary. It works after the fact; `/grill-with-docs` is the upfront cure, because a shared language agreed early is what stops the jargon arriving at all.
+- **`/teach`**: learn a concept over multiple sessions, using the current directory as a stateful workspace.
+- **`/writing-for-agents`** is the reference for writing documents agents consume: skills, AGENTS.md, pointed-at docs.
+
+## Precondition
+
+**`/setup-matt-pocock-skills`**: run before your first engineering flow to configure the issue tracker, triage labels, and doc layout the other skills assume. Custom issue trackers also work.
+
+</skill>
+````
+
+## assistant 进度消息 156
+
+这轮按 `ask-matt` 使用 `/diagnosing-bugs`、`/implement` 和 `/research`。你描述的效果可以叫“保留同一元素的补间动画”：原有提示连续移动、缩放到完整字格中的位置，整行答案同时上移，补全内容沿先快后慢的曲线渐渐显现。
+
+联机平台保持待选择状态，我会核查你朋友项目的联机方法，以及已经筛除专业词语、允许免费商用的词库。
+
+## assistant 提问消息 157
+
+部首提示中，“夕”本身确实也是字典部首。你希望“部首”模式只显示氵、扌、忄、艹、宀等常见部首形式，并且答案中的对应汉字必须包含其他笔画吗？
+
+选项：是，只显示常见部首形式，并要求汉字包含其他笔画；保留全部字典部首，但都用部件形态呈现。
+
+## assistant 提问消息 158
+
+我对补间效果的理解是：原有声母、韵母、音调和汉字保持同一元素，连续移动并缩放到最终字格中的位置；音调移动到对应元音上方，整行答案同时上移，补全部分渐渐显示。这个理解符合你的意思吗？
+
+选项：符合，按这个效果实现；基本符合，我会补充区别。
+
+## assistant 提问消息 159
+
+方便研究完成后继续调整电脑选词：电脑是否应优先选择常见、容易理解的词语，同时玩家仍可提交词库内的其他合法词语？
+
+选项：是，电脑优先常见词语；玩家和电脑都只使用常见词语。
+
+## 用户消息 31
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_0991a6a64ad24bb6b29bb7e49ea200d4\",0]","question":"部首提示中，“夕”本身确实也是字典部首。你希望“部首”模式只显示氵、扌、忄、艹、宀等常见部首形式，并且答案中的对应汉字必须包含其他笔画吗？","answer":"是，只显示常见部首形式，并要求汉字包含其他笔画"},{"questionItemId":"[\"request_user_input_async\",\"call_2d33ad1d7bd74dc8914f7251d252fc15\",0]","question":"我对补间效果的理解是：原有声母、韵母、音调和汉字保持同一元素，连续移动并缩放到最终字格中的位置；音调移动到对应元音上方，整行答案同时上移，补全部分渐渐显示。这个理解符合你的意思吗？","answer":"符合，按这个效果实现"},{"questionItemId":"[\"request_user_input_async\",\"call_c13fb259f44d4b998b3f017885cf728a\",0]","question":"方便研究完成后继续调整电脑选词：电脑是否应优先选择常见、容易理解的词语，同时玩家仍可提交词库内的其他合法词语？","answer":"是，电脑优先常见词语"}]
+</send_user_message_question_reply>
+````
+
+## assistant 提问消息 160
+
+为词库选择确定收录范围：你希望保留“人工智能、咖啡、冰淇淋”等日常常见名称，同时排除医学诊断、化学物质名等需要专业知识的词语，对吗？
+
+选项：对，按照日常使用范围保留和排除；所有行业术语都排除，包括人工智能。
+
+## assistant 进度消息 161
+
+已确认当前代码已经具备基本的提示匹配和答案输入结构。本轮会把补间运动、常见部首限制、电脑选词和词库质量筛选放在同一套规则数据上验证，并把联机平台研究结果写入部署说明。
+
+## assistant 进度消息 162
+
+真实词库测试已经捕获部首与医学诊断词的判定问题。动画代码正在改为持续移动同一个提示元素，声调独立绘制，整行答案共同移动。电脑选词将使用有来源的词频排序。
+
+朋友的项目使用 Render。当前服务可直接部署到 Render 免费实例；空闲服务唤醒约需一分钟，服务重启会清除内存房间。没有核实到同时公开免费商用授权、专业词语筛除标准和完整审核记录的现成词库。
+
+## assistant 进度消息 163
+
+词库构建已经加入固定版本 jieba 词频，电脑会从全部合法答案里优先选择常见词语，玩家可继续提交其他合法词语。“边缘性人格障碍”和原先明确排除的组织全称已经写入排除文件；部首生成与判定已限制为常见部件形态，并要求对应汉字包含其他笔画。
+
+## 用户消息 32
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_ilHqzyrTT6A2bTWK2mCIPCDl\",0]","question":"为词库选择确定收录范围：你希望保留“人工智能、咖啡、冰淇淋”等日常常见名称，同时排除医学诊断、化学物质名等需要专业知识的词语，对吗？","answer":"对，按照日常使用范围保留和排除"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 164
+
+收录范围已经确定为日常使用，保留“人工智能、咖啡、冰淇淋”等名称。我会把来源中可以可靠识别的专业释义纳入筛选，保存明确的排除依据。
+
+34 项规则与真实 WebSocket 测试已经通过。浏览器逐帧检查已确认原有提示保持同一元素、连续缩放，整行答案同步移动，补全内容逐渐显现。Render 的免费部署文件已经准备好，公开服务仍需要账户连接仓库后创建。
+
+## assistant 进度消息 165
+
+筛选采用词条释义：只有专业领域释义的记录进入排除范围，拥有日常含义的记录继续保留，同时维护明确保留的日常名称。当前数据共 88,166 个词语，成语仍有 7,133 个。全部词条的人工审核尚未完成，因此这套筛选能够说明依据，无法保证已经识别每个专业词语。
+
+浏览器检查发现本地服务仍读取旧版本规则，已重新启动服务，正在使用更新后的真实数据重新验证全部流程。
+
+## assistant 进度消息 166
+
+本轮使用 `/code-review`，审查基准为开始修改时的 `805cac4`。两个审查分别核对仓库要求和用户已经确认的玩法、动画与词库规则。Render Blueprint 配置已经通过官方 schema 校验。
+
+## assistant 进度消息 167
+
+更新后的 34 项规则与联机测试、12 项浏览器流程全部通过，TypeScript 与构建也通过。Standards 审查未发现需要修改的问题，Spec 审查正在核对最后的提示运动、字段颜色和收录范围。
+
+## assistant 进度消息 168
+
+完整浏览器流程已经通过；我又修正了提示拼音中声调的定位，让提示阶段和附着阶段都把符号放在对应元音上方。现在执行最后一次构建检查和提交。
+
+## assistant 进度消息 169
+
+我已按已确认的补间、部首、词库和联机要求继续处理，当前重点是完成声调定位验证、规格审查和最终提交。研究与开发记录会同步保存到项目文档。
+
+## assistant 进度消息 170
+
+规格审查发现“药片”被专业标签筛选排除了，我会补充核查日常名称，并验证医学诊断和化学物质的收录边界。声调位置和补间动画的针对性浏览器检查已经通过。
+
+## assistant 进度消息 171
+
+“药片、流食、呼吸机”等日常名称已保留，核查过的专业名称已加入明确排除文件。审查还发现“姆妈”这类音节没有韵母，声调需要显示在音节字母上方；我会补充这个读音边界的处理和验证。
+
+## assistant 进度消息 172
+
+更新后的 34 项规则与真实 WebSocket 测试、12 项浏览器流程全部通过，构建也通过。补间保持原有提示元素连续运动，整行答案同步上移；日常收录文件和 Render 免费部署配置已保存，现在整理提交。
+
+## assistant 消息 173
+
+已提交 `fix: animate prompt completion and prioritize everyday words`。
+
+- 提示使用同一元素连续移动与缩放，整行答案上移，补全内容渐显与渐隐，运动先快后慢。
+- 原有提示和声调保持黑色，补全使用亮橙色 `#FFAD32`；部首采用常见部件形态。
+- 电脑按词频优先选择常见答案。[收录文件](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/data/policy.json) 保留日常名称并筛选专业词语；全部词条的人工审核尚未完成。
+
+推荐 Render Free，已准备[部署说明](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/deployment.md)和配置。公开服务尚未创建；免费实例空闲 15 分钟会休眠，唤醒约一分钟，重启会清除内存房间。
+
+34 项规则与联机测试、12 项浏览器测试、TypeScript 和构建全部通过。[聊天原文](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/conversation.md)已保存。

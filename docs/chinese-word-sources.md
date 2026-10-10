@@ -106,7 +106,7 @@ Unihan 主要提供汉字级数据。它不能单独提供完整中文词语、�
 
 ## 当前游戏资料
 
-当前游戏词库 `data/dictionary.json` 包含 88,613 个词语，其中 7,133 个列入成语集合；THUOCL 中有 5,042 个候选获得完整 CC-CEDICT 读音。生成规则、筛选文件及完整统计见 `data/README.md`、`data/policy.json`、`data/build-report.json`。
+当前游戏词库 `data/dictionary.json` 包含 88,177 个词语，其中 7,133 个列入成语集合；THUOCL 中有 5,042 个候选获得完整 CC-CEDICT 读音。生成规则、筛选文件及完整统计见 `data/README.md`、`data/policy.json`、`data/build-report.json`。常见程度排序采用 jieba 固定版本的 MIT 词频资料，专业领域筛选依据词条释义和明确保留文件，研究见 `docs/everyday-word-sources-2026-10-11.md`。
 
 资料按来源保存许可：CC-CEDICT 的词语与拼音部分按 CC BY-SA 4.0 发布；THUOCL 原始候选和 DF 保留 MIT；Unicode 部首保留 Unicode License v3。词语数据的修改包括长度与释义筛选、完整读音去重、拼音条件字段生成和成语分类。单局条件使用同一匹配窗口与同一套完整读音，候选数量按实际交集统计。
 
