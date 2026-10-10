@@ -91,7 +91,7 @@ test('大厅提供创建顺序、密码、房主转移和空房删除', async t 
   await second.wait(message => message.type === 'lobby' && message.rooms.length === 0, start);
 });
 
-test('分享令牌加入隐藏房间并支持房主修改元数据', async t => {
+test('拼音分享链接加入隐藏房间并支持房主修改元数据', async t => {
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
   t.after(() => server.close());
   const host = await Client.connect(server.address, '分享房主');
@@ -99,13 +99,12 @@ test('分享令牌加入隐藏房间并支持房主修改元数据', async t => 
   t.after(() => host.close());
   t.after(() => guest.close());
   await host.request({type: 'create', data: {name: '', password: '', listed: true, settings: defaultSettings}});
-  const token = host.room!.shareToken;
-  assert.ok(token.length >= 40);
+  const pinyin = host.room!.roomPinyin;
   assert.equal((await host.request({type: 'metadata', data: {name: '隐藏房间', listed: false, password: '分享密码'}})).ok, true);
   assert.equal(host.room!.name, '隐藏房间');
   assert.equal(host.room!.listed, false);
-  assert.equal((await guest.request({type: 'joinByLink', data: {token, password: '错误密码'}})).ok, false);
-  assert.equal((await guest.request({type: 'joinByLink', data: {token, password: '分享密码'}})).ok, true);
+  assert.equal((await guest.request({type: 'joinByCode', data: {code: pinyin, password: '错误密码'}})).ok, false);
+  assert.equal((await guest.request({type: 'joinByCode', data: {code: pinyin.replaceAll('-', ''), password: '分享密码'}})).ok, true);
   assert.equal(guest.room!.id, host.room!.id);
   const lobby = guest.messages.filter(message => message.type === 'lobby').at(-1);
   if (lobby?.type === 'lobby') assert.equal(lobby.rooms.some(room => room.id === host.room!.id), false);

@@ -76,7 +76,7 @@ export interface PlayerView {
 export interface HistoryItem { playerId: string; nickname: string; word: string; at: number }
 export interface ChatMessage { id: string; nickname: string; text: string; at: number }
 export interface RoomView {
-  id: string; shareToken: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string;
+  id: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string;
   hostId: string; protected: boolean; listed: boolean;
   phase: 'waiting' | 'playing' | 'between' | 'finished';
   settings: Settings; players: PlayerView[];
@@ -86,7 +86,7 @@ export interface RoomView {
   lastWinnerId: string | null; winnerIds: string[];
 }
 export interface LobbyRoom {
-  id: string; shareToken: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string; mode: ModeId;
+  id: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string; mode: ModeId;
   playerCount: number; maxPlayers: number; protected: boolean; listed: boolean;
   phase: RoomView['phase']; conditions: ConditionType[];
 }
@@ -94,7 +94,6 @@ export type ClientCommand =
   | {type: 'hello'; data: {nickname: string; token?: string}}
   | {type: 'create'; data: {name: string; password: string; listed?: boolean; settings: Settings}}
   | {type: 'join'; data: {roomId: string; password: string}}
-  | {type: 'joinByLink'; data: {token: string; password: string}}
   | {type: 'joinByCode'; data: {code: string; password: string}}
   | {type: 'leave'; data: Record<string, never>}
   | {type: 'ready'; data: {ready: boolean}}

@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID, scryptSync, timingSafeEqual } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { fileURLToPath } from 'node:url';
@@ -20,7 +20,6 @@ const commandSchema = z.discriminatedUnion('type', [
   z.object({id: identifier, type: z.literal('hello'), data: z.object({nickname, token: identifier.optional()}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('create'), data: z.object({name: z.string().trim().max(40), password, listed: z.boolean().optional().default(true), settings: settingsSchema}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('join'), data: z.object({roomId: identifier, password}).strict()}).strict(),
-  z.object({id: identifier, type: z.literal('joinByLink'), data: z.object({token: z.string().trim().min(16).max(128), password}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('joinByCode'), data: z.object({code: z.string().trim().min(1).max(100), password}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('leave'), data: empty}).strict(),
   z.object({id: identifier, type: z.literal('ready'), data: z.object({ready: z.boolean()}).strict()}).strict(),
@@ -50,7 +49,7 @@ interface Session extends PlayerView {
   reconnectTimer?: ReturnType<typeof setTimeout>;
 }
 
-interface Room extends Omit<RoomView, 'players' | 'protected' | 'serverTime' | 'shareToken'> {
+interface Room extends Omit<RoomView, 'players' | 'protected' | 'serverTime'> {
   players: Session[];
   passwordSalt: Buffer | null;
   passwordHash: Buffer | null;
@@ -86,7 +85,6 @@ export async function createGameServer(options: GameServerOptions = {}) {
   const allowedOrigins = options.allowedOrigins;
   let closing = false;
   let creationOrder = 0;
-  const linkSecret = randomBytes(32);
   let rulesPromise: Promise<WordRules> | undefined;
   let loadedRules: WordRules | undefined;
 
@@ -128,7 +126,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
 
   function snapshot(room: Room): RoomView {
     return {
-      id: room.id, shareToken: makeShareToken(room.id), roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
+      id: room.id, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
       hostId: room.hostId, protected: room.passwordHash !== null, listed: room.listed, phase: room.phase,
       settings: structuredClone(room.settings), players: room.players.map(player => ({
         id: player.id, nickname: player.nickname, online: player.online, ready: player.ready,
@@ -146,27 +144,12 @@ export async function createGameServer(options: GameServerOptions = {}) {
     return [...rooms.values()].filter(room => room.listed && now - room.lastActivity < idleMs)
       .sort((first, second) => second.createdAt - first.createdAt || second.creationOrder - first.creationOrder)
       .map(room => ({
-        id: room.id, shareToken: makeShareToken(room.id), roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
+        id: room.id, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
         playerCount: room.players.length, maxPlayers: room.settings.maxPlayers,
         protected: room.passwordHash !== null, listed: room.listed, phase: room.phase,
         mode: room.settings.mode,
         conditions: conditionTypes.filter(type => room.settings.appearance[type] !== 'off'),
       }));
-  }
-
-  function makeShareToken(roomId: string) {
-    const signature = createHmac('sha256', linkSecret).update(roomId).digest();
-    return Buffer.concat([Buffer.from(roomId), signature]).toString('base64url');
-  }
-
-  function findRoomByShareToken(token: string) {
-    const decoded = Buffer.from(token, 'base64url');
-    if (decoded.length !== 36 + 32) return undefined;
-    const roomId = decoded.subarray(0, 36).toString();
-    const signature = decoded.subarray(36);
-    const expected = createHmac('sha256', linkSecret).update(roomId).digest();
-    if (!timingSafeEqual(signature, expected)) return undefined;
-    return rooms.get(roomId);
   }
 
   function broadcastLobby() {
@@ -180,15 +163,11 @@ export async function createGameServer(options: GameServerOptions = {}) {
   }
 
   function makeRoomKey(rules: WordRules, usedKeys: Set<string>) {
-    const candidates = rules.data.words.filter(entry => entry.idiom && [...entry.word].length === 4 && entry.readings.length > 0);
-    if (!candidates.length) throw new Error('词库没有可用的房间编号');
-    for (let attempt = 0; attempt < 1000; attempt++) {
-      const entry = candidates[randomInt(candidates.length)];
-      const reading = entry.readings[0];
-      const roomPinyin = reading.syllables.map(syllable => normalizePinyin(syllable)).join('-');
-      if (!usedKeys.has(roomPinyin)) return {roomKey: entry.word, roomPinyin};
-    }
-    throw new Error('当前房间编号已经用尽');
+    const candidates = rules.data.words.filter(entry => entry.idiom && [...entry.word].length === 4 && entry.readings.length > 0)
+      .map(entry => ({roomKey: entry.word, roomPinyin: entry.readings[0].syllables.map(syllable => normalizePinyin(syllable)).join('-')}))
+      .filter(candidate => !usedKeys.has(candidate.roomPinyin.replaceAll('-', '')));
+    if (!candidates.length) throw new Error('当前房间拼音已经用尽');
+    return candidates[randomInt(candidates.length)];
   }
 
   function touch(room: Room) {
@@ -445,7 +424,7 @@ export async function createGameServer(options: GameServerOptions = {}) {
 
   function createRoom(session: Session, requestedName: string, passwordValue: string, listed: boolean, requestedSettings: RoomView['settings'], rules: WordRules) {
     const now = Date.now();
-    const code = makeRoomKey(rules, new Set([...rooms.values()].map(room => room.roomPinyin)));
+    const code = makeRoomKey(rules, new Set([...rooms.values()].map(room => room.roomPinyin.replaceAll('-', ''))));
     const settings = structuredClone(requestedSettings);
     const salt = passwordValue ? randomBytes(16) : null;
     const room: Room = {
@@ -497,15 +476,10 @@ export async function createGameServer(options: GameServerOptions = {}) {
         if (session.roomId) throw new BusinessError('请离开当前房间后加入');
         return joinRoom(session, rooms.get(request.data.roomId), request.data.password);
       }
-      case 'joinByLink': {
-        if (session.roomId) throw new BusinessError('请离开当前房间后加入');
-        const room = findRoomByShareToken(request.data.token);
-        return joinRoom(session, room, request.data.password);
-      }
       case 'joinByCode': {
         if (session.roomId) throw new BusinessError('请离开当前房间后加入');
-        const code = request.data.code.trim().toLowerCase();
-        const room = [...rooms.values()].find(item => item.roomKey === request.data.code.trim() || item.roomPinyin === code);
+        const code = request.data.code.trim().toLowerCase().replaceAll('-', '');
+        const room = [...rooms.values()].find(item => item.roomKey === code || item.roomPinyin.replaceAll('-', '') === code);
         return joinRoom(session, room, request.data.password);
       }
       case 'leave': removePlayer(session); return {};

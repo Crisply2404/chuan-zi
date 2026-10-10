@@ -10,7 +10,7 @@ export const modeLabels: Record<ModeId, string> = {
 
 export const modeColors: Record<ModeId, string> = {
   'initial-tone': '#9B3D35',
-  radical: '#35605F',
+  radical: '#35635F',
   character: '#587044',
   'tone-only': '#4C5F7A',
   custom: '#735D73',

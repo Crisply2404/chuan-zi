@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { Download, Eye, Save } from 'lucide-react';
+import { ArrowLeft, Check, ChevronRight, Component, Download, Eye, Music2, Save, SlidersHorizontal, Speech, Type } from 'lucide-react';
 import { conditionTypes, modeIds, type Appearance, type ConditionType, type ModeId, type Prompt, type RelationMode, type Settings } from '../shared/types';
 import { settingsSchema } from '../shared/settings';
 import { getModeSettings, modeColors, modeDescriptions, modeLabels } from '../shared/presets';
@@ -9,6 +9,7 @@ export const conditionLabels: Record<ConditionType, string> = {
   initial: '声母', final: '韵母', tone: '声调', radical: '部首', component: '字形部件', contains: '连续汉字',
 };
 const initials = ['b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's', 'y', 'w'];
+const modeIcons = { 'initial-tone': Speech, radical: Component, character: Type, 'tone-only': Music2, custom: SlidersHorizontal };
 
 function NumberField({ label, value, min, max, step = 1, onChange, disabled = false }: {
   label: string; value: number; min: number; max: number; step?: number; onChange: (value: number) => void; disabled?: boolean;
@@ -19,9 +20,10 @@ function NumberField({ label, value, min, max, step = 1, onChange, disabled = fa
 
 export function SettingsEditor({ value, onChange, disabled, preview, onPreview, onSave, busy, fixedBestOf = false }: {
   value: Settings; onChange: (settings: Settings) => void; disabled: boolean; preview: Prompt | null;
-  onPreview: () => void; onSave?: () => void; busy: boolean; fixedBestOf?: boolean;
+  onPreview: () => void; onSave?: (settings: Settings, onSaved?: () => void) => void; busy: boolean; fixedBestOf?: boolean;
 }) {
   const [mode, setMode] = useState<ModeId>(value.mode);
+  const [editingCustom, setEditingCustom] = useState(false);
   useEffect(() => setMode(value.mode), [value.mode]);
   const update = <K extends keyof Settings>(key: K, next: Settings[K]) => onChange({ ...value, [key]: next });
   const updateDictionary = (next: Settings['dictionary']) => onChange({
@@ -38,13 +40,18 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     ...(relationMode === 'free' ? [] : [{ first, second, mode: relationMode }]),
   ]);
   const active = conditionTypes.filter(type => value.appearance[type] !== 'off');
-  const custom = mode === 'custom';
+  const custom = editingCustom;
   const selectMode = (next: ModeId) => {
     setMode(next);
-    onChange(next === 'custom' ? { ...value, mode: 'custom' } : getModeSettings(next));
+    setEditingCustom(next === 'custom');
+    const settings = next === 'custom' ? { ...value, mode: 'custom' as const } : {
+      ...getModeSettings(next), bestOf: value.bestOf, maxPlayers: value.maxPlayers,
+    };
+    onChange(settings);
+    if (next !== 'custom') onSave?.(settings);
   };
   const exportRules = () => {
-    const file = new Blob([JSON.stringify(value, null, 2)], {type: 'application/json'});
+    const file = new Blob([JSON.stringify({ version: 1, settings: value }, null, 2)], {type: 'application/json'});
     const link = document.createElement('a');
     link.href = URL.createObjectURL(file);
     link.download = 'chuan-zi-rule.json';
@@ -52,13 +59,19 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     URL.revokeObjectURL(link.href);
   };
   return <div className="settings-editor">
-    <div className="settings-heading"><h2>房间规则</h2>{disabled && <span className="muted">本局规则已确定</span>}</div>
+    <div className="settings-heading"><h2>{custom ? '自定义规则' : '房间规则'}</h2>{custom && <button type="button" className="back-button" onClick={() => setEditingCustom(false)}><ArrowLeft size={15} />游戏模式</button>}{disabled && <span className="muted">本局规则已确定</span>}</div>
     <fieldset disabled={disabled || busy}>
       <section className="settings-section">
-        <h3>游戏模式</h3>
-        <div className="mode-grid" aria-label="游戏模式">{modeIds.map(id => <button type="button" className="mode-card" aria-label={modeLabels[id]} style={{'--mode-color': modeColors[id]} as CSSProperties} aria-pressed={mode === id} key={id}
-          onClick={() => selectMode(id)}><span>{modeLabels[id]}</span><small>{modeDescriptions[id]}</small></button>)}</div>
-        {custom ? <><p className="settings-help">自定义模式可以逐项设置提示条件与条件关系。</p><div className="condition-controls">{conditionTypes.map(type => <div className="condition-row" key={type}>
+        <h3>{custom ? '提示条件' : '游戏模式'}</h3>
+        {!custom && <div className="mode-grid" aria-label="游戏模式">{modeIds.map(id => {
+          const Icon = modeIcons[id];
+          return <button type="button" className="mode-card" aria-label={modeLabels[id]} style={{'--mode-color': modeColors[id]} as CSSProperties} aria-pressed={mode === id} key={id}
+            onClick={() => selectMode(id)}><Icon className="mode-icon" size={25} strokeWidth={1.5} aria-hidden="true" />
+            <span className="mode-copy"><span>{modeLabels[id]}</span><small>{modeDescriptions[id]}</small></span>
+            <span className="mode-status">{id === 'custom' ? <ChevronRight size={18} aria-hidden="true" /> : mode === id ? <Check size={18} aria-hidden="true" /> : null}</span>
+          </button>;
+        })}</div>}
+        {custom ? <><div className="condition-controls">{conditionTypes.map(type => <div className="condition-row" key={type}>
           <span>{conditionLabels[type]}</span><div className="segments" role="group" aria-label={conditionLabels[type]}>{([
             ['off', '关闭'], ['random', '随机'], ['required', '必选'],
           ] as [Appearance, string][]).map(([appearance, label]) => <button type="button" key={appearance} aria-pressed={value.appearance[type] === appearance}
@@ -120,7 +133,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     {problems.length > 0 && <div className="field-errors" role="alert">{problems.map(problem => <p key={problem}>{problem}</p>)}</div>}
     {custom && <><div className="settings-actions"><button type="button" className="secondary-button" disabled={!validate.success || busy} onClick={onPreview}><Eye size={16} />预览提示</button>
         <button type="button" className="secondary-button" disabled={!validate.success || busy} onClick={exportRules}><Download size={16} />导出规则</button>
-        {onSave && <button type="button" className="primary-button" disabled={disabled || !validate.success || busy} onClick={onSave}><Save size={16} />保存规则</button>}
+        {onSave && <button type="button" className="primary-button" disabled={disabled || !validate.success || busy} onClick={() => onSave(value, () => setEditingCustom(false))}><Save size={16} />保存规则</button>}
       </div>
       {preview && <div className="preview-area"><PromptView prompt={preview} compact /></div>}</>}
   </div>;

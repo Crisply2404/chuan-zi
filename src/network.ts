@@ -65,19 +65,17 @@ export function useGameConnection(url: string, nickname: string) {
       socket.onopen = () => {
         if (stopped || generation !== generationRef.current) { socket.close(); return; }
         const token = sessionStorage.getItem(storageKey) || undefined;
-        let renewed = false;
         const hello = send({ type: 'hello', data: { nickname, token } }).catch(error => {
           if (error.message !== '登录信息已过期，请重新连接') throw error;
           sessionStorage.removeItem(storageKey);
           setRoom(null);
-          renewed = true;
           return send({ type: 'hello', data: { nickname } });
         });
         hello.then(() => {
           if (stopped) return;
           attempts = 0;
           setStatus('connected');
-          setNotice(renewed ? '身份已过期，已重新连接大厅' : '');
+          setNotice('');
         }, error => setNotice(error.message));
         heartbeat = setInterval(() => {
           if (socket.readyState !== WebSocket.OPEN) return;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, Heart, LockKeyhole, LogOut, MessageCircle, Pencil, Plus, RefreshCw, Send, Settings2, UserRound, Users, Wifi, WifiOff, X } from 'lucide-react';
 import { defaultSettings, type ClientCommand, type DraftMatch, type LobbyRoom, type PlayerView, type Prompt, type RoomView, type Settings } from '../shared/types';
 import { ConnectionError, useGameConnection } from './network';
@@ -14,8 +14,8 @@ function defaultWebSocketUrl() {
 }
 const initialUrl = defaultWebSocketUrl();
 const initialNickname = localStorage.getItem('chuan-zi:nickname') || '无名';
-function confirmedAnswer(value: string) {
-  return [...value].filter(character => /\p{Script=Han}/u.test(character)).join('').slice(0, 9);
+function confirmedAnswer(value: string, maxLength: number) {
+  return [...value].filter(character => /\p{Script=Han}/u.test(character)).slice(0, maxLength).join('');
 }
 
 function IconButton({ label, children, onClick, disabled = false, className = '' }: {
@@ -61,9 +61,8 @@ export default function App() {
   const connection = useGameConnection(url, nickname);
   const [modal, setModal] = useState<'connection' | 'join' | 'rename' | 'metadata' | 'licenses' | null>(null);
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
-  const [joining, setJoining] = useState<{ token: string; name?: string } | null>(null);
+  const [joining, setJoining] = useState<{ code: string; name?: string } | null>(null);
   const [settings, setSettings] = useState<Settings>(() => structuredClone(defaultSettings));
   const [preview, setPreview] = useState<Prompt | null>(null);
   const [roomTab, setRoomTab] = useState<'game' | 'settings'>('game');
@@ -81,12 +80,16 @@ export default function App() {
 
   useEffect(() => {
     if (room) {
-      history.replaceState(null, '', `${location.pathname}?room=${encodeURIComponent(room.shareToken)}`);
+      const address = new URL(location.href);
+      address.searchParams.set('room', room.roomPinyin);
+      history.replaceState(null, '', address);
       setModal(null);
-      roomParamHandled.current = room.shareToken;
+      roomParamHandled.current = room.roomPinyin;
       previousRoomId.current = room.id;
     } else if (previousRoomId.current) {
-      history.replaceState(null, '', location.pathname + location.search);
+      const address = new URL(location.href);
+      address.searchParams.delete('room');
+      history.replaceState(null, '', address);
       previousRoomId.current = null;
       roomParamHandled.current = '';
       setRoomTab('game');
@@ -108,17 +111,20 @@ export default function App() {
 
   useEffect(() => {
     if (!connected || !connection.lobbyReady || room) return;
-    const token = new URLSearchParams(location.search).get('room');
-    if (!token || roomParamHandled.current === token) return;
-    roomParamHandled.current = token;
-    setJoining({ token });
-    act({ type: 'joinByLink', data: { token, password: '' } }, undefined, () => setModal('join'));
+    const code = new URLSearchParams(location.search).get('room');
+    if (!code || roomParamHandled.current === code) return;
+    roomParamHandled.current = code;
+    setJoining({ code });
+    act({ type: 'joinByCode', data: { code, password: '' } }, undefined, failure => {
+      if (failure.message === '房间密码不正确') setModal('join');
+      else setError(failure.message);
+    });
   }, [connected, connection.lobbyReady, room, act]);
 
   const closeModal = useCallback(() => setModal(null), []);
   const join = (target: LobbyRoom) => {
-    if (target.protected) { setError(''); setJoining({ token: target.shareToken, name: target.name }); setModal('join'); }
-    else act({ type: 'joinByLink', data: { token: target.shareToken, password: '' } });
+    if (target.protected) { setError(''); setJoining({ code: target.roomPinyin, name: target.name }); setModal('join'); }
+    else act({ type: 'joinByCode', data: { code: target.roomPinyin, password: '' } });
   };
   const previewSettings = () => act<Prompt>({ type: 'preview', data: { settings } }, result => setPreview(result));
   const leave = () => act({ type: 'leave', data: {} }, () => {
@@ -129,27 +135,27 @@ export default function App() {
     setJoining(null);
   });
 
-  return <div className="app-shell">
+  return <div className={`app-shell ${room && roomTab === 'game' ? 'room-game-shell' : ''}`}>
     <header className="site-header"><a className="brand" href="#" onClick={event => { if (room) event.preventDefault(); }}><DrumMark /><span>击鼓传字</span></a>
       <div className="header-tools"><button type="button" className="connection-button" onClick={() => setModal('connection')}>
         {connected ? <Wifi size={16} /> : <WifiOff size={16} />}<span>{connectionLabels[connection.status]}</span>
       </button><span className="header-nickname"><UserRound size={15} />{nickname}</span><IconButton label="连接与昵称" onClick={() => setModal('connection')}><Settings2 size={19} /></IconButton></div>
     </header>
-    {((error && modal !== 'join' && modal !== 'metadata') || connection.notice || notice) && <div className={`notice-banner ${error ? 'notice-error' : ''}`} role={error ? 'alert' : 'status'}>
-      <span>{error || connection.notice || notice}</span><IconButton label="关闭消息" onClick={() => { setError(''); setNotice(''); connection.dismissNotice(); }}><X size={16} /></IconButton>
+    {((error && modal !== 'join' && modal !== 'metadata') || connection.notice) && <div className="notice-banner notice-error" role="alert">
+      <span>{error || connection.notice}</span><IconButton label="关闭消息" onClick={() => { setError(''); connection.dismissNotice(); }}><X size={16} /></IconButton>
     </div>}
     {room ? <main className="room-page">
       <div className="room-heading"><div><button type="button" className="back-button" onClick={leave} disabled={busy}><ArrowLeft size={15} />大厅</button>
-        <h1>{room.name}{room.protected && <LockKeyhole size={18} />}{isHost && <IconButton label="修改房间名称" onClick={() => setModal('metadata')}><Pencil size={15} /></IconButton>}</h1><p className="room-meta">{room.phase === 'playing' ? `第 ${room.round || 1} 局` : room.phase === 'finished' ? '比赛结束' : '准备中'}</p>
+        <h1>{room.name}{room.protected && <LockKeyhole size={18} />}{isHost && <IconButton label="修改房间名称" onClick={() => setModal('metadata')}><Pencil size={15} /></IconButton>}</h1>
       </div><div className="room-heading-tools"><IconButton label="复制邀请链接" onClick={() => {
-        navigator.clipboard.writeText(location.href).then(() => setNotice('邀请链接已复制'), failure => setError(failure.message));
+        navigator.clipboard.writeText(location.href).catch(failure => setError(failure.message));
       }}><Copy size={19} /></IconButton><IconButton label="离开房间" onClick={leave} disabled={busy}><LogOut size={19} /></IconButton></div></div>
       <div className="room-tabs" role="tablist"><button type="button" role="tab" aria-selected={roomTab === 'game'} onClick={() => setRoomTab('game')}>游戏</button>
         <button type="button" role="tab" aria-selected={roomTab === 'settings'} onClick={() => setRoomTab('settings')}>规则设置</button></div>
       {roomTab === 'game' ? <RoomGame room={room} self={self} isHost={Boolean(isHost)} busy={busy} connected={connected} act={act} send={connection.send} setError={setError} />
         : <div className="room-settings-layout"><SettingsEditor value={settings} onChange={next => { setSettings(next); setPreview(null); }} disabled={!isHost || room.phase === 'playing'}
           fixedBestOf={room.phase === 'between'} preview={preview} busy={busy} onPreview={previewSettings}
-          onSave={isHost ? () => act({ type: 'settings', data: { settings } }) : undefined} />
+          onSave={isHost ? (next, onSaved) => act({ type: 'settings', data: { settings: next } }, onSaved) : undefined} />
           <aside className="settings-room-info"><h3>房间</h3><p>{room.players.length} / {room.settings.maxPlayers} 人</p><p>{phaseLabels[room.phase]}</p>
             <p>第 {room.round || 1} 局 / {room.settings.bestOf} 局</p><p className="muted">房主：{room.players.find(player => player.id === room.hostId)?.nickname}</p>
             <label className="visibility-setting"><input type="checkbox" checked={room.listed} disabled={!isHost || busy} onChange={event => act({ type: 'visibility', data: { listed: event.target.checked } })} />{room.listed ? <><Eye size={14} />在大厅展示</> : <><EyeOff size={14} />大厅隐藏</>}</label></aside></div>}
@@ -173,7 +179,7 @@ export default function App() {
       setNickname(nextNickname); setModal(null);
     }} /></Modal>}
     {modal === 'join' && joining && !room && <Modal title={joining.name || '加入房间'} onClose={closeModal} error={error}><JoinForm busy={busy} onJoin={password =>
-      act({ type: 'joinByLink', data: { token: joining.token, password } })} /></Modal>}
+      act({ type: 'joinByCode', data: { code: joining.code, password } })} /></Modal>}
     {modal === 'metadata' && room && <Modal title="房间设置" onClose={closeModal} error={error}><MetadataForm name={room.name} listed={room.listed} busy={busy} onSave={(name, listed, password) => act({ type: 'metadata', data: { name, listed, password } }, () => setModal(null))} /></Modal>}
     {modal === 'licenses' && <Modal title="数据与许可" onClose={closeModal}><div className="license-list"><p>成语候选与文档频次：THUOCL · MIT</p>
       <p>普通词语与读音：CC-CEDICT · CC BY-SA 4.0</p><p>部首：Unicode Unihan · Unicode License v3</p>
@@ -218,32 +224,38 @@ type Act = <T = unknown>(command: ClientCommand, done?: (result: T) => void, fai
 function PlayerTopology({ room, self, isHost, busy, connected, act }: {
   room: RoomView; self?: PlayerView; isHost: boolean; busy: boolean; connected: boolean; act: Act;
 }) {
-  const currentIndex = room.players.findIndex(player => player.id === room.currentPlayerId);
-  const currentAngle = currentIndex < 0 ? 0 : (currentIndex / Math.max(1, room.players.length)) * 360 - 90;
-  return <section className="topology-area" aria-label="玩家拓扑图">
-    <div className="topology-heading"><span>{room.players.length} / {room.settings.maxPlayers} 位玩家</span>
-      {isHost && room.phase !== 'playing' && <button type="button" className="cpu-button" disabled={busy || !connected} onClick={() => act({ type: room.players.some(player => player.cpu) ? 'removeCpu' : 'addCpu', data: {} })}><Bot size={14} />{room.players.some(player => player.cpu) ? '移除电脑' : '添加电脑'}</button>}
-    </div>
-    <div className="player-topology">
-      <div className="topology-ring" style={{'--player-count': room.players.length} as CSSProperties}>
-        <div className="topology-arrow" style={{'--arrow-angle': `${currentAngle + 90}deg`} as CSSProperties} aria-hidden="true" />
+  const [menuId, setMenuId] = useState<string | null>(null);
+  const count = Math.max(2, room.players.length);
+  const dense = count > 8;
+  const positions = dense
+    ? [[10, 12], [30, 12], [50, 12], [70, 12], [90, 12], [90, 31], [90, 50], [90, 69], [90, 88], [70, 88], [50, 88], [30, 88], [10, 88], [10, 69], [10, 50], [10, 31]]
+    : [[50, 16], [87, 16], [87, 50], [87, 84], [50, 84], [13, 84], [13, 50], [13, 16]];
+  useEffect(() => { setMenuId(null); }, [room.phase]);
+  return <section className={`topology-area ${count > 2 ? 'topology-area-many' : ''} ${dense ? 'topology-area-dense' : ''}`} aria-label="玩家拓扑图">
+    <div className={`player-topology ${count > 2 ? 'player-topology-many' : ''} ${dense ? 'player-topology-dense' : ''}`}>
         {room.players.map((player, index) => {
-          const angle = (index / Math.max(1, room.players.length)) * 360 - 90;
-          const radians = angle * Math.PI / 180;
-          return <div className={`topology-player ${player.id === room.currentPlayerId ? 'topology-player-current' : ''} ${!player.online ? 'topology-player-disconnected' : ''}`} style={{left: `${50 + Math.cos(radians) * 40}%`, top: `${50 + Math.sin(radians) * 40}%`} as CSSProperties} key={player.id}>
-            <div className="topology-avatar">{index + 1}</div><span>{player.nickname}</span>
-            <small>{room.phase === 'playing' && player.role === 'player' ? `生命 ${player.lives}` : player.role === 'spectator' ? '观战' : player.ready ? '已准备' : '等待准备'}</small>
-            {player.id === room.hostId && <Crown size={12} aria-label="房主" />}
-            {isHost && player.id !== self?.id && <span className="topology-controls">
+          const [left, top] = count === 2 ? [index === 0 ? 14 : 86, 50] : positions[Math.floor(index * positions.length / count)];
+          const manageable = isHost && player.id !== self?.id;
+          const lives = room.phase === 'waiting' ? room.settings.startingLives : player.lives;
+          return <div className={`topology-player ${player.id === room.currentPlayerId ? 'topology-player-current' : ''} ${!player.online ? 'topology-player-disconnected' : ''}`} style={{left: `${left}%`, top: `${top}%`} as CSSProperties} key={player.id}>
+            <button type="button" className={`topology-avatar ${player.ready ? 'topology-avatar-ready' : ''}`} aria-label={`${player.nickname}${manageable ? '，玩家管理' : ''}`} title={manageable ? '玩家管理' : player.nickname} aria-expanded={manageable ? menuId === player.id : undefined} disabled={!manageable} onClick={() => setMenuId(menuId === player.id ? null : player.id)}>
+              {player.cpu ? <Bot size={25} /> : <UserRound size={25} />}
+            </button><span>{player.nickname}</span>
+            {player.role === 'spectator' ? <small>观战</small> : <div className="topology-lives" aria-label={`生命 ${lives}`}>
+              {dense ? <><Heart size={11} fill="currentColor" /><span>{lives}</span></> : Array.from({ length: lives }, (_, heart) => <Heart size={12} fill="currentColor" key={heart} />)}
+            </div>}
+            {manageable && menuId === player.id && <div className="topology-controls">
               {player.cpu ? <IconButton label="移除电脑" disabled={busy || room.phase === 'playing'} onClick={() => act({ type: 'removeCpu', data: {} })}><X size={13} /></IconButton> : <>
                 <IconButton label={`转移房主给 ${player.nickname}`} disabled={busy} onClick={() => act({ type: 'transfer', data: { playerId: player.id } })}><Crown size={13} /></IconButton>
                 <IconButton label={`移除 ${player.nickname}`} disabled={busy} onClick={() => act({ type: 'kick', data: { playerId: player.id } })}><X size={13} /></IconButton>
               </>}
-            </span>}
+            </div>}
           </div>;
         })}
-        <div className="topology-center"><DrumMark size={48} /><span>{room.currentPlayerId ? room.players.find(player => player.id === room.currentPlayerId)?.nickname : '击鼓传字'}</span></div>
-      </div>
+        {isHost && room.players.length === 1 && room.phase !== 'playing' && <button type="button" className="topology-add" aria-label="添加电脑" disabled={busy || !connected} onClick={() => act({ type: 'addCpu', data: {} })}>
+          <span className="topology-avatar"><Plus size={24} /></span><span>添加电脑</span>
+        </button>}
+        <div className="topology-center"><DrumMark size={46} /></div>
     </div>
   </section>;
 }
@@ -253,6 +265,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   send: <T = unknown>(command: ClientCommand) => Promise<T>; setError: (message: string) => void;
 }) {
   const [word, setWord] = useState('');
+  const [inputValue, setInputValue] = useState('');
   const [draftMatch, setDraftMatch] = useState<DraftMatch>({ word: '', promptId: null, offset: null });
   const [feedback, setFeedback] = useState(false);
   const [chat, setChat] = useState('');
@@ -262,6 +275,28 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const chatComposing = useRef(false);
   const chatComposedAt = useRef(0);
   const input = useRef<HTMLInputElement>(null);
+  const pendingSelection = useRef<number | null>(null);
+  const [cursor, setCursor] = useState(0);
+  const [inputFocused, setInputFocused] = useState(false);
+  useLayoutEffect(() => {
+    if (pendingSelection.current === null || !input.current) return;
+    input.current.setSelectionRange(pendingSelection.current, pendingSelection.current);
+    pendingSelection.current = null;
+  });
+  const updateAnswer = (target: HTMLInputElement) => {
+    const confirmed = confirmedAnswer(target.value, room.settings.maxLength);
+    const position = confirmedAnswer(target.value.slice(0, target.selectionStart ?? target.value.length), room.settings.maxLength).length;
+    pendingSelection.current = position;
+    setCursor([...confirmed.slice(0, position)].length);
+    setInputValue(confirmed); setWord(confirmed);
+  };
+  const selectCharacter = (index: number) => {
+    if (!isTurn || composing.current) return;
+    const position = [...word].slice(0, index).join('').length;
+    input.current?.focus({ preventScroll: true });
+    input.current?.setSelectionRange(position, position);
+    setCursor(index);
+  };
   const chatList = useRef<HTMLDivElement>(null);
   const historyList = useRef<HTMLDivElement>(null);
   const [sideTab, setSideTab] = useState<'history' | 'chat'>('history');
@@ -272,7 +307,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 100); return () => clearInterval(timer); }, []);
   const seconds = room.deadline === null ? 0 : Math.max(0, (room.deadline - now - serverOffset.current) / 1000);
   const initial = room.settings.timerMode === 'fixed' ? room.settings.initialSeconds : room.settings.randomMaxSeconds;
-  useEffect(() => { setWord(''); setDraftMatch({ word: '', promptId: room.prompt?.id ?? null, offset: null }); setFeedback(false); composing.current = false; if (isTurn) input.current?.focus(); }, [room.prompt?.id, isTurn]);
+  useEffect(() => { setWord(''); setInputValue(''); setCursor(0); setDraftMatch({ word: '', promptId: room.prompt?.id ?? null, offset: null }); setFeedback(false); composing.current = false; if (isTurn) input.current?.focus({ preventScroll: true }); }, [room.prompt?.id, isTurn]);
   useEffect(() => {
     if (!isTurn || !connected) return;
     const timer = setTimeout(() => { send<DraftMatch>({ type: 'draft', data: { word } }).then(result => setDraftMatch(result), failure => setError(failure.message)); }, 180);
@@ -283,7 +318,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (composing.current || Date.now() - composedAt.current < 120 || !room.prompt || !isTurn || !word.trim()) return;
-    act({ type: 'submit', data: { word: word.trim(), promptId: room.prompt.id } }, () => setWord(''), failure => {
+    act({ type: 'submit', data: { word: word.trim(), promptId: room.prompt.id } }, () => { setWord(''); setInputValue(''); }, failure => {
       if (/答案|词库|提示|重复|长度|当前回合|时间/.test(failure.message)) {
         setFeedback(true);
         window.setTimeout(() => setFeedback(false), 360);
@@ -292,23 +327,31 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   };
   const lastWinner = room.players.find(player => player.id === room.lastWinnerId);
   const winners = room.players.filter(player => room.winnerIds.includes(player.id));
-  return <div className="room-layout room-layout-centered">
+  return <div className={`room-layout room-layout-centered ${room.players.length > 2 ? 'room-layout-many' : ''} ${room.players.length > 8 ? 'room-layout-dense' : ''}`}>
     <section className="game-area"><PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} />
       {room.phase === 'playing' && room.prompt ? <>
         <div className="timer-area"><div className={`timer ${seconds <= 5 ? 'timer-urgent' : ''}`} aria-label="剩余时间"><span>{seconds.toFixed(1)}</span><small>秒</small></div>
           <div className="timer-track"><span style={{ width: `${Math.min(100, seconds / initial * 100)}%` }} /></div></div>
-        <div className="live-prompt"><PromptView prompt={room.prompt} draft={word} draftMatch={draftMatch} feedback={feedback} /></div>
-        <form className={`answer-form ${isTurn ? 'answer-active' : ''} ${feedback ? 'answer-feedback' : ''}`} onSubmit={submit}><input ref={input} aria-label="输入答案" value={word} maxLength={9} autoComplete="off" autoCorrect="off" spellCheck={false}
-          disabled={!isTurn || !connected} placeholder={isTurn ? '输入词语或成语' : self?.role === 'spectator' ? '正在观战' : '等待你的回合'}
-          onChange={event => { if (!composing.current) setWord(confirmedAnswer(event.target.value)); }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={event => { composing.current = false; setWord(confirmedAnswer(event.currentTarget.value)); composedAt.current = Date.now(); }}
-          onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || composing.current || event.keyCode === 229 || Date.now() - composedAt.current < 120)) event.preventDefault(); }} />
-          <button type="submit" className="submit-button" title="提交答案" aria-label="提交答案" disabled={!isTurn || !connected || busy || !word.trim()}><ArrowRight size={23} /></button></form>
+        <form className={`answer-form ${isTurn ? 'answer-active' : ''}`} onSubmit={submit}>
+          <PromptView prompt={room.prompt} draft={word} draftMatch={draftMatch} feedback={feedback} maxLength={room.settings.maxLength} cursor={cursor} focused={inputFocused} onSelectCharacter={selectCharacter} answerInput={<input ref={input} aria-label="输入答案" value={inputValue} autoComplete="off" autoCorrect="off" spellCheck={false}
+          disabled={!isTurn || !connected}
+          onFocus={() => setInputFocused(true)} onBlur={() => setInputFocused(false)}
+          onSelect={event => { if (!composing.current) setCursor([...event.currentTarget.value.slice(0, event.currentTarget.selectionStart ?? 0)].length); }}
+          onChange={event => {
+            if (composing.current) { setInputValue(event.target.value); return; }
+            updateAnswer(event.target);
+          }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={event => {
+            composing.current = false;
+            updateAnswer(event.currentTarget); composedAt.current = Date.now();
+          }}
+          onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || composing.current || event.keyCode === 229 || Date.now() - composedAt.current < 120)) event.preventDefault(); }} />} />
+          <button type="submit" className="submit-button" title="提交答案" aria-label="提交答案" disabled={!isTurn || !connected || busy || !word.trim()}><ArrowRight size={23} /></button>
+        </form>
         {self && <div className="bonus-progress"><div><span>奖励生命</span><Heart size={13} /></div><div className="bonus-letters">{room.settings.bonusInitials.map(initial =>
           <span className={self.collected.includes(initial) ? 'bonus-collected' : ''} key={initial}>{initial}</span>)}</div></div>}
-      </> : <div className="waiting-stage"><DrumMark size={88} />
-        {room.phase === 'finished' ? <><h2>{winners.map(player => player.nickname).join('、')} 获胜</h2><span className="muted">比赛结束</span></>
-          : room.phase === 'between' ? <><h2>{lastWinner ? `${lastWinner.nickname} 获胜` : '本局中止'}</h2><span className="muted">{lastWinner ? room.suddenDeath ? '准备加赛' : '准备下一局' : '重新准备'}</span></>
-          : <><h2>准备开始</h2><span className="muted">{room.players.filter(player => player.ready).length} 人已准备</span></>}
+      </> : <div className="waiting-stage">
+        {room.phase === 'finished' ? <h2>{winners.map(player => player.nickname).join('、')} 获胜</h2>
+          : room.phase === 'between' ? <h2>{lastWinner ? `${lastWinner.nickname} 获胜` : '本局中止'}</h2> : null}
         <div className="ready-actions">{self && <button type="button" className={self.ready ? 'secondary-button' : 'primary-button'} disabled={busy || !connected} onClick={() => act({ type: 'ready', data: { ready: !self.ready } })}>
           <Check size={17} />{self.ready ? '取消准备' : '准备'}</button>}
           {isHost && <button type="button" className="primary-button" disabled={busy || !connected || room.players.filter(player => player.ready && player.online).length < 2}
