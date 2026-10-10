@@ -25,6 +25,27 @@ async function connect(page: Page, nickname: string) {
   await expect(page.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true })).toBeEnabled();
 }
 
+async function sampleMotion(page: Page, action: () => Promise<unknown>) {
+  await page.evaluate(() => {
+    const samples: { y: number; alpha: number; newCellAlpha: number }[] = [];
+    Object.assign(window, { motionSamples: samples, motionFinished: false });
+    const started = performance.now();
+    const sample = () => {
+      const prompt = document.querySelector('.prompt-layer')!;
+      const supplement = document.querySelector('.prompt-complete .prompt-supplement');
+      const newCell = document.querySelector('.answer-cell:nth-child(2) .answer-cell-surface');
+      samples.push({ y: prompt.getBoundingClientRect().y, alpha: supplement ? Number(getComputedStyle(supplement).opacity) : 0,
+        newCellAlpha: newCell ? Number(getComputedStyle(newCell).opacity) : 0 });
+      if (performance.now() - started < 1100) requestAnimationFrame(sample);
+      else Object.assign(window, { motionFinished: true });
+    };
+    requestAnimationFrame(sample);
+  });
+  await action();
+  await page.waitForFunction(() => Reflect.get(window, 'motionFinished'));
+  return page.evaluate(() => Reflect.get(window, 'motionSamples') as { y: number; alpha: number; newCellAlpha: number }[]);
+}
+
 async function assertLayout(page: Page) {
   const overflow = await page.evaluate(() => {
     const viewport = document.documentElement.clientWidth;
@@ -43,14 +64,15 @@ async function assertGameLayout(page: Page) {
     const topology = bounds('.player-topology');
     const stage = bounds('.timer-area, .waiting-stage');
     const game = bounds('.game-area');
-    const activity = bounds('.activity-area');
+    const activityElement = document.querySelector('.activity-area');
+    const activity = activityElement?.getBoundingClientRect();
     const players = [...document.querySelectorAll('.topology-player')].map(element => element.getBoundingClientRect());
     const failures: unknown[] = [];
     players.forEach((player, index) => {
       if (player.top < game.top - 1 || player.bottom > stage.top + 1) failures.push({ index, player: player.toJSON(), game: game.toJSON(), stage: stage.toJSON() });
     });
     if (topology.bottom > stage.top + 1) failures.push({ topology: topology.toJSON(), stage: stage.toJSON() });
-    if (game.bottom > innerHeight || (activity.left < game.right && game.bottom > activity.top + 1)) failures.push({ game: game.toJSON(), activity: activity.toJSON(), height: innerHeight });
+    if (game.bottom > innerHeight || (activity && activity.left < game.right && game.bottom > activity.top + 1)) failures.push({ game: game.toJSON(), activity: activity?.toJSON(), height: innerHeight });
     return failures;
   })).toEqual([]);
 }
@@ -139,9 +161,15 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
       return match.valid && match.offset! > 0;
     })!.word;
     const offset = rules.match(answer, state.prompt!, state.settings).offset!;
-    await active.getByLabel('输入答案').fill(answer);
+    const mergeFrames = await sampleMotion(active, () => active.getByLabel('输入答案').fill(answer));
+    expect(new Set(mergeFrames.map(frame => Math.round(frame.y))).size).toBeGreaterThan(5);
+    expect(mergeFrames.some(frame => frame.alpha > 0 && frame.alpha < 1)).toBe(true);
+    expect(mergeFrames.some(frame => frame.newCellAlpha > 0 && frame.newCellAlpha < 1)).toBe(true);
     await expect(active.locator('.answer-cells')).toBeVisible();
     await expect(active.locator('.prompt-layer-attached')).toBeVisible();
+    await expect(active.locator('.prompt-origin').first()).toHaveCSS('color', 'rgb(34, 34, 34)');
+    await expect(active.locator('.prompt-supplement').first()).toHaveCSS('color', 'rgb(177, 94, 33)');
+    await expect.poll(() => active.locator('.answer-cell-attached').first().evaluate(element => new DOMMatrix(getComputedStyle(element).transform).m42)).toBeLessThan(-20);
     await expect.poll(async () => active.locator('.prompt-cell').evaluateAll((elements, start) => {
       const answerCells = [...document.querySelectorAll('.answer-cell')];
       return elements.every((element, index) => {
@@ -151,7 +179,9 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
       });
     }, offset)).toBe(true);
     await active.getByLabel('输入答案').press('ControlOrMeta+A');
-    await active.getByLabel('输入答案').press('Backspace');
+    const returnFrames = await sampleMotion(active, () => active.getByLabel('输入答案').press('Backspace'));
+    expect(new Set(returnFrames.map(frame => Math.round(frame.y))).size).toBeGreaterThan(5);
+    expect(returnFrames.some(frame => frame.alpha > 0 && frame.alpha < 1)).toBe(true);
     await expect(active.locator('.prompt-layer-attached')).toHaveCount(0);
     await expect(active.locator('.answer-cell')).toHaveCount(1);
     await expect.poll(async () => {
@@ -321,7 +351,7 @@ test('原生 IME 组合文本保持可编辑，确认汉字后更新答案', asy
     await expect(active.locator('.answer-character')).toHaveText(['打', '击', '报', '复']);
     await expect(active.locator('.answer-cell')).toHaveCount(5);
     await expect(active.locator('.answer-cell-empty')).toHaveCount(1);
-    expect(await active.locator('.answer-cell').nth(4).evaluate(element => getComputedStyle(element).animationName)).toBe('cell-appear');
+    expect(await active.locator('.answer-cell-surface').nth(4).evaluate(element => getComputedStyle(element).animationName)).toBe('cell-appear');
     await active.locator('.answer-cell').nth(1).click();
     expect(await input.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(2);
     await input.click();
@@ -391,6 +421,43 @@ test('过期身份自动恢复大厅且不显示成功通知', async ({ page }) 
   await page.reload();
   await expect(page.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true })).toBeEnabled();
   await expect(page.locator('.notice-banner')).toHaveCount(0);
+});
+
+test('窄窗口活动面板默认收起，房间设置与局数在各宽度可用', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const state = observe(page);
+  await connect(page, '活动玩家');
+  await expect(page.getByRole('button', { name: '数据与许可', exact: true })).toBeVisible();
+  await page.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true }).click();
+  await expect(page.locator('.site-footer')).toHaveCount(0);
+  await expect(page.getByLabel('比赛局数')).toHaveText('第 1 局 / 3 局');
+  await expect(page.getByRole('button', { name: '查看答案记录与聊天', exact: true })).toBeVisible();
+  await expect(page.locator('.history-list')).toBeHidden();
+  await page.getByRole('button', { name: '查看答案记录与聊天', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '答案记录与聊天', exact: true })).toBeVisible();
+  const panel = (await page.getByRole('dialog', { name: '答案记录与聊天', exact: true }).boundingBox())!;
+  expect(panel.height).toBeGreaterThan(300);
+  await expect(page.getByRole('tab', { name: '答案记录', exact: false })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(page.getByRole('button', { name: '关闭记录与聊天', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('tab', { name: '答案记录', exact: false })).toBeFocused();
+  await page.getByRole('tab', { name: '聊天', exact: true }).click();
+  await page.getByLabel('聊天消息', { exact: true }).fill('这条消息保持清楚可读');
+  await page.getByRole('button', { name: '发送消息', exact: true }).click();
+  await expect(page.locator('.chat-message p')).toHaveText('这条消息保持清楚可读');
+  await page.getByRole('button', { name: '关闭记录与聊天', exact: true }).click();
+  await page.getByRole('tab', { name: '规则设置', exact: true }).click();
+  await page.getByRole('checkbox', { name: '在大厅展示', exact: true }).click();
+  await expect.poll(() => state.room?.listed).toBe(false);
+  await page.setViewportSize({ width: 1440, height: 800 });
+  await expect(page.getByRole('checkbox', { name: '在大厅展示', exact: true })).toBeVisible();
+  await expect(page.locator('.settings-room-info')).toHaveCount(0);
+  await page.getByRole('tab', { name: '游戏', exact: true }).click();
+  await expect(page.locator('.history-list')).toBeVisible();
+  const height = await page.getByRole('tab', { name: '聊天', exact: true }).evaluate(element => element.getBoundingClientRect().height);
+  expect(height).toBeGreaterThanOrEqual(44);
+  await assertLayout(page);
 });
 
 for (const playerCount of [8, 16]) test(`${playerCount} 人玩家图和头像管理菜单保持可用`, async ({ browser }) => {

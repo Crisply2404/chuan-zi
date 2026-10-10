@@ -44,4 +44,10 @@ docker run --name chuan-zi -p 8787:8787 -e ALLOWED_ORIGINS=https://crisply2404.g
 
 ## 发布状态
 
-本项目提供网页构建与可运行的服务端。公开 WSS 地址尚未配置；GitHub Pages 上的联机需要填写已经部署的服务地址。
+本项目提供网页构建与可运行的 Node.js 服务端。公开 WSS 服务尚未部署；发布者取得服务地址后，通过 `VITE_WS_URL` 构建网页。玩家打开网页即可自动连接。
+
+## Cloudflare 部署建议
+
+用户目前没有公开服务器。建议使用 Cloudflare Workers Free 与 SQLite Durable Objects 提供联机服务，使用 WebSocket Hibernation 保持空闲连接。免费额度、官方来源、持久计时和服务适配范围见 [Cloudflare 联机服务研究](cloudflare-deployment-research-2026-10-11.md)。Cloudflare 服务适配属于待确认的开发工作，当前 Node.js 服务继续用于本地联机。
+
+发布到个人网站时，只更新 `chuan-zi/` 目录中的构建产物。公开页面所需的服务地址由发布者配置。独立 Worker 服务发布后，使用其公开 `/ws` 地址重新生成 `dist`；Cloudflare 账户凭据保留在发布环境。

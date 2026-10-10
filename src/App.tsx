@@ -4,6 +4,7 @@ import { defaultSettings, type ClientCommand, type DraftMatch, type LobbyRoom, t
 import { ConnectionError, useGameConnection } from './network';
 import { conditionLabels, SettingsEditor } from './SettingsEditor';
 import { PromptView } from './PromptView';
+import { useTimedMessage } from './useTimedMessage';
 
 const phaseLabels: Record<RoomView['phase'], string> = { waiting: '准备中', playing: '正在游戏', between: '本局结束', finished: '比赛结束' };
 const connectionLabels = { idle: '未连接', connecting: '正在连接', connected: '已连接', reconnecting: '正在重连' };
@@ -24,7 +25,7 @@ function IconButton({ label, children, onClick, disabled = false, className = ''
   return <button type="button" className={`icon-button ${className}`} aria-label={label} title={label} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
-function Modal({ title, children, onClose, error = '' }: { title: string; children: ReactNode; onClose: () => void; error?: string }) {
+function Modal({ title, children, onClose, error = '', showHeading = true }: { title: string; children: ReactNode; onClose: () => void; error?: string; showHeading?: boolean }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -44,7 +45,7 @@ function Modal({ title, children, onClose, error = '' }: { title: string; childr
   }, [onClose]);
   return <div className="modal-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
     <div className="modal" role="dialog" aria-modal="true" aria-label={title} ref={panel}>
-      <div className="modal-heading"><h2>{title}</h2><IconButton label="关闭窗口" onClick={onClose}><X size={20} /></IconButton></div>
+      {showHeading && <div className="modal-heading"><h2>{title}</h2><IconButton label="关闭窗口" onClick={onClose}><X size={20} /></IconButton></div>}
       {error && <p className="modal-error" role="alert">{error}</p>}
       {children}
     </div>
@@ -60,7 +61,7 @@ export default function App() {
   const [nickname, setNickname] = useState(initialNickname);
   const connection = useGameConnection(url, nickname);
   const [modal, setModal] = useState<'connection' | 'join' | 'rename' | 'metadata' | 'licenses' | null>(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useTimedMessage();
   const [busy, setBusy] = useState(false);
   const [joining, setJoining] = useState<{ code: string; name?: string } | null>(null);
   const [settings, setSettings] = useState<Settings>(() => structuredClone(defaultSettings));
@@ -73,6 +74,8 @@ export default function App() {
   const isHost = room?.hostId === connection.playerId;
   const connected = connection.status === 'connected';
   const settingsSignature = room ? JSON.stringify(room.settings) : '';
+
+  useEffect(() => { setError(''); }, [connection.responseRevision, setError]);
 
   useEffect(() => {
     if (room) { setSettings(structuredClone(room.settings)); setPreview(null); }
@@ -156,9 +159,7 @@ export default function App() {
         : <div className="room-settings-layout"><SettingsEditor value={settings} onChange={next => { setSettings(next); setPreview(null); }} disabled={!isHost || room.phase === 'playing'}
           fixedBestOf={room.phase === 'between'} preview={preview} busy={busy} onPreview={previewSettings}
           onSave={isHost ? (next, onSaved) => act({ type: 'settings', data: { settings: next } }, onSaved) : undefined} />
-          <aside className="settings-room-info"><h3>房间</h3><p>{room.players.length} / {room.settings.maxPlayers} 人</p><p>{phaseLabels[room.phase]}</p>
-            <p>第 {room.round || 1} 局 / {room.settings.bestOf} 局</p><p className="muted">房主：{room.players.find(player => player.id === room.hostId)?.nickname}</p>
-            <label className="visibility-setting"><input type="checkbox" checked={room.listed} disabled={!isHost || busy} onChange={event => act({ type: 'visibility', data: { listed: event.target.checked } })} />{room.listed ? <><Eye size={14} />在大厅展示</> : <><EyeOff size={14} />大厅隐藏</>}</label></aside></div>}
+          <label className="visibility-setting"><input type="checkbox" aria-label="在大厅展示" checked={room.listed} disabled={!isHost || busy || !connected} onChange={event => act({ type: 'visibility', data: { listed: event.target.checked } })} />{room.listed ? <><Eye size={14} />在大厅展示</> : <><EyeOff size={14} />大厅隐藏</>}</label></div>}
     </main> : <main className="lobby-page"><div className="page-heading"><div><span className="eyebrow">击鼓传字</span><h1>游戏大厅</h1></div>
       <div className="page-heading-actions"><button type="button" className="primary-button" disabled={!connected || busy} onClick={() => act({ type: 'create', data: { name: '', password: '', listed: true, settings: structuredClone(defaultSettings) } })}><Plus size={18} />创建房间</button></div></div>
       <div className="lobby-toolbar"><span>{connection.rooms.length} 个房间</span><span className="muted">最新创建</span><IconButton label="重新连接" onClick={connection.reconnect}><RefreshCw size={16} /></IconButton></div>
@@ -170,10 +171,10 @@ export default function App() {
           <span className="lobby-phase">{phaseLabels[target.phase]}</span><ChevronRight size={18} />
         </button>) : <div className="empty-lobby"><DrumMark size={66} /><p>{connected ? '暂时没有房间' : connection.status === 'idle' ? '联机服务尚未设置' : '正在连接大厅'}</p>
           {connected ? <button type="button" className="secondary-button" onClick={() => act({ type: 'create', data: { name: '', password: '', listed: true, settings: structuredClone(defaultSettings) } })}><Plus size={16} />创建房间</button>
-            : <button type="button" className="secondary-button" onClick={() => setModal('connection')}><Settings2 size={16} />连接设置</button>}</div>}
+            : <button type="button" className="secondary-button" onClick={connection.reconnect}><RefreshCw size={16} />重新连接</button>}</div>}
       </div>
     </main>}
-    <footer className="site-footer"><span>击鼓传字</span><button type="button" onClick={() => setModal('licenses')}>数据与许可</button></footer>
+    {!room && <footer className="site-footer"><button type="button" onClick={() => setModal('licenses')}>数据与许可</button></footer>}
     {modal === 'connection' && <Modal title="昵称设置" onClose={closeModal}><ConnectionForm nickname={nickname} onApply={nextNickname => {
       localStorage.setItem('chuan-zi:nickname', nextNickname);
       setNickname(nextNickname); setModal(null);
@@ -300,6 +301,15 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const chatList = useRef<HTMLDivElement>(null);
   const historyList = useRef<HTMLDivElement>(null);
   const [sideTab, setSideTab] = useState<'history' | 'chat'>('history');
+  const [compactActivity, setCompactActivity] = useState(() => matchMedia('(max-width: 1000px)').matches);
+  const [activityOpen, setActivityOpen] = useState(false);
+  const closeActivity = useCallback(() => setActivityOpen(false), []);
+  useEffect(() => {
+    const query = matchMedia('(max-width: 1000px)');
+    const update = () => { setCompactActivity(query.matches); setActivityOpen(false); };
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
   const isTurn = room.phase === 'playing' && self?.id === room.currentPlayerId && self.role === 'player';
   const deadlineOffset = room.serverTime - Date.now();
   const serverOffset = useRef(deadlineOffset);
@@ -327,8 +337,27 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   };
   const lastWinner = room.players.find(player => player.id === room.lastWinnerId);
   const winners = room.players.filter(player => room.winnerIds.includes(player.id));
+  const activity = <aside className="activity-area"><div className="activity-tabs" role="tablist"><button role="tab" type="button" aria-selected={sideTab === 'history'} onClick={() => setSideTab('history')}>答案记录<span>{room.history.length}</span></button>
+    <button role="tab" type="button" aria-selected={sideTab === 'chat'} onClick={() => setSideTab('chat')}><MessageCircle size={16} />聊天</button>
+    {compactActivity && <IconButton label="关闭记录与聊天" onClick={closeActivity}><X size={18} /></IconButton>}</div>
+    {sideTab === 'history' ? <div className="history-list" ref={historyList}>{room.history.length ? room.history.map((item, index) => <div className="history-row" key={`${item.at}:${index}`}>
+      <span>{item.word}</span><small>{item.nickname}</small></div>) : <p className="activity-empty">暂无答案</p>}</div>
+      : <><div className="chat-list" ref={chatList}>{room.chat.length ? room.chat.map(message => <div className="chat-message" key={message.id}>
+        <div><span>{message.nickname}</span><time>{new Date(message.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</time></div><p>{message.text}</p>
+      </div>) : <p className="activity-empty">暂无消息</p>}</div><form className="chat-form" onSubmit={event => {
+        event.preventDefault();
+        if (chatComposing.current || Date.now() - chatComposedAt.current < 120) return;
+        if (chat.trim()) act({ type: 'chat', data: { text: chat.trim() } }, () => setChat(''));
+      }}>
+        <input aria-label="聊天消息" value={chat} maxLength={300} onChange={event => setChat(event.target.value)} placeholder="发送消息" disabled={!connected}
+          onCompositionStart={() => { chatComposing.current = true; }} onCompositionEnd={() => { chatComposing.current = false; chatComposedAt.current = Date.now(); }}
+          onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || chatComposing.current || event.keyCode === 229 || Date.now() - chatComposedAt.current < 120)) event.preventDefault(); }} />
+        <button type="submit" aria-label="发送消息" title="发送消息" disabled={!chat.trim() || busy || !connected}><Send size={16} /></button></form></>}
+  </aside>;
   return <div className={`room-layout room-layout-centered ${room.players.length > 2 ? 'room-layout-many' : ''} ${room.players.length > 8 ? 'room-layout-dense' : ''}`}>
-    <section className="game-area"><PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} />
+    <section className="game-area"><div className="game-summary"><span aria-label="比赛局数">第 {room.round || 1} 局 / {room.settings.bestOf} 局</span>
+      {compactActivity && <IconButton label="查看答案记录与聊天" onClick={() => setActivityOpen(true)}><MessageCircle size={19} /></IconButton>}</div>
+      <PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} />
       {room.phase === 'playing' && room.prompt ? <>
         <div className="timer-area"><div className={`timer ${seconds <= 5 ? 'timer-urgent' : ''}`} aria-label="剩余时间"><span>{seconds.toFixed(1)}</span><small>秒</small></div>
           <div className="timer-track"><span style={{ width: `${Math.min(100, seconds / initial * 100)}%` }} /></div></div>
@@ -358,21 +387,6 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
             onClick={() => act({ type: 'start', data: {} })}><ArrowRight size={17} />{room.phase === 'between' ? '开始下一局' : room.phase === 'finished' ? '开始新比赛' : '开始比赛'}</button>}</div>
       </div>}
     </section>
-    <aside className="activity-area"><div className="activity-tabs" role="tablist"><button role="tab" type="button" aria-selected={sideTab === 'history'} onClick={() => setSideTab('history')}>答案记录<span>{room.history.length}</span></button>
-      <button role="tab" type="button" aria-selected={sideTab === 'chat'} onClick={() => setSideTab('chat')}><MessageCircle size={14} />聊天</button></div>
-      {sideTab === 'history' ? <div className="history-list" ref={historyList}>{room.history.length ? room.history.map((item, index) => <div className="history-row" key={`${item.at}:${index}`}>
-        <span>{item.word}</span><small>{item.nickname}</small></div>) : <p className="activity-empty">暂无答案</p>}</div>
-        : <><div className="chat-list" ref={chatList}>{room.chat.length ? room.chat.map(message => <div className="chat-message" key={message.id}>
-          <div><span>{message.nickname}</span><time>{new Date(message.at).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</time></div><p>{message.text}</p>
-        </div>) : <p className="activity-empty">暂无消息</p>}</div><form className="chat-form" onSubmit={event => {
-          event.preventDefault();
-          if (chatComposing.current || Date.now() - chatComposedAt.current < 120) return;
-          if (chat.trim()) act({ type: 'chat', data: { text: chat.trim() } }, () => setChat(''));
-        }}>
-          <input aria-label="聊天消息" value={chat} maxLength={300} onChange={event => setChat(event.target.value)} placeholder="发送消息" disabled={!connected}
-            onCompositionStart={() => { chatComposing.current = true; }} onCompositionEnd={() => { chatComposing.current = false; chatComposedAt.current = Date.now(); }}
-            onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || chatComposing.current || event.keyCode === 229 || Date.now() - chatComposedAt.current < 120)) event.preventDefault(); }} />
-          <button type="submit" aria-label="发送消息" title="发送消息" disabled={!chat.trim() || busy || !connected}><Send size={16} /></button></form></>}
-    </aside>
+    {compactActivity ? activityOpen && <Modal title="答案记录与聊天" onClose={closeActivity} showHeading={false}>{activity}</Modal> : activity}
   </div>;
 }

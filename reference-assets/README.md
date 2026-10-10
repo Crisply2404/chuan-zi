@@ -5,6 +5,7 @@
 ## BombParty
 
 - `bombparty/bombparty-2p-correct.gif`：用户提供的正确答案反馈参考动画。
+- `bombparty/06.png` 与 `bombparty/07.png`：用户提供的玩家排列与中央传递物参考图片，对应原始附件顺序 6、7。
 
 ## 汉兜
 
@@ -14,5 +15,5 @@
 
 ## 用户提供的图片
 
-- `user-attachments/01.jpg` 至 `user-attachments/11.png`：本轮用户消息中的 11 个图片附件，按照消息中的出现顺序保存。
+- `user-attachments/01.jpg`、`02.png` 至 `05.png`、`08.png` 至 `11.png`：2026-10-09 用户消息中的图片附件，文件编号对应原始出现顺序。第 6、7 个附件位于 `bombparty/`。
 - 图片只用于产品讨论、布局核查和交互参考，不作为产品界面资源发布。

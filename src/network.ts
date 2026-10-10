@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ClientCommand, LobbyRoom, Request, RoomView, ServerMessage } from '../shared/types';
+import { useTimedMessage } from './useTimedMessage';
 
 export type ConnectionStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting';
 export class ConnectionError extends Error {}
@@ -16,7 +17,8 @@ export function useGameConnection(url: string, nickname: string) {
   const [lobbyReady, setLobbyReady] = useState(false);
   const [room, setRoom] = useState<RoomView | null>(null);
   const [playerId, setPlayerId] = useState('');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useTimedMessage();
+  const [responseRevision, setResponseRevision] = useState(0);
   const [serverTimeOffset, setServerTimeOffset] = useState(0);
   const socketRef = useRef<WebSocket | null>(null);
   const pendingRef = useRef(new Map<string, PendingRequest>());
@@ -89,6 +91,10 @@ export function useGameConnection(url: string, nickname: string) {
         if (stopped || generation !== generationRef.current || socketRef.current !== socket) return;
         const message = JSON.parse(event.data) as ServerMessage;
         if (message.type === 'reply') {
+          if (message.ok) {
+            setNotice('');
+            setResponseRevision(value => value + 1);
+          }
           const pending = pendingRef.current.get(message.id);
           if (!pending) return;
           clearTimeout(pending.timeout);
@@ -126,7 +132,9 @@ export function useGameConnection(url: string, nickname: string) {
         setStatus('reconnecting');
         retryRef.current = setTimeout(open, Math.min(1000 * 2 ** Math.min(attempts - 1, 4), 10000));
       };
-      socket.onerror = () => setNotice('联机服务暂时无法连接');
+      socket.onerror = () => {
+        if (!stopped && generation === generationRef.current && socketRef.current === socket) setNotice('联机服务暂时无法连接');
+      };
     };
     open();
     return () => {
@@ -143,5 +151,5 @@ export function useGameConnection(url: string, nickname: string) {
     };
   }, [url, nickname, revision, send]);
 
-  return { status, rooms, lobbyReady, room, playerId, notice, send, serverTimeOffset, dismissNotice: () => setNotice(''), reconnect: () => setRevision(value => value + 1) };
+  return { status, rooms, lobbyReady, room, playerId, notice, send, serverTimeOffset, responseRevision, dismissNotice: () => setNotice(''), reconnect: () => setRevision(value => value + 1) };
 }
