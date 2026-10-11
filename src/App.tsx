@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, Heart, LockKeyhole, LogOut, MessageCircle, Pencil, Plus, RefreshCw, Send, Settings2, UserRound, Users, Wifi, WifiOff, X } from 'lucide-react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, Heart, LockKeyhole, LogOut, MessageCircle, Pencil, Plus, RefreshCw, Send, Settings2, UserRound, Users, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react';
 import { defaultSettings, type ClientCommand, type DraftMatch, type LobbyRoom, type PlayerView, type Prompt, type RoomView, type Settings } from '../shared/types';
 import { ConnectionError, useGameConnection } from './network';
 import { conditionLabels, SettingsEditor } from './SettingsEditor';
 import { PromptView } from './PromptView';
 import { useTimedMessage } from './useTimedMessage';
+import { GameAudio } from './audio';
 
 const phaseLabels: Record<RoomView['phase'], string> = { waiting: '准备中', playing: '正在游戏', between: '本局结束', finished: '比赛结束' };
 const connectionLabels = { idle: '未连接', connecting: '正在连接', connected: '已连接', reconnecting: '正在重连' };
@@ -25,14 +26,14 @@ function IconButton({ label, children, onClick, disabled = false, className = ''
   return <button type="button" className={`icon-button ${className}`} aria-label={label} title={label} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
-function Modal({ title, children, onClose, error = '', showHeading = true, drawer = false }: { title: string; children: ReactNode; onClose: () => void; error?: string; showHeading?: boolean; drawer?: boolean }) {
+function Modal({ title, children, onClose, error = '', showHeading = true, drawer = false, allowInteraction = false }: { title: string; children: ReactNode; onClose: () => void; error?: string; showHeading?: boolean; drawer?: boolean; allowInteraction?: boolean }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
-    panel.current?.querySelector<HTMLElement>('input, button, select')?.focus();
+    if (!allowInteraction) panel.current?.querySelector<HTMLElement>('input, button, select')?.focus();
     const keydown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
-      if (event.key !== 'Tab') return;
+      if (allowInteraction || event.key !== 'Tab') return;
       const controls = panel.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]');
       if (!controls?.length) return;
       const first = controls[0];
@@ -42,9 +43,9 @@ function Modal({ title, children, onClose, error = '', showHeading = true, drawe
     };
     document.addEventListener('keydown', keydown);
     return () => { document.removeEventListener('keydown', keydown); previous?.focus(); };
-  }, [onClose]);
-  return <div className={`modal-backdrop ${drawer ? 'modal-backdrop-drawer' : ''}`} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className={`modal ${drawer ? 'modal-drawer' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={panel}>
+  }, [allowInteraction, onClose]);
+  return <div className={`modal-backdrop ${drawer ? 'modal-backdrop-drawer' : ''} ${allowInteraction ? 'modal-backdrop-passthrough' : ''}`} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className={`modal ${drawer ? 'modal-drawer' : ''}`} role="dialog" aria-modal={allowInteraction ? 'false' : 'true'} aria-label={title} ref={panel}>
       {showHeading && <div className="modal-heading"><h2>{title}</h2><IconButton label="关闭窗口" onClick={onClose}><X size={20} /></IconButton></div>}
       {error && <p className="modal-error" role="alert">{error}</p>}
       {children}
@@ -279,6 +280,12 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const pendingSelection = useRef<number | null>(null);
   const [cursor, setCursor] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
+  const audio = useMemo(() => new GameAudio(`${import.meta.env.BASE_URL}audio/chuan-zi-drum.wav`), []);
+  const [audioEnabled, setAudioEnabled] = useState(() => audio.isEnabled());
+  const [audioVolume, setAudioVolume] = useState(() => audio.getVolume());
+  const previousRoom = useRef<{ currentPlayerId: string | null; historyLength: number; lives: Record<string, number>; phase: RoomView['phase'] }>({ currentPlayerId: room.currentPlayerId, historyLength: room.history.length, lives: Object.fromEntries(room.players.map(player => [player.id, player.lives])), phase: room.phase });
+  const countdownSecond = useRef<number | null>(null);
+  useEffect(() => () => audio.dispose(), [audio]);
   useLayoutEffect(() => {
     if (pendingSelection.current === null || !input.current) return;
     input.current.setSelectionRange(pendingSelection.current, pendingSelection.current);
@@ -301,12 +308,12 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const chatList = useRef<HTMLDivElement>(null);
   const historyList = useRef<HTMLDivElement>(null);
   const [sideTab, setSideTab] = useState<'history' | 'chat'>('history');
-  const [compactActivity, setCompactActivity] = useState(() => matchMedia('(max-width: 1000px)').matches);
+  const [narrowViewport, setNarrowViewport] = useState(() => matchMedia('(max-width: 1000px)').matches);
   const [activityOpen, setActivityOpen] = useState(false);
   const closeActivity = useCallback(() => setActivityOpen(false), []);
   useEffect(() => {
     const query = matchMedia('(max-width: 1000px)');
-    const update = () => { setCompactActivity(query.matches); setActivityOpen(false); };
+    const update = () => setNarrowViewport(query.matches);
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
@@ -317,6 +324,24 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 100); return () => clearInterval(timer); }, []);
   const seconds = room.deadline === null ? 0 : Math.max(0, (room.deadline - now - serverOffset.current) / 1000);
   const initial = room.settings.timerMode === 'fixed' ? room.settings.initialSeconds : room.settings.randomMaxSeconds;
+  useEffect(() => {
+    const previous = previousRoom.current;
+    const lives = Object.fromEntries(room.players.map(player => [player.id, player.lives]));
+    if (room.phase === 'playing') {
+      if (room.history.length > previous.historyLength) audio.play('correct');
+      if (room.currentPlayerId && room.currentPlayerId !== previous.currentPlayerId) audio.play('turn');
+      if (room.players.some(player => player.lives < (previous.lives[player.id] ?? player.lives))) audio.play('timeout');
+    }
+    previousRoom.current = { currentPlayerId: room.currentPlayerId, historyLength: room.history.length, lives, phase: room.phase };
+  }, [audio, room.currentPlayerId, room.history.length, room.phase, room.players]);
+  useEffect(() => {
+    const second = Math.ceil(seconds);
+    if (room.phase !== 'playing') { countdownSecond.current = null; return; }
+    if (second <= 5 && second > 0 && countdownSecond.current !== second) {
+      countdownSecond.current = second;
+      audio.play('countdown');
+    }
+  }, [audio, room.phase, seconds]);
   useEffect(() => { setWord(''); setInputValue(''); setCursor(0); setDraftMatch({ word: '', promptId: room.prompt?.id ?? null, offset: null }); setFeedback(false); composing.current = false; if (isTurn) input.current?.focus({ preventScroll: true }); }, [room.prompt?.id, isTurn]);
   useEffect(() => {
     if (!isTurn || !connected) return;
@@ -330,6 +355,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
     if (composing.current || Date.now() - composedAt.current < 120 || !room.prompt || !isTurn || !word.trim()) return;
     act({ type: 'submit', data: { word: word.trim(), promptId: room.prompt.id } }, () => { setWord(''); setInputValue(''); }, failure => {
       if (/答案|词库|提示|重复|长度|当前回合|时间/.test(failure.message)) {
+        audio.play('incorrect');
         setFeedback(true);
         window.setTimeout(() => setFeedback(false), 360);
       } else setError(failure.message);
@@ -339,7 +365,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const winners = room.players.filter(player => room.winnerIds.includes(player.id));
   const activity = <aside className="activity-area"><div className="activity-tabs" role="tablist"><button role="tab" type="button" aria-selected={sideTab === 'history'} onClick={() => setSideTab('history')}>答案记录<span>{room.history.length}</span></button>
     <button role="tab" type="button" aria-selected={sideTab === 'chat'} onClick={() => setSideTab('chat')}><MessageCircle size={16} />聊天</button>
-    {compactActivity && <IconButton label="关闭记录与聊天" onClick={closeActivity}><X size={18} /></IconButton>}</div>
+    <IconButton label="关闭记录与聊天" onClick={closeActivity}><X size={18} /></IconButton></div>
     {sideTab === 'history' ? <div className="history-list" ref={historyList}>{room.history.length ? room.history.map((item, index) => <div className="history-row" key={`${item.at}:${index}`}>
       <span>{item.word}</span><small>{item.nickname}</small></div>) : <p className="activity-empty">暂无答案</p>}</div>
       : <><div className="chat-list" ref={chatList}>{room.chat.length ? room.chat.map(message => <div className="chat-message" key={message.id}>
@@ -356,7 +382,11 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   </aside>;
   return <div className={`room-layout room-layout-centered ${room.players.length > 2 ? 'room-layout-many' : ''} ${room.players.length > 8 ? 'room-layout-dense' : ''}`}>
     <section className="game-area"><div className="game-summary"><span aria-label="比赛局数">第 {room.round || 1} 局 / {room.settings.bestOf} 局</span>
-      {compactActivity && <IconButton label="查看答案记录与聊天" onClick={() => setActivityOpen(true)}><MessageCircle size={19} /></IconButton>}</div>
+      <div className="game-summary-tools">
+        <label className="audio-volume" title="音量"><Volume2 size={15} /><input aria-label="音量" type="range" min="0" max="1" step="0.05" value={audioVolume} onChange={event => { const value = Number(event.target.value); setAudioVolume(value); audio.setVolume(value); }} /></label>
+        <IconButton label={audioEnabled ? '静音' : '打开音效'} onClick={() => { const enabled = !audioEnabled; setAudioEnabled(enabled); audio.setEnabled(enabled); if (enabled) audio.play('turn'); }}>{audioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}</IconButton>
+        <IconButton label={`${narrowViewport ? '查看' : '打开'}答案记录与聊天`} onClick={() => setActivityOpen(true)}><MessageCircle size={19} /></IconButton>
+      </div></div>
       <PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} />
       {room.phase === 'playing' && room.prompt ? <>
         <div className="timer-area"><div className={`timer ${seconds <= 5 ? 'timer-urgent' : ''}`} aria-label="剩余时间"><span>{seconds.toFixed(1)}</span><small>秒</small></div>
@@ -387,6 +417,6 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
             onClick={() => act({ type: 'start', data: {} })}><ArrowRight size={17} />{room.phase === 'between' ? '开始下一局' : room.phase === 'finished' ? '开始新比赛' : '开始比赛'}</button>}</div>
       </div>}
     </section>
-    {compactActivity ? activityOpen && <Modal title="答案记录与聊天" onClose={closeActivity} showHeading={false} drawer>{activity}</Modal> : activity}
+    {activityOpen && <Modal title="答案记录与聊天" onClose={closeActivity} showHeading={false} drawer allowInteraction>{activity}</Modal>}
   </div>;
 }

@@ -38,9 +38,10 @@ function PromptCellView({ cell, character, reading, position, cellIndex }: {
   const displayToneIndex = reading && position !== undefined ? toneIndex : hintToneIndex;
   const displayInitial = displayPinyin(initial, 0, displayToneIndex);
   const displayFinal = displayPinyin(final, initial.length, displayToneIndex);
+  const visiblePinyin = (value: string, field: string, start: number) => pinyinTargets(value, field, start, -1, undefined);
   const parts = [
-    { field: 'initial', content: displayInitial, original: cell.initial !== undefined },
-    { field: 'final', content: displayFinal, original: cell.final !== undefined },
+    { field: 'initial', content: visiblePinyin(displayInitial, 'initial', 0), original: cell.initial !== undefined },
+    { field: 'final', content: visiblePinyin(displayFinal, 'final', initial.length), original: cell.final !== undefined },
     { field: 'tone', content: tone !== undefined ? <ToneMark tone={tone} /> : null, original: cell.tone !== undefined },
     { field: 'radical', content: cell.radical, original: true },
     { field: 'component', content: cell.component, original: true },
@@ -66,9 +67,7 @@ function PromptCellView({ cell, character, reading, position, cellIndex }: {
         const start = sourceBounds ?? destination;
         next[field] = {
           '--hint-x': `${start.x - bounds.x - root.clientLeft}px`, '--hint-y': `${start.y - bounds.y - root.clientTop}px`,
-          '--hint-scale-x': start.width / width, '--hint-scale-y': start.height / height,
           '--complete-x': `${destination.x - bounds.x - root.clientLeft}px`, '--complete-y': `${destination.y - bounds.y - root.clientTop}px`,
-          '--complete-scale-x': destination.width / width, '--complete-scale-y': destination.height / height,
         } as CSSProperties;
       }
       setGeometry(next);
@@ -79,12 +78,14 @@ function PromptCellView({ cell, character, reading, position, cellIndex }: {
     return () => observer.disconnect();
   }, [cell, character, fullPinyin, initial, final, tone]);
 
-  const pinyinTargets = (value: string, field: string, start: number, anchor = toneIndex, mark = tone) => <span data-field={field}>
-    {[...value].map((letter, index) => <span className="prompt-letter" data-tone-anchor={start + index === anchor ? 'true' : undefined} key={index}>
-      <span className={start + index === anchor && letter.toLowerCase() === 'i' ? 'prompt-letter-base prompt-letter-dotless' : 'prompt-letter-base'}>{start + index === anchor && letter.toLowerCase() === 'i' ? 'ı' : letter}</span>
-      {start + index === anchor && mark !== undefined && <span className="prompt-tone-target" data-field="tone"><ToneMark tone={mark} /></span>}
-    </span>)}
-  </span>;
+  function pinyinTargets(value: string, field: string, start: number, anchor = toneIndex, mark = tone) {
+    return <span data-field={field}>
+      {[...value].map((letter, index) => <span className="prompt-letter" data-tone-anchor={start + index === anchor ? 'true' : undefined} key={index}>
+        <span className={start + index === anchor && letter.toLowerCase() === 'i' ? 'prompt-letter-base prompt-letter-dotless' : 'prompt-letter-base'}>{start + index === anchor && letter.toLowerCase() === 'i' ? 'ı' : letter}</span>
+        {start + index === anchor && mark !== undefined && <span className="prompt-tone-target" data-field="tone"><ToneMark tone={mark} /></span>}
+      </span>)}
+    </span>;
+  }
   return <div ref={element} data-cell-index={cellIndex} className={`prompt-cell ${hidden ? 'prompt-hidden' : ''} ${character ? 'prompt-attached-cell' : ''}`} aria-label={character ? `${character} ${fullPinyin}` : '提示位置'}>
     <div className="prompt-hint-layout" aria-hidden="true">
       <span className="prompt-hint-pinyin">

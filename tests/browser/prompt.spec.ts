@@ -23,6 +23,8 @@ test('显示文字替换 i 原点，zh 保持宽度，成音节辅音声调位�
     const width = await page.locator('.prompt-part-initial').evaluate(element => element.getBoundingClientRect().width);
     const naturalWidth = await page.locator('.prompt-part-initial').evaluate(element => element.scrollWidth);
     expect(width).toBeGreaterThanOrEqual(naturalWidth - 1);
+    await expect(page.locator('.prompt-part-initial .prompt-letter')).toHaveCount(2);
+    expect(await page.locator('.prompt-part-initial').evaluate(element => new DOMMatrix(getComputedStyle(element).transform).a)).toBe(1);
     await page.goto(`${base}?case=consonant`);
     await page.getByLabel('测试答案').fill('姆妈');
     await expect(page.locator('.prompt-layer-attached')).toBeVisible();
