@@ -31,3 +31,5 @@
 - `npm run check`、`npm run build` 和 `git diff --check` 通过。Standards 与 Spec 审查的问题已经修正并通过针对性浏览器测试。
 
 Render 与日常词语研究已经保存，`render.yaml` 的免费 Blueprint 配置通过官方 schema 校验。公开 WSS 服务尚未创建；Render 账户连接仓库与创建服务后，将公开地址写入构建变量即可部署网页。全部词条的人工审核、Cloudflare 适配与鼓的传递表现属于后续工作。
+
+本轮补充验证：可见拼音的声调目标 `i` 使用无点字形；多格提示的 FLIP 状态键包含格子位置；快速编辑期间会从当前动画位置继续移动；`prefers-reduced-motion: reduce` 下提示与答案格不保留脚本动画。提示专项浏览器测试通过 3 项，类型检查通过，差异格式检查通过。

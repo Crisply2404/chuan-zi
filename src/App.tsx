@@ -25,7 +25,7 @@ function IconButton({ label, children, onClick, disabled = false, className = ''
   return <button type="button" className={`icon-button ${className}`} aria-label={label} title={label} onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
-function Modal({ title, children, onClose, error = '', showHeading = true }: { title: string; children: ReactNode; onClose: () => void; error?: string; showHeading?: boolean }) {
+function Modal({ title, children, onClose, error = '', showHeading = true, drawer = false }: { title: string; children: ReactNode; onClose: () => void; error?: string; showHeading?: boolean; drawer?: boolean }) {
   const panel = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -43,8 +43,8 @@ function Modal({ title, children, onClose, error = '', showHeading = true }: { t
     document.addEventListener('keydown', keydown);
     return () => { document.removeEventListener('keydown', keydown); previous?.focus(); };
   }, [onClose]);
-  return <div className="modal-backdrop" onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
-    <div className="modal" role="dialog" aria-modal="true" aria-label={title} ref={panel}>
+  return <div className={`modal-backdrop ${drawer ? 'modal-backdrop-drawer' : ''}`} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <div className={`modal ${drawer ? 'modal-drawer' : ''}`} role="dialog" aria-modal="true" aria-label={title} ref={panel}>
       {showHeading && <div className="modal-heading"><h2>{title}</h2><IconButton label="关闭窗口" onClick={onClose}><X size={20} /></IconButton></div>}
       {error && <p className="modal-error" role="alert">{error}</p>}
       {children}
@@ -387,6 +387,6 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
             onClick={() => act({ type: 'start', data: {} })}><ArrowRight size={17} />{room.phase === 'between' ? '开始下一局' : room.phase === 'finished' ? '开始新比赛' : '开始比赛'}</button>}</div>
       </div>}
     </section>
-    {compactActivity ? activityOpen && <Modal title="答案记录与聊天" onClose={closeActivity} showHeading={false}>{activity}</Modal> : activity}
+    {compactActivity ? activityOpen && <Modal title="答案记录与聊天" onClose={closeActivity} showHeading={false} drawer>{activity}</Modal> : activity}
   </div>;
 }

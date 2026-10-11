@@ -39,6 +39,10 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     ...value.relations.filter(item => !((item.first === first && item.second === second) || (item.first === second && item.second === first))),
     ...(relationMode === 'free' ? [] : [{ first, second, mode: relationMode }]),
   ]);
+  const applyTemplate = (template: Exclude<ModeId, 'custom'>) => {
+    const next = getModeSettings(template);
+    onChange({ ...next, mode: 'custom', bestOf: value.bestOf, maxPlayers: value.maxPlayers });
+  };
   const active = conditionTypes.filter(type => value.appearance[type] !== 'off');
   const custom = editingCustom;
   const selectMode = (next: ModeId) => {
@@ -71,7 +75,8 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
             <span className="mode-status">{id === 'custom' ? <ChevronRight size={18} aria-hidden="true" /> : mode === id ? <Check size={18} aria-hidden="true" /> : null}</span>
           </button>;
         })}</div>}
-        {custom ? <><div className="condition-controls">{conditionTypes.map(type => <div className="condition-row" key={type}>
+        {custom ? <><div className="custom-templates" aria-label="预设模板"><span>预设模板</span><div className="preset-row">{(['initial-tone', 'radical', 'character', 'tone-only'] as const).map(template => <button type="button" className="preset-button" key={template}
+          onClick={() => applyTemplate(template)}>{modeLabels[template]}</button>)}</div></div><div className="condition-controls">{conditionTypes.map(type => <div className="condition-row" key={type}>
           <span>{conditionLabels[type]}</span><div className="segments" role="group" aria-label={conditionLabels[type]}>{([
             ['off', '关闭'], ['random', '随机'], ['required', '必选'],
           ] as [Appearance, string][]).map(([appearance, label]) => <button type="button" key={appearance} aria-pressed={value.appearance[type] === appearance}

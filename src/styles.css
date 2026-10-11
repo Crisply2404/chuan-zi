@@ -150,30 +150,32 @@ h3 { font-size: 13px; font-weight: 600; }
 .timer-urgent + .timer-track > span { background: #202020; }
 .prompt { width: 100%; container-type: inline-size; --cell-gap: 6px; --row-gap: 16px; --cell-size: min(62px, calc((100cqw - (var(--slot-count) - 1) * var(--cell-gap)) / var(--slot-count))); --merge-distance: calc((var(--cell-size) + var(--row-gap)) / 2); display: flex; flex-direction: column; align-items: center; position: relative; min-height: var(--cell-size); }
 .prompt-with-answer { padding-top: calc(var(--cell-size) + var(--row-gap)); }
-.prompt-layer { position: absolute; top: 0; left: 50%; z-index: 3; transform: translateX(-50%); transition: transform .7s cubic-bezier(.16,1,.3,1); pointer-events: none; }
+.prompt-layer { position: absolute; top: 0; left: 50%; z-index: 3; transform: translateX(-50%); pointer-events: none; }
 .prompt-layer-attached { transform: translate(calc(-50% + var(--prompt-shift) * (var(--cell-size) + var(--cell-gap))), var(--merge-distance)); }
 .prompt-cells, .answer-cells { display: flex; justify-content: center; gap: var(--cell-gap); }
 .prompt-cell { flex: 0 0 var(--cell-size); width: var(--cell-size); aspect-ratio: 1; position: relative; display: flex; align-items: center; justify-content: center; flex-direction: column; border: 1px solid #bdbdbd; background: #fff; padding: 2px; gap: 2px; transition: border-color .18s, background .18s; }
 .prompt-input-character { font-size: min(25px, calc(var(--cell-size) * .43)); line-height: 1.1; font-family: 'Noto Serif SC', 'Songti SC', serif; }
 .prompt-hint-layout { position: absolute; inset: 2px; display: flex; align-items: center; justify-content: center; gap: 3px; flex-wrap: wrap; font-size: min(21px, calc(var(--cell-size) * .34)); line-height: 1.2; visibility: hidden; }
 .prompt-hint-pinyin { display: inline-flex; align-items: center; }
+.prompt-hint-pinyin [data-field], .prompt-pinyin [data-field] { display: inline-flex; align-items: center; }
 .prompt-tone { width: min(27px, calc(var(--cell-size) * .44)); height: min(25px, calc(var(--cell-size) * .4)); flex-shrink: 0; }
 .prompt-tone-source { display: inline-flex; margin-left: 3px; }
-.prompt-tone-source .prompt-tone { width: min(32px, calc(var(--cell-size) * .52)); height: min(28px, calc(var(--cell-size) * .45)); }
+.prompt-tone-source .prompt-tone { width: min(22px, calc(var(--cell-size) * .36)); height: min(18px, calc(var(--cell-size) * .3)); }
 .prompt-pinyin { font-size: min(18px, calc(var(--cell-size) * .29)); font-family: 'Noto Sans SC', sans-serif; text-align: center; line-height: 1.25; max-width: 100%; white-space: nowrap; }
 .prompt-pinyin-long { font-size: min(13px, calc(var(--cell-size) * .22)); }
 .prompt-complete-layout { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; visibility: hidden; }
-.prompt-letter { display: inline-block; position: relative; }
-.prompt-tone-target { position: absolute; left: 50%; top: -5px; transform: translateX(-50%); height: 7px; width: 10px; }
-.prompt-tone-target .prompt-tone { width: 10px; height: 7px; display: block; }
-.prompt-hint-layout .prompt-tone-target { top: -7px; width: 13px; height: 9px; }
-.prompt-hint-layout .prompt-tone-target .prompt-tone { width: 13px; height: 9px; }
+.prompt-letter { display: inline-block; position: relative; min-width: .62em; text-align: center; }
+.prompt-letter-base { display: inline-block; }
+.prompt-letter-dotless { font-family: 'Noto Sans SC', sans-serif; }
+.prompt-tone-target { position: absolute; left: 50%; top: -.38em; transform: translateX(-50%); height: .42em; width: .86em; min-width: 10px; }
+.prompt-tone-target .prompt-tone { width: 100%; height: 100%; display: block; }
+.prompt-hint-layout .prompt-tone-target { top: -.48em; }
 .prompt-neutral-target { display: inline-flex; height: 7px; width: 7px; vertical-align: top; }
 .prompt-neutral-target .prompt-tone { width: 7px; height: 7px; }
 .prompt-complete { position: absolute; inset: 0; }
-.prompt-part { position: absolute; left: 0; top: 0; transform-origin: top left; transform: translate(var(--hint-x, 0px), var(--hint-y, 0px)) scale(var(--hint-scale-x, 1), var(--hint-scale-y, 1)); transition: transform .7s cubic-bezier(.16,1,.3,1), opacity .7s cubic-bezier(.16,1,.3,1); white-space: nowrap; font-size: 21px; line-height: 1.2; }
+.prompt-part { position: absolute; left: 0; top: 0; transform-origin: top left; transform: translate(var(--hint-x, 0px), var(--hint-y, 0px)) scale(var(--hint-scale-x, 1), var(--hint-scale-y, 1)); white-space: nowrap; font-size: 21px; line-height: 1.2; }
 .prompt-part-character, .prompt-part-radical, .prompt-part-component { font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: 25px; }
-.prompt-part-tone { width: 32px; height: 28px; }
+.prompt-part-tone { width: 22px; height: 19px; }
 .prompt-part-tone .prompt-tone { width: 100%; height: 100%; display: block; }
 .prompt-complete .prompt-supplement { opacity: 0; }
 .prompt-layer-attached .prompt-part { transform: translate(var(--complete-x, 0px), var(--complete-y, 0px)) scale(var(--complete-scale-x, 1), var(--complete-scale-y, 1)); }
@@ -185,7 +187,7 @@ h3 { font-size: 13px; font-weight: 600; }
 .prompt-attached-cell { border-color: #222; background: #fff; }
 .prompt-origin { color: #222; }
 .prompt-supplement { color: #ffad32; }
-.answer-editor { position: relative; width: calc(var(--answer-count) * (var(--cell-size) + var(--cell-gap)) - var(--cell-gap)); transition: width .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
+.answer-editor { position: relative; width: calc(var(--answer-count) * (var(--cell-size) + var(--cell-gap)) - var(--cell-gap)); transition: width .7s cubic-bezier(.16,1,.3,1); }
 .answer-editor-attached { transform: translateY(calc(-1 * var(--merge-distance))); }
 .answer-cells { position: relative; z-index: 1; }
 .answer-cell { flex: 0 0 var(--cell-size); width: var(--cell-size); aspect-ratio: 1; position: relative; display: flex; justify-content: center; align-items: center; cursor: text; }
@@ -246,6 +248,8 @@ h3 { font-size: 13px; font-weight: 600; }
 .preset-button:hover { background: #eaeaea; }
 .preset-button[aria-pressed='true'] { color: #fff; background: #333; border-color: #333; }
 .settings-help { color: #777; font-size: 11px; line-height: 1.7; }
+.custom-templates { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 17px; color: #707070; font-size: 11px; }
+.custom-templates .preset-row { margin: 0; }
 .condition-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 30px; row-gap: 13px; }
 .condition-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
 .segments { display: inline-flex; padding: 2px; background: #f3f3f3; border-radius: 5px; flex-shrink: 0; }
@@ -297,6 +301,9 @@ h3 { font-size: 13px; font-weight: 600; }
 .modal-heading h2 { font-size: 17px; }
 .modal-heading .icon-button { margin-right: -8px; }
 .modal-error { font-size: 12px; line-height: 1.7; background: #f3f3f3; border-left: 2px solid #666; padding: 10px 12px; margin-bottom: 18px; }
+.modal-backdrop-drawer { justify-content: flex-end; align-items: stretch; padding: 0; }
+.modal-drawer { width: min(430px, 100%); max-height: none; height: 100dvh; border: 0; border-radius: 0; padding: 20px 24px 24px; animation: drawer-in .42s cubic-bezier(.16,1,.3,1) both; }
+@keyframes drawer-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
 .dialog-form { display: flex; flex-direction: column; gap: 20px; }
 .dialog-form > label, .dialog-form .number-grid > label { display: flex; flex-direction: column; gap: 9px; font-size: 12px; }
 .dialog-form input { width: 100%; font-size: 13px; min-height: 40px; }
@@ -397,6 +404,7 @@ h3 { font-size: 13px; font-weight: 600; }
   .room-game-shell .game-area { border: 0; padding: 0; min-height: 0; }
   .room-game-shell .game-area { flex: 1; }
   .room-game-shell .modal:has(.activity-area) { width: min(600px, 100%); padding: 16px; }
+  .room-game-shell .modal-drawer:has(.activity-area) { width: min(430px, 100%); height: 100dvh; max-height: none; padding: 16px; }
   .room-game-shell .modal .activity-area { height: min(520px, 75dvh); max-height: none; }
   .room-game-shell .modal .history-list { display: block; }
   .room-game-shell .modal .chat-form { height: 42px; margin-top: 12px; }

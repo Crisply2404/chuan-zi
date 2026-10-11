@@ -339,6 +339,12 @@ test('五个模式入口和移动端页面保持可用', async ({ page }) => {
   }
   await page.getByRole('button', { name: '自定义', exact: true }).click();
   await expect(page.getByRole('group', { name: '声母', exact: true })).toBeVisible();
+  const templates = page.locator('.custom-templates');
+  await expect(templates.getByRole('button')).toHaveText(['声母+音调', '部首', '字', '只有音调']);
+  await templates.getByRole('button', { name: '声母+音调', exact: true }).click();
+  await expect(page.getByRole('group', { name: '声母', exact: true }).getByRole('button', { name: '必选', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('group', { name: '声调', exact: true }).getByRole('button', { name: '必选', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('heading', { name: '自定义规则', exact: true })).toBeVisible();
   await assertLayout(page);
 });
 
@@ -459,6 +465,8 @@ test('窄窗口活动面板默认收起，房间设置与局数在各宽度可�
   await expect(page.locator('.history-list')).toBeHidden();
   await page.getByRole('button', { name: '查看答案记录与聊天', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '答案记录与聊天', exact: true })).toBeVisible();
+  await expect(page.locator('.modal-backdrop-drawer')).toBeVisible();
+  await expect(page.locator('.modal-drawer')).toHaveCSS('animation-name', 'drawer-in');
   const panel = (await page.getByRole('dialog', { name: '答案记录与聊天', exact: true }).boundingBox())!;
   expect(panel.height).toBeGreaterThan(300);
   await expect(page.getByRole('tab', { name: '答案记录', exact: false })).toBeFocused();
