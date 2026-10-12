@@ -9,6 +9,7 @@ import { useTimedMessage } from './useTimedMessage';
 import { GameAudio } from './audio';
 import { DrumTransfer } from './DrumTransfer';
 import { modeColors, modeLabels } from '../shared/presets';
+import { correctionMessage } from '../shared/word-corrections';
 
 const phaseLabels: Record<RoomView['phase'], string> = { waiting: '准备中', playing: '正在游戏', between: '本局结束', finished: '比赛结束' };
 const connectionLabels = { idle: '未连接', connecting: '正在连接', connected: '已连接', reconnecting: '正在重连' };
@@ -411,6 +412,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   }, [canEdit, room.prompt?.id]);
   useEffect(clearAnswerMessage, [clearAnswerMessage, room.prompt?.id, isTurn]);
   const duplicateWord = isTurn && room.history.some(item => item.word === word);
+  const wordCorrection = isTurn ? correctionMessage(word) : undefined;
   useEffect(() => {
     if (!duplicateWord) return;
     clearAnswerMessage();
@@ -428,10 +430,14 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
     event.preventDefault();
     if (composing.current || Date.now() - composedAt.current < 120 || !room.prompt || !isTurn || !word.trim()) return;
     act({ type: 'submit', data: { word: word.trim(), promptId: room.prompt.id } }, () => { setWord(''); setInputValue(''); }, failure => {
-      if (/答案|词库|提示|重复|长度|当前回合|时间/.test(failure.message)) {
+      if (/答案|词库|提示|重复|长度|当前回合|时间|写作/.test(failure.message)) {
         if (failure.message === '本局已经使用这个答案') {
           clearAnswerMessage();
           setAnswerMessage('这个词之前输入过了');
+          answerMessageTimer.current = window.setTimeout(clearAnswerMessage, 2600);
+        } else if (failure.message.includes('应写作')) {
+          clearAnswerMessage();
+          setAnswerMessage(failure.message);
           answerMessageTimer.current = window.setTimeout(clearAnswerMessage, 2600);
         }
         audio.play('incorrect');
@@ -445,10 +451,11 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const currentPlayer = room.players.find(player => player.id === room.currentPlayerId);
   const pendingAccepted = room.acceptedAnswer && room.acceptedAnswer.id !== lastCompletion.current && !isTurn ? { answer: room.acceptedAnswer, returning: false } : null;
   const activeCompletion = isTurn ? null : pendingAccepted ?? completion;
-  const shownPrompt = activeCompletion?.answer.prompt ?? room.prompt;
-  const shownWord = activeCompletion ? activeCompletion.returning ? '' : activeCompletion.answer.word : isTurn ? word : currentPlayer?.draft ?? '';
-  const shownMatch = activeCompletion ? activeCompletion.returning ? undefined : activeCompletion.answer.match : isTurn ? draftMatch : room.draftMatch ?? undefined;
-  const inputColor = activeCompletion?.answer.color ?? currentPlayer?.color ?? self?.color ?? '#47738A';
+  const combiningAnswer = activeCompletion && !activeCompletion.returning ? activeCompletion.answer : null;
+  const shownPrompt = combiningAnswer?.prompt ?? room.prompt;
+  const shownWord = combiningAnswer ? combiningAnswer.word : isTurn ? word : currentPlayer?.draft ?? '';
+  const shownMatch = combiningAnswer ? combiningAnswer.match : isTurn ? draftMatch : room.draftMatch ?? undefined;
+  const inputColor = combiningAnswer?.color ?? currentPlayer?.color ?? self?.color ?? '#47738A';
   const activity = <aside className="activity-area"><div className="activity-tabs" role="tablist"><button role="tab" type="button" aria-selected={sideTab === 'history'} onClick={() => setSideTab('history')}>答案记录<span>{room.history.length}</span></button>
     <button role="tab" type="button" aria-selected={sideTab === 'chat'} onClick={() => setSideTab('chat')}><MessageCircle size={16} />聊天</button>
     <IconButton label="关闭记录与聊天" onClick={closeActivity}><X size={18} /></IconButton></div>
@@ -490,7 +497,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
           }}
           onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || composing.current || event.keyCode === 229 || Date.now() - composedAt.current < 120)) event.preventDefault(); }} />} />
           <button type="submit" className="submit-button" title="提交答案" aria-label="提交答案" disabled={!isTurn || !connected || busy || !word.trim()}><ArrowRight size={23} /></button>
-          <div className="answer-message" role="status" aria-live="polite">{duplicateWord ? '这个词之前输入过了' : answerMessage}</div>
+          <div className="answer-message" role="status" aria-live="polite">{duplicateWord ? '这个词之前输入过了' : wordCorrection ?? answerMessage}</div>
         </form>
         {self && <div className="bonus-progress"><div><span>奖励生命</span><Heart size={13} /></div><div className="bonus-letters">{room.settings.bonusInitials.map(initial =>
           <span className={self.collected.includes(initial) ? 'bonus-collected' : ''} key={initial}>{initial}</span>)}</div></div>}

@@ -1,5 +1,6 @@
 import { conditionTypes, type ConditionType, type DictionaryData, type MatchResult, type Prompt, type Settings, type WordEntry } from './types';
 import { validateSettings } from './settings';
+import { correctionFor, correctionMessage } from './word-corrections';
 
 export class RuleError extends Error {}
 
@@ -64,6 +65,8 @@ export class WordRules {
   }
 
   match(word: string, prompt: Prompt, settings: Settings, used = new Set<string>()): MatchResult {
+    const correction = correctionMessage(word);
+    if (correction) return { valid: false, reason: correction };
     const entry = this.entries.get(word);
     if (!entry) return { valid: false, reason: '词库没有收录这个答案' };
     if (used.has(word)) return { valid: false, reason: '本局已经使用这个答案' };
@@ -74,6 +77,8 @@ export class WordRules {
 
   draft(word: string, prompt: Prompt, settings: Settings, used = new Set<string>()): MatchResult {
     if (!word) return { valid: false };
+    const correction = correctionMessage(word);
+    if (correction) return { valid: false, reason: correction };
     const exact = this.entries.get(word);
     if (!exact) return { valid: false, reason: '词库没有收录这个答案' };
     if (used.has(word)) return { valid: false, reason: '本局已经使用这个答案' };
@@ -83,7 +88,7 @@ export class WordRules {
 
   private allowed(entry: WordEntry, settings: Settings): boolean {
     const length = [...entry.word].length;
-    return length >= settings.minLength && length <= settings.maxLength && (settings.dictionary === 'all' || (settings.dictionary === 'idioms' ? entry.idiom : !entry.idiom));
+    return !correctionFor(entry.word) && length >= settings.minLength && length <= settings.maxLength && (settings.dictionary === 'all' || (settings.dictionary === 'idioms' ? entry.idiom : !entry.idiom));
   }
 
   private radicalsFor(letter: string): string[] {

@@ -2,6 +2,28 @@ import type { AddressInfo } from 'node:net';
 import { createServer } from 'vite';
 import { test, expect } from '@playwright/test';
 
+test('部件与拼音提示采用汉字在上拼音在下的布局', async ({ page }) => {
+  const server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
+  await server.listen();
+  const address = server.httpServer!.address() as AddressInfo;
+  try {
+    for (const width of [390, 1440]) {
+      await page.setViewportSize({width, height: 900});
+      await page.goto(`http://127.0.0.1:${address.port}/tests/browser/prompt-harness.html?case=combined`);
+      await expect(page.locator('.prompt-part-radical')).toHaveText('冫');
+      await expect.poll(() => page.locator('.prompt-cell').evaluate(element => {
+        const radical = element.querySelector('.prompt-part-radical')!.getBoundingClientRect();
+        const pinyin = element.querySelector('.prompt-part-initial')!.getBoundingClientRect();
+        return radical.bottom <= pinyin.top;
+      }), {timeout: 1000}).toBe(true);
+      await page.getByLabel('测试答案').fill('冰凉');
+      await expect(page.locator('.prompt-layer-attached')).toBeVisible();
+      await expect(page.locator('.prompt-part-initial')).toHaveText('b');
+      await expect(page.locator('.device-glyph-text')).toHaveText(['冰', '冰']);
+    }
+  } finally { await server.close(); }
+});
+
 test('提示内原有字段附着与返回都经过连续中间位置', async ({ page }) => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
   await server.listen();

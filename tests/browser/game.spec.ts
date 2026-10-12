@@ -25,6 +25,40 @@ async function connect(page: Page, nickname: string) {
   await expect(page.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true })).toBeEnabled();
 }
 
+test('易误写词语在答案格下方提示正确写法并保持游戏操作', async ({ page }) => {
+  const state = observe(page);
+  await page.setViewportSize({width: 1100, height: 900});
+  await connect(page, '词语提醒');
+  await page.locator('.page-heading').getByRole('button', {name: '创建房间', exact: true}).click();
+  await page.getByRole('button', {name: '添加电脑', exact: true}).click();
+  await page.getByRole('button', {name: '准备', exact: true}).click();
+  await page.getByRole('button', {name: '开始比赛', exact: true}).click();
+  await expect(page.getByLabel('输入答案')).toBeFocused();
+  await page.keyboard.insertText('不可置否');
+  await expect(page.locator('.answer-message')).toHaveText('这个词应写作「不置可否」');
+  expect(await page.locator('.answer-message').evaluate(element => element.getBoundingClientRect().top >= document.querySelector('.answer-editor')!.getBoundingClientRect().bottom)).toBe(true);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.prompt-layer-attached')).toHaveCount(0);
+  await page.screenshot({path: 'docs/images/common-word-correction.png'});
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.prompt-feedback')).toBeVisible();
+  expect(state.room!.history).toHaveLength(0);
+  await expect(page.locator('.answer-message')).toHaveText('这个词应写作「不置可否」');
+  await page.keyboard.press('End');
+  await page.keyboard.press('Backspace');
+  await expect(page.locator('.answer-message')).toHaveText('');
+  await page.keyboard.press('ControlOrMeta+A');
+  await page.locator('input[aria-label="输入答案"]').dispatchEvent('compositionstart');
+  await page.getByLabel('输入答案').fill('bukezhifou');
+  await expect(page.locator('.answer-character')).toHaveText(['不', '可', '置']);
+  await page.getByLabel('输入答案').fill('不可置否');
+  await page.locator('input[aria-label="输入答案"]').dispatchEvent('compositionend', {data: '不可置否'});
+  await expect(page.locator('.answer-message')).toHaveText('这个词应写作「不置可否」');
+  await page.getByLabel('输入答案').fill('不置可否');
+  await expect(page.locator('.answer-message')).toHaveText('');
+  expect(state.errors).toEqual([]);
+});
+
 async function sampleMotion(page: Page, action: () => Promise<unknown>) {
   await page.evaluate(() => {
     const samples: { y: number; alpha: number; newCellAlpha: number; originConnected: boolean; originScale: number; originLocalY: number; answerY: number; time: number }[] = [];
@@ -392,7 +426,7 @@ test('全员观看实时草稿并在计时结束时播放自动提交结果', as
   } finally { await first.close(); await second.close(); }
 });
 
-test('已经结合的真实答案提交时保持原提示元素并直接返回', async ({ browser }) => {
+test('已经结合的真实答案提交后立即使用新提示并连续返回', async ({ browser }) => {
   const desktop = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
   const mobile = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
   try {
@@ -413,24 +447,29 @@ test('已经结合的真实答案提交时保持原提示元素并直接返回',
     await expect.poll(() => host.locator('.prompt-layer').evaluate(element => element.getAnimations().length)).toBe(0);
     await host.evaluate(() => {
       Reflect.set(window, 'submittedOrigin', document.querySelector('.answer-form .prompt-origin'));
-      const samples: number[] = [];
+      const samples: {y: number; detached: boolean; hints: string[]}[] = [];
       Reflect.set(window, 'acceptedPositions', samples);
       const start = performance.now();
       const sample = () => {
-        samples.push(document.querySelector('.answer-form .prompt-layer')!.getBoundingClientRect().y);
+        const layer = document.querySelector('.answer-form .prompt-layer')!;
+        samples.push({y: layer.getBoundingClientRect().y, detached: !layer.classList.contains('prompt-layer-attached'), hints: [...layer.querySelectorAll('.prompt-hint-layout')].map(cell => cell.textContent!)});
         if (performance.now() - start < 600) requestAnimationFrame(sample);
         else Reflect.set(window, 'acceptedSampleComplete', true);
       };
       requestAnimationFrame(sample);
     });
     await host.getByRole('button', { name: '提交答案', exact: true }).click();
-    expect(await host.evaluate(() => (Reflect.get(window, 'submittedOrigin') as Element).isConnected)).toBe(true);
     await expect(guest.getByLabel('输入答案')).toBeFocused({ timeout: 300 });
     await guest.keyboard.insertText('知识');
     await expect(guest.getByLabel('输入答案')).toHaveValue('知识');
     await host.waitForFunction(() => Reflect.get(window, 'acceptedSampleComplete'));
-    const positions = await host.evaluate(() => Reflect.get(window, 'acceptedPositions') as number[]);
-    expect(positions.every((position, index) => index === 0 || position <= positions[index - 1] + 1)).toBe(true);
+    const frames = await host.evaluate(() => Reflect.get(window, 'acceptedPositions') as {y: number; detached: boolean; hints: string[]}[]);
+    const expectedHints = state.room!.prompt!.cells.map(cell => [cell.radical, cell.component, cell.contains, cell.initial === '' || cell.final === '' ? '∅' : '', cell.initial, cell.final].filter(value => value !== undefined).join(''));
+    const returning = frames.filter(frame => frame.detached);
+    expect(returning.length).toBeGreaterThan(3);
+    expect(returning[0].hints).toEqual(expectedHints);
+    expect(new Set(returning.map(frame => Math.round(frame.y * 10))).size).toBeGreaterThan(3);
+    expect(frames.every((frame, index) => index === 0 || frame.y <= frames[index - 1].y + 1)).toBe(true);
   } finally { await desktop.close(); await mobile.close(); }
 });
 

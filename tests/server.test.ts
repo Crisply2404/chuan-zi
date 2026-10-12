@@ -60,6 +60,34 @@ class Client {
   }
 }
 
+test('易误写草稿同步正确词形，提交拒绝并减少一秒', async t => {
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '词语提醒');
+  const guest = await Client.connect(server.address, '同步提醒');
+  t.after(() => host.close());
+  t.after(() => guest.close());
+  await host.request({type: 'create', data: {name: '词形核查', password: '', settings: defaultSettings}});
+  await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
+  await host.request({type: 'ready', data: {ready: true}});
+  await guest.request({type: 'ready', data: {ready: true}});
+  await host.request({type: 'start', data: {}});
+  const question = host.room!.prompt!;
+  const deadline = host.room!.deadline!;
+  const player = host.room!.currentPlayerId === host.playerId ? host : guest;
+  const observer = player === host ? guest : host;
+  const start = observer.messages.length;
+  const draft = await player.request({type: 'draft', data: {word: '不可置否', promptId: question.id}});
+  assert.equal(draft.ok, true);
+  await observer.wait(message => message.type === 'state' && message.room?.draftMatch?.reason === '这个词应写作「不置可否」', start);
+  const result = await player.request({type: 'submit', data: {word: '不可置否', promptId: question.id}});
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.equal(result.error, '这个词应写作「不置可否」');
+  assert.equal(player.room!.deadline, deadline - 1000);
+  assert.equal(player.room!.prompt!.id, question.id);
+  assert.equal(player.room!.history.length, 0);
+});
+
 test('大厅提供创建顺序、密码、房主转移和空房删除', async t => {
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
   t.after(() => server.close());
@@ -554,8 +582,10 @@ test('多人最后规定局平局后，累计胜局并列者继续加赛', async
     if (round < 3) {
       const winner = players[round === 1 ? 2 : 0];
       await host.wait(message => message.type === 'state' && message.room?.currentPlayerId === winner.playerId && message.room.players.filter(player => player.lives > 0).length === 1, start);
-      const answer = rules.cpuAnswer(host.room!.prompt!, settings)!;
-      assert.equal((await winner.request({type: 'submit', data: {word: answer.word, promptId: host.room!.prompt!.id}})).ok, true);
+      const answer = rules.examples(host.room!.prompt!, settings, new Set(), 1)[0];
+      assert.ok(answer);
+      const submitted = await winner.request({type: 'submit', data: {word: answer.word, promptId: host.room!.prompt!.id}});
+      assert.equal(submitted.ok, true, JSON.stringify(submitted));
     }
     await host.wait(message => message.type === 'state' && message.room?.phase === 'between', start);
   }

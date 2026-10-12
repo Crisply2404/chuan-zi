@@ -26,6 +26,9 @@
 | 34：箭头、重复词与错误反馈 | resolved | diagnosing-bugs、tdd、code-review | 翻面变灰、输入时提示重复词、方格内部反馈通过专项检查 |
 | 35：设备字体与部首数量 | resolved | research、tdd、code-review | 设备字体区域着色、部首一或二个等概率、研究边界记录 |
 | 36：最后一名玩家与平局 | resolved | tdd、code-review | 最后玩家继续同题，双方零生命平局计入局数；多人累计胜局并列继续加赛 |
+| 37：易误写词语提醒 | resolved | research、tdd、code-review | 13 组词形来源、真实游戏截图、草稿与拒绝扣时通过 |
+| 38：返回过程中更新提示 | resolved | diagnosing-bugs、tdd、code-review | 返回开始显示新提示，连续位置与即时输入通过 |
+| 39：部件与拼音组合布局 | resolved | diagnosing-bugs、tdd、code-review | 电脑和手机的部件在上、拼音在下，结合与声调检查通过 |
 
 ## 用户已经确定的要求
 

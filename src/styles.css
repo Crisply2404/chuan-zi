@@ -188,6 +188,11 @@ h3 { font-size: 13px; font-weight: 600; }
 .prompt-glyph-origin { color: #222; }
 .prompt-glyph-supplement { color: var(--supplement-color, #ffad32); }
 .prompt-hint-layout { position: absolute; inset: 2px; display: flex; align-items: center; justify-content: center; gap: 3px; flex-wrap: wrap; font-size: min(21px, calc(var(--cell-size) * .34)); line-height: 1.2; visibility: hidden; }
+.prompt-hint-character { display: inline-flex; gap: 3px; font-family: 'Noto Serif SC', 'Songti SC', serif; }
+.prompt-hint-character:empty { display: none; }
+.prompt-hint-combined { inset: 0; }
+.prompt-hint-combined .prompt-hint-character { position: absolute; top: calc(var(--cell-size) * .03); font-size: min(25px, calc(var(--cell-size) * .43)); line-height: 1.1; }
+.prompt-hint-combined .prompt-hint-pinyin { position: absolute; top: calc(var(--cell-size) * .58); }
 .prompt-hint-pinyin { display: inline-flex; align-items: center; font: var(--pinyin-font-size)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .prompt-hint-pinyin [data-field], .prompt-pinyin [data-field] { display: inline-flex; align-items: center; }
 .prompt-tone { width: min(27px, calc(var(--cell-size) * .44)); height: auto; aspect-ratio: 1; flex-shrink: 0; }

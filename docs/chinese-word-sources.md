@@ -117,3 +117,5 @@ Unihan 主要提供汉字级数据。它不能单独提供完整中文词语、�
 来源文件与 SHA-256 见 `data/sources.json`。原始资料保存于 `data/sources/`，生成过程使用 JSON、JSON Lines、CSV/TSV、ZIP 与 IDS 的现有库。词条直接维护入口为 JSON；重新生成所需的持续排除设置保存在 `policy.json`。
 
 官方核查资料：Make Me a Hanzi 固定版本 README、COPYING、LGPL 与完整 dictionary JSON Lines；Unicode 18.0.0 CJKRadicals 完整文件和 Unicode License v3。部件数据采用 LGPL-3.0-or-later，修改后的相应资料继续保留来源许可；词语部分采用 CC BY-SA 4.0，来源署名为 CC-CEDICT contributors。
+
+易误写提醒保存于 `data/common-mistakes.json`，记录项目人工核查的词形对应与来源链接，网页、Node 服务和 Cloudflare 共用。当前 13 组，研究见 `common-misspellings-research-2026-10-13.md`。

@@ -31,3 +31,4 @@
 - 开始任务或恢复中断任务时，阅读 `docs/tasks.md`，按当前状态继续；执行期间更新任务状态、使用的 Skill 与验证结果。
 - 任务状态见 `docs/agents/triage-labels.md`。
 - 领域资料读取规则见 `docs/agents/domain.md`；开发规格见 `docs/spec.md`。
+- 一组相关功能完成、测试与审查通过后主动创建 Conventional Commit；任务中断前完成已验证内容的提交。

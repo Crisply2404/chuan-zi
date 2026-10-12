@@ -83,6 +83,8 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
   const hidden = Object.keys(cell).length === 0;
   const zeroInitial = cell.initial === '';
   const emptyPhonetic = zeroInitial || cell.final === '';
+  const combinedHint = [cell.radical, cell.component, cell.contains].some(value => value !== undefined)
+    && [cell.initial, cell.final, cell.tone].some(value => value !== undefined);
   const [loadedGlyph, setGlyph] = useState<Glyph | null>(null);
   const glyph = loadedGlyph?.character === character ? loadedGlyph : null;
   useEffect(() => {
@@ -174,16 +176,18 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
     </span>;
   }
   return <div ref={element} data-cell-index={cellIndex} data-glyph-ready={!character || (cell.radical === undefined && cell.component === undefined) || glyph !== null} style={{ '--pinyin-length': Math.max(initial.length + final.length, 3) } as CSSProperties} className={`prompt-cell ${hidden ? 'prompt-hidden' : ''} ${character ? 'prompt-attached-cell' : ''}`} aria-label={character ? `${character} ${fullPinyin}` : hidden ? '不限条件' : zeroInitial ? '零声母' : emptyPhonetic ? '无韵母' : '提示位置'}>
-    <div className="prompt-hint-layout" aria-hidden="true">
-      {emptyPhonetic && <span data-field="zero">∅</span>}
+    <div className={`prompt-hint-layout ${combinedHint ? 'prompt-hint-combined' : ''}`} aria-hidden="true">
+      <span className="prompt-hint-character">
+        {cell.radical !== undefined && <span data-field="radical">{cell.radical}</span>}
+        {cell.component !== undefined && <span data-field="component">{cell.component}</span>}
+        {cell.contains !== undefined && <span data-field="character">{cell.contains}</span>}
+      </span>
       <span className="prompt-hint-pinyin">
+        {emptyPhonetic && <span data-field="zero">∅</span>}
         {cell.initial !== undefined && pinyinTargets(cell.initial, 'initial', 0, hintToneIndex, cell.tone)}
         {cell.final !== undefined && pinyinTargets(cell.final, 'final', cell.initial?.length ?? 0, hintToneIndex, cell.tone)}
         {cell.tone !== undefined && (cell.final === undefined || cell.tone === 5) && <span className="prompt-tone-source" data-field="tone"><ToneMark tone={cell.tone} /></span>}
       </span>
-      {cell.radical !== undefined && <span data-field="radical">{cell.radical}</span>}
-      {cell.component !== undefined && <span data-field="component">{cell.component}</span>}
-      {cell.contains !== undefined && <span data-field="character">{cell.contains}</span>}
     </div>
     {character && <div className="prompt-complete-layout" aria-hidden="true">
       <span className="prompt-attached-hint">

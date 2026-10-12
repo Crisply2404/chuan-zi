@@ -5,10 +5,24 @@ import { RuleError, WordRules } from '../shared/rules';
 import { formatPinyin } from '../shared/pinyin';
 import { getModeSettings, getPresetSettings } from '../shared/presets';
 import { defaultSettings, type DictionaryData, type Prompt } from '../shared/types';
+import corrections from '../data/common-mistakes.json' with {type: 'json'};
 
 const data = JSON.parse(readFileSync('data/dictionary.json', 'utf8')) as DictionaryData;
 const rules = new WordRules(data);
 const prompt = (cells: Prompt['cells']): Prompt => ({ id: 'public-rule-test', cells, answerCount: 0 });
+
+test('易误写表达返回正确词形，草稿与提交继续拒绝', () => {
+  const question = prompt([{contains: '置'}]);
+  assert.equal(rules.draft('不可置否', question, defaultSettings).reason, '这个词应写作「不置可否」');
+  assert.equal(rules.match('不可置否', question, defaultSettings).reason, '这个词应写作「不置可否」');
+  assert.equal(rules.match('不置可否', question, defaultSettings).valid, true);
+  for (const entry of corrections.entries) {
+    assert.equal(data.words.some(word => word.word === entry.incorrect), false, entry.incorrect);
+    assert.equal(rules.draft(entry.incorrect, question, defaultSettings).reason, `这个词应写作「${entry.correct}」`);
+    assert.equal(rules.match(entry.incorrect, question, defaultSettings).valid, false);
+    assert.equal(rules.match(entry.correct, prompt([{contains: [...entry.correct][0]}]), defaultSettings).valid, true, entry.correct);
+  }
+});
 
 test('默认设置使用全部词语并允许两个汉字答案', () => {
   assert.equal(defaultSettings.dictionary, 'all');
