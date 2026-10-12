@@ -100,6 +100,13 @@ README 要求 Fork 或修改时注明原始仓库与作者。若从 `CharBlock.v
 
 仓库的 `src/data/README.md` 记录：`idioms.txt` 与 `polyphones.json` 由 `pwxcoo/chinese-xinhua` 的 `idiom.json` 整理，`t2s.json` 由 `mollykannn/translate-big5-gbk` 整理，另有用户输入资料；根目录只提供项目自己的 MIT 文本，没有为这些上游数据附带独立许可文件。[S25] 这些词语和读音资料不能仅凭 `antfu/handle` 的 MIT 文本判定为同一授权，产品继续使用当前已经核查的词库与许可记录即可。
 
+## 2026-10-12 产品中的声调实现
+
+- `src/PromptView.tsx` 参考声调位置结构，使用 20 × 20 自然比例的线条图形；轻声使用圆点。声调笔画以拼音字号的 7.5% 显示，保持独立提示、附着提示和补全声调的样式一致。
+- 汉字位于拼音上方，字母使用自然宽度。声调以元音宽度的 86% 定位，左侧距离为 8%；普通元音的底部距离为 `.66em`，`ü` 为 `.85em`，单位随文字尺寸变化。
+- 定位元素与可见字段采用相同字体、字号与行高。提示字段在附着及返回时连续移动，字号与符号尺寸通过 Web Animations 补间，文字比例保持自然。
+- 版权、完整 MIT 文本、来源版本与修改范围保存在 `licenses/HanDou.txt`，通过 `scripts/prepare-public.ts` 随构建发布。
+
 ## 来源
 
 - [S1：README，项目说明、数据维护和许可证](https://github.com/antfu/handle/blob/2003b777f507ed18c1c80304fd6894280c56ad58/README.md#L3-L41)

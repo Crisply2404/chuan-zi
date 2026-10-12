@@ -1,0 +1,51 @@
+击鼓传字音效来源记录
+
+核查日期：2026-10-12（Asia/Shanghai）
+全部音效：Creative Commons Zero 1.0 Universal（CC0）
+许可原文：CC0-1.0.txt
+许可原文来源：https://creativecommons.org/publicdomain/zero/1.0/legalcode.txt
+
+1. chuan-zi-drum.wav
+
+作品：Bata Low Dry.wav
+作者：MrRentAPercussionist
+作者说明：单次 Meinl Bata Drum 打击，Zoom H5 和两支 Shure SM 81 录制。
+来源页面：https://freesound.org/people/MrRentAPercussionist/sounds/451230/
+获取文件：https://cdn.freesound.org/previews/451/451230_5720726-hq.mp3
+源文件 SHA-256：af3983a9ac73c3d3ce9d9c0be7e462639312d05d36fc33f9ee48881062959fc1
+项目文件 SHA-256：d3c85d49c63c01dd301e5f7ee367baa90a4c0940b2bf0c571e70e0c2e5e1bfe6
+来源页面标明 CC0 并明确允许商业复制、修改、分发和播放。
+处理：使用来源页面公开提供的高质量 MP3 预览，取前 0.95 秒；最后 0.05 秒淡出；转换为单声道 44100 Hz 16-bit PCM WAV。内容为单次鼓声，不混入其他声音。
+
+2. Kenney Interface Sounds 1.0
+
+作者：Kenney（www.kenney.nl）
+来源页面：https://kenney.nl/assets/interface-sounds
+源音频包：https://kenney.nl/media/pages/assets/interface-sounds/fa43c1dd4d-1677589452/kenney_interface-sounds.zip
+音频包 SHA-256：f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232
+音频包许可原文：Kenney-Interface-Sounds-CC0.txt
+包内原文明确允许个人、教育和商业项目使用，署名属于自愿行为。
+处理：从包内 Audio/ 目录取得下列文件；转换为单声道 44100 Hz 16-bit PCM WAV。没有添加或混合其他声音。
+
+项目文件：chuan-zi-correct.wav
+包内文件：Audio/confirmation_001.ogg
+源文件 SHA-256：063564703b6094d70718a3e787a55cc9141611e4ecd6b6637f8828f79b4a8c3a
+项目文件 SHA-256：c49f1cda243b62223f4c7eb80d47a8aa0143aac107636fad2891e61a90db9c74
+
+项目文件：chuan-zi-incorrect.wav
+包内文件：Audio/error_001.ogg
+源文件 SHA-256：46e67425d16339772e8d328fb36a49426c9467418686e11beeb71ff84b0f6433
+项目文件 SHA-256：b117c88f17076f293093b7876f1239b81b50cd18451eaa081bf6d41b55d8011a
+
+项目文件：chuan-zi-countdown.wav
+包内文件：Audio/tick_001.ogg
+源文件 SHA-256：9d057b918024c787bbe6c00beed13a7ef72a3fa0c259add3cef36582792f4230
+项目文件 SHA-256：2efc0bffe2961ac113234d48e9fc9f476a971c58e8cd19b6d708fc8168382ca7
+
+项目文件：chuan-zi-timeout.wav
+包内文件：Audio/error_006.ogg
+源文件 SHA-256：a97513d7fd2b12b1210c423be943b4c1ab0e899b11db95855e9b74836e646ae0
+项目文件 SHA-256：2976e7c1d59f633d2b20228e243491f24aa1307e4ec2aab165f8c76f0ed312ad
+
+CC0 允许商业用途，包括包含广告的游戏，无需支付素材使用费。
+这些记录用于证明来源和许可；不会将原作者的作品署名为项目原创。

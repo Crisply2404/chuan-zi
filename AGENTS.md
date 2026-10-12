@@ -28,5 +28,6 @@
 ## Agent skills
 
 - 工程流程使用本地任务记录，配置见 `docs/agents/issue-tracker.md`。
+- 开始任务或恢复中断任务时，阅读 `docs/tasks.md`，按当前状态继续；执行期间更新任务状态、使用的 Skill 与验证结果。
 - 任务状态见 `docs/agents/triage-labels.md`。
 - 领域资料读取规则见 `docs/agents/domain.md`；开发规格见 `docs/spec.md`。

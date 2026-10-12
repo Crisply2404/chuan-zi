@@ -26,6 +26,13 @@ test('草稿只在完整合法词语匹配提示后返回附着位置', () => {
   assert.equal(rules.draft('清澈', prompt([{ initial: 'q' }]), settings).valid, true);
 });
 
+test('官方快照收录独享，旋转遵守第三声，重复草稿返回原因', () => {
+  assert.equal(rules.match('独享', prompt([{initial: 'd'}, {initial: 'x'}]), defaultSettings).valid, true);
+  assert.equal(rules.match('旋转', prompt([{initial: 'x'}, {initial: 'zh', tone: 3}]), defaultSettings).valid, true);
+  assert.equal(rules.match('旋转', prompt([{initial: 'x'}, {initial: 'zh', tone: 4}]), defaultSettings).valid, false);
+  assert.equal(rules.draft('草帽', prompt([{contains: '草'}]), defaultSettings, new Set(['草帽'])).reason, '本局已经使用这个答案');
+});
+
 test('真实成语按隐藏位置与连续声母序列接受答案', () => {
   const settings = { ...defaultSettings, promptLength: 4, hiddenCount: 1 };
   assert.equal(rules.match('生生不息', prompt([{ initial: 'sh' }, { initial: 'sh' }, {}, { initial: 'x' }]), settings).valid, true);
@@ -41,6 +48,10 @@ test('部首提示使用常见部件形态且要求答案汉字包含其他笔�
   const settings = getModeSettings('radical');
   assert.equal(rules.match('夕阳', prompt([{ radical: '夕' }]), settings).valid, false);
   assert.equal(rules.match('清澈', prompt([{ radical: '氵' }]), settings).valid, true);
+  assert.deepEqual(data.characters['冰'].strokeParts?.['冫'], [0, 1]);
+  assert.deepEqual(data.characters['密'].strokeParts?.['宀'], [0, 1, 2]);
+  assert.equal(rules.match('冬季', prompt([{ radical: '冫' }]), settings).valid, false);
+  assert.equal(rules.match('才华', prompt([{ radical: '扌' }]), settings).valid, false);
   for (let index = 0; index < 20; index++) {
     const generated = rules.generate(settings);
     assert.ok(generated.cells.every(cell => cell.radical === undefined || ['氵', '扌', '忄', '艹', '宀', '讠', '纟', '钅', '灬', '辶', '阝', '犭', '饣', '衤', '礻', '冫', '疒', '亻', '刂', '囗', '⺮'].includes(cell.radical)));
@@ -48,10 +59,38 @@ test('部首提示使用常见部件形态且要求答案汉字包含其他笔�
   }
 });
 
+test('部首预设按相等概率生成一个或两个提示位置', () => {
+  const settings = getModeSettings('radical');
+  const counts = new Map<number, number>();
+  for (let index = 0; index < 80; index++) {
+    const result = rules.generate(settings);
+    counts.set(result.cells.length, (counts.get(result.cells.length) ?? 0) + 1);
+    assert.ok(rules.examples(result, settings).every(entry => rules.match(entry.word, result, settings).valid));
+  }
+  assert.deepEqual([...counts.keys()].sort(), [1, 2]);
+  assert.ok(counts.get(1)! >= 15 && counts.get(1)! <= 65);
+});
+
+test('空穴来风属于成语，实际宀部件可以匹配部首模式', () => {
+  const settings = { ...defaultSettings, dictionary: 'idioms' as const, minLength: 4 };
+  assert.equal(rules.match('空穴来风', prompt([{ contains: '空' }]), settings).valid, true);
+  assert.equal(rules.match('空穴来风', prompt([{ radical: '宀' }]), settings).valid, true);
+  assert.equal(rules.match('空穴来风', prompt([{ component: '宀' }]), settings).valid, true);
+  assert.equal(rules.match('连接', prompt([{ component: '立' }]), defaultSettings).valid, false);
+});
+
 test('游戏词库按日常使用范围保留名称并排除专业词语', () => {
   assert.equal(rules.match('边缘性人格障碍', prompt([{ initial: 'b' }]), defaultSettings).valid, false);
   for (const word of ['乙酰胆碱', '二甲基亚砜', '精索静脉曲张', '苯丙酮尿症', '氰化钾', '乙二醇', '胰腺炎', '躁郁症']) assert.equal(data.words.some(entry => entry.word === word), false, word);
   for (const word of ['人工智能', '咖啡', '冰淇淋', '组织', '培养', '活泼', '新陈代谢', '药片', '流食', '呼吸机', '留观', '心律', '化学式']) assert.equal(data.words.some(entry => entry.word === word), true, word);
+});
+
+test('独立词语范围排除用户指定的口语组合', () => {
+  for (const word of ['到家', '亲亲']) {
+    assert.equal(data.words.some(entry => entry.word === word), false);
+    assert.equal(rules.match(word, prompt([{ contains: [...word][0] }]), defaultSettings).valid, false);
+  }
+  assert.equal(rules.match('知识', prompt([{ contains: '知' }]), defaultSettings).valid, true);
 });
 
 test('电脑优先使用常见合法词语并继续遵守已使用答案集合', () => {

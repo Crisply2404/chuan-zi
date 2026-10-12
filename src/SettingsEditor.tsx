@@ -26,11 +26,11 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   const [editingCustom, setEditingCustom] = useState(false);
   useEffect(() => setMode(value.mode), [value.mode]);
   const update = <K extends keyof Settings>(key: K, next: Settings[K]) => onChange({ ...value, [key]: next });
-  const updateDictionary = (next: Settings['dictionary']) => onChange({
-    ...value,
-    dictionary: next,
-    minLength: next === 'idioms' ? Math.max(4, value.minLength) : value.minLength,
-  });
+  const updateDictionary = (next: Settings['dictionary']) => {
+    const settings = { ...value, dictionary: next, minLength: next === 'idioms' ? 4 : 2, maxLength: Math.max(value.maxLength, next === 'idioms' ? 4 : 2), promptLength: Math.min(value.promptLength, next === 'idioms' ? 4 : 2) };
+    onChange(settings);
+    if (!editingCustom) onSave?.(settings);
+  };
   const validate = settingsSchema.safeParse(value);
   const problems = validate.success ? [] : [...new Set(validate.error.issues.map(issue => issue.message))];
   const relation = (first: ConditionType, second: ConditionType): RelationMode => value.relations.find(item =>
@@ -41,7 +41,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   ]);
   const applyTemplate = (template: Exclude<ModeId, 'custom'>) => {
     const next = getModeSettings(template);
-    onChange({ ...next, mode: 'custom', bestOf: value.bestOf, maxPlayers: value.maxPlayers });
+    onChange({ ...next, mode: 'custom', dictionary: value.dictionary, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers });
   };
   const active = conditionTypes.filter(type => value.appearance[type] !== 'off');
   const custom = editingCustom;
@@ -49,7 +49,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     setMode(next);
     setEditingCustom(next === 'custom');
     const settings = next === 'custom' ? { ...value, mode: 'custom' as const } : {
-      ...getModeSettings(next), bestOf: value.bestOf, maxPlayers: value.maxPlayers,
+      ...getModeSettings(next), dictionary: value.dictionary, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers,
     };
     onChange(settings);
     if (next !== 'custom') onSave?.(settings);
@@ -65,6 +65,11 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   return <div className="settings-editor">
     <div className="settings-heading"><h2>{custom ? '自定义规则' : '房间规则'}</h2>{custom && <button type="button" className="back-button" onClick={() => setEditingCustom(false)}><ArrowLeft size={15} />游戏模式</button>}{disabled && <span className="muted">本局规则已确定</span>}</div>
     <fieldset disabled={disabled || busy}>
+      <section className="settings-section dictionary-choice">
+        <h3>答案词库</h3><div className="segments" role="group" aria-label="答案词库">
+          {([['all', '全部词语'], ['words', '普通词语'], ['idioms', '成语']] as const).map(([id, label]) => <button type="button" aria-pressed={value.dictionary === id} key={id} onClick={() => updateDictionary(id)}>{label}</button>)}
+        </div>
+      </section>
       <section className="settings-section">
         <h3>{custom ? '提示条件' : '游戏模式'}</h3>
         {!custom && <div className="mode-grid" aria-label="游戏模式">{modeIds.map(id => {
@@ -96,9 +101,6 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
         </section>
         <section className="settings-section">
           <h3>词库与难度</h3>
-          <label className="select-field"><span>答案词库</span><select value={value.dictionary} onChange={event => updateDictionary(event.target.value as Settings['dictionary'])}>
-            <option value="idioms">成语</option><option value="words">普通词语</option><option value="all">全部词语</option>
-          </select></label>
           <div className="number-grid">
             <NumberField label="答案最短字数" value={value.minLength} min={2} max={9} onChange={next => update('minLength', next)} />
             <NumberField label="答案最长字数" value={value.maxLength} min={2} max={9} onChange={next => update('maxLength', next)} />
@@ -127,10 +129,9 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
             <button type="button" aria-pressed={value.timerMode === 'random'} onClick={() => update('timerMode', 'random')}>随机</button>
           </div>
           <div className="number-grid">{value.timerMode === 'fixed'
-            ? <NumberField label="初始秒数" value={value.initialSeconds} min={1} max={120} onChange={next => update('initialSeconds', next)} />
+            ? <NumberField label="每回合秒数" value={value.initialSeconds} min={1} max={120} onChange={next => update('initialSeconds', next)} />
             : <><NumberField label="随机秒数下限" value={value.randomMinSeconds} min={1} max={120} onChange={next => update('randomMinSeconds', next)} />
               <NumberField label="随机秒数上限" value={value.randomMaxSeconds} min={1} max={120} onChange={next => update('randomMaxSeconds', next)} /></>}
-            <NumberField label="回合最短秒数" value={value.minimumSeconds} min={1} max={60} onChange={next => update('minimumSeconds', next)} />
           </div>
         </section>
       </>}

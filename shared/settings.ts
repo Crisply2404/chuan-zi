@@ -22,7 +22,6 @@ export const settingsSchema = z.object({
   initialSeconds: z.number().int().min(1).max(120),
   randomMinSeconds: z.number().int().min(1).max(120),
   randomMaxSeconds: z.number().int().min(1).max(120),
-  minimumSeconds: z.number().int().min(1).max(60),
   bestOf: z.number().int().min(1).max(21),
   maxPlayers: z.number().int().min(2).max(16),
   bonusInitials: z.array(z.string().regex(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])$/)).min(1).max(23),

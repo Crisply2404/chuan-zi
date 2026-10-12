@@ -201,13 +201,13 @@ test('身份在新的连接恢复后，旧连接不能继续操作房间', async
   assert.equal((await restored.request({type: 'chat', data: {text: '新的连接'}})).ok, true);
 });
 
-test('服务器验证真实词语，共享计时、规则锁定、声母奖励与观战状态', async t => {
+test('服务器验证真实词语、独立回合计时、规则锁定、声母奖励与观战状态', async t => {
   const {WordRules} = await import('../shared/rules');
   const dictionary: DictionaryData = JSON.parse(await readFile(new URL('../data/dictionary.json', import.meta.url), 'utf8'));
   const rules = new WordRules(dictionary);
   const settings: Settings = {
     ...structuredClone(defaultSettings), dictionary: 'all', minLength: 2, maxLength: 9,
-    promptLength: 1, minAnswers: 1, initialSeconds: 15, minimumSeconds: 2,
+    promptLength: 1, minAnswers: 1, initialSeconds: 15,
     appearance: {initial: 'off', final: 'off', tone: 'required', radical: 'off', component: 'off', contains: 'off'},
     bonusInitials: ['b'],
   };
@@ -241,7 +241,8 @@ test('服务器验证真实词语，共享计时、规则锁定、声母奖励�
   assert.ok(answer, '真实词库含有符合提示和奖励声母的答案');
   assert.equal((await host.request({type: 'submit', data: {word: answer.word, promptId: prompt.id}})).ok, true);
   assert.equal(host.room!.currentPlayerId, guest.playerId);
-  assert.ok(host.room!.deadline! <= deadline - 1000);
+  assert.ok(host.room!.deadline! > deadline);
+  assert.ok(host.room!.deadline! - host.room!.serverTime >= 14_900);
   assert.equal(host.room!.history[0].word, answer.word);
   assert.equal(host.room!.players.find(player => player.id === host.playerId)!.lives, lives + 1);
   assert.deepEqual(host.room!.players.find(player => player.id === host.playerId)!.collected, []);
@@ -257,10 +258,84 @@ test('服务器验证真实词语，共享计时、规则锁定、声母奖励�
   assert.equal(spectator.room!.players.find(player => player.id === spectator.playerId)!.role, 'player');
 });
 
-test('断线期间共享计时继续，重连恢复扣除后的生命', async t => {
+test('题目超时依次顺延，全部参赛玩家未答出后更换', async t => {
+  const server = await createGameServer({ port: 0, host: '127.0.0.1' });
+  t.after(() => server.close());
+  const players = await Promise.all(['甲', '乙', '丙'].map(name => Client.connect(server.address, name)));
+  for (const player of players) t.after(() => player.close());
+  const host = players[0];
+  const settings = { ...structuredClone(defaultSettings), initialSeconds: 1, startingLives: 4, maxLives: 4 };
+  await host.request({ type: 'create', data: { name: '顺延题目', password: '', settings } });
+  for (const player of players.slice(1)) await player.request({ type: 'join', data: { roomId: host.room!.id, password: '' } });
+  for (const player of players) await player.request({ type: 'ready', data: { ready: true } });
+  await host.request({ type: 'start', data: {} });
+  const prompt = host.room!.prompt!;
+  const start = host.messages.length;
+  await host.wait(message => message.type === 'state' && message.room?.currentPlayerId === players[1].playerId, start);
+  assert.deepEqual(host.room!.prompt, prompt);
+  await host.wait(message => message.type === 'state' && message.room?.currentPlayerId === players[2].playerId, start);
+  assert.deepEqual(host.room!.prompt, prompt);
+  await host.wait(message => message.type === 'state' && message.room?.currentPlayerId === host.playerId, start);
+  assert.notEqual(host.room!.prompt!.id, prompt.id);
+});
+
+test('倒计时结束时自动接受已经输入的合法答案并广播匹配', async t => {
+  const { WordRules } = await import('../shared/rules');
+  const dictionary: DictionaryData = JSON.parse(await readFile(new URL('../data/dictionary.json', import.meta.url), 'utf8'));
+  const rules = new WordRules(dictionary);
+  const server = await createGameServer({ port: 0, host: '127.0.0.1' });
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '甲');
+  const guest = await Client.connect(server.address, '乙');
+  t.after(() => host.close()); t.after(() => guest.close());
+  await host.request({ type: 'create', data: { name: '自动作答', password: '', settings: { ...structuredClone(defaultSettings), initialSeconds: 2 } } });
+  await guest.request({ type: 'join', data: { roomId: host.room!.id, password: '' } });
+  await host.request({ type: 'ready', data: { ready: true } });
+  await guest.request({ type: 'ready', data: { ready: true } });
+  await host.request({ type: 'start', data: {} });
+  const prompt = host.room!.prompt!;
+  const answer = rules.cpuAnswer(prompt, host.room!.settings)!;
+  const start = guest.messages.length;
+  await host.request({ type: 'draft', data: { word: answer.word, promptId: prompt.id } });
+  await guest.wait(message => message.type === 'state' && message.room?.draftMatch?.word === answer.word, start);
+  assert.notEqual(guest.room!.draftMatch!.offset, null);
+  assert.equal(guest.room!.players[0].color, host.room!.players[0].color);
+  assert.notEqual(guest.room!.players[0].color, guest.room!.players[1].color);
+  await guest.wait(message => message.type === 'state' && message.room?.history.length === 1, start);
+  assert.equal(guest.room!.history[0].word, answer.word);
+  assert.equal(guest.room!.players[0].lives, 3);
+  assert.equal(guest.room!.acceptedAnswer!.match.word, answer.word);
+  const confirmation = await host.request({ type: 'submit', data: { word: answer.word, promptId: prompt.id } });
+  assert.equal(confirmation.ok, true);
+  assert.equal(host.room!.history.length, 1);
+  assert.equal(host.room!.players[0].lives, 3);
+});
+
+test('未作答玩家离开后按仍在场的玩家决定换题', async t => {
+  const server = await createGameServer({ port: 0, host: '127.0.0.1' });
+  t.after(() => server.close());
+  const players = await Promise.all(['甲', '乙', '丙'].map(name => Client.connect(server.address, name)));
+  for (const player of players) t.after(() => player.close());
+  const host = players[0];
+  await host.request({ type: 'create', data: { name: '离开题目', password: '', settings: { ...structuredClone(defaultSettings), initialSeconds: 1, startingLives: 4, maxLives: 4 } } });
+  for (const player of players.slice(1)) await player.request({ type: 'join', data: { roomId: host.room!.id, password: '' } });
+  for (const player of players) await player.request({ type: 'ready', data: { ready: true } });
+  await host.request({ type: 'start', data: {} });
+  const promptId = host.room!.prompt!.id;
+  const start = host.messages.length;
+  await host.wait(message => message.type === 'state' && message.room?.currentPlayerId === players[2].playerId, start);
+  assert.equal(host.room!.prompt!.id, promptId);
+  const change = host.messages.length;
+  await players[2].request({ type: 'leave', data: {} });
+  await host.wait(message => message.type === 'state' && message.room?.players.length === 2, change);
+  assert.notEqual(host.room!.prompt!.id, promptId);
+  assert.equal(host.room!.currentPlayerId, host.playerId);
+});
+
+test('断线期间回合计时继续，重连恢复扣除后的生命', async t => {
   const settings: Settings = {
     ...structuredClone(defaultSettings), promptLength: 1, minAnswers: 1, initialSeconds: 1,
-    minimumSeconds: 1, startingLives: 2,
+    startingLives: 2,
     appearance: {initial: 'required', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'off'},
   };
   const server = await createGameServer({port: 0, host: '127.0.0.1', reconnectMs: 4000});
@@ -361,9 +436,11 @@ test('真实答案全部使用后中止本局，接受最终答案并允许修�
 });
 
 test('真实计时扣除生命，双人多数局结算并允许下一场比赛', async t => {
+  const {WordRules} = await import('../shared/rules');
+  const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
   const settings: Settings = {
     ...structuredClone(defaultSettings), promptLength: 1, minAnswers: 1, initialSeconds: 1,
-    minimumSeconds: 1, startingLives: 1, bestOf: 3,
+    startingLives: 1, bestOf: 3,
     appearance: {initial: 'required', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'off'},
   };
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
@@ -379,8 +456,12 @@ test('真实计时扣除生命，双人多数局结算并允许下一场比赛',
     await guest.request({type: 'ready', data: {ready: true}});
     const start = host.messages.length;
     assert.equal((await host.request({type: 'start', data: {}})).ok, true);
-    await host.wait(message => message.type === 'state' && message.room?.round === round && message.room.phase !== 'playing', start);
     const expectedWinner = round % 2 === 1 ? guest.playerId : host.playerId;
+    await host.wait(message => message.type === 'state' && message.room?.currentPlayerId === expectedWinner, start);
+    const winner = expectedWinner === host.playerId ? host : guest;
+    const answer = rules.cpuAnswer(host.room!.prompt!, settings, new Set(host.room!.history.map(item => item.word)))!;
+    await winner.request({type: 'submit', data: {word: answer.word, promptId: host.room!.prompt!.id}});
+    await host.wait(message => message.type === 'state' && message.room?.round === round && message.room.phase !== 'playing', start);
     assert.equal(host.room!.lastWinnerId, expectedWinner);
     assert.equal(host.room!.players.find(player => player.id !== expectedWinner)!.lives, 0);
     assert.equal(host.room!.phase, round === 3 ? 'finished' : 'between');
@@ -393,10 +474,33 @@ test('真实计时扣除生命，双人多数局结算并允许下一场比赛',
   assert.ok(host.room!.players.every(player => player.wins === 0));
 });
 
+test('最后一名玩家继续同题，双方耗尽生命判定平局', async t => {
+  const settings = {...structuredClone(defaultSettings), initialSeconds: 1, startingLives: 1, maxLives: 1, bestOf: 3};
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '甲'); const guest = await Client.connect(server.address, '乙');
+  t.after(() => host.close()); t.after(() => guest.close());
+  await host.request({type: 'create', data: {name: '最后同题', password: '', settings}});
+  await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
+  await host.request({type: 'ready', data: {ready: true}}); await guest.request({type: 'ready', data: {ready: true}});
+  await host.request({type: 'start', data: {}});
+  const prompt = host.room!.prompt!; const start = host.messages.length;
+  await host.wait(message => message.type === 'state' && message.room?.players.find(player => player.id === host.playerId)?.lives === 0, start);
+  assert.equal(host.room!.phase, 'playing');
+  assert.deepEqual(host.room!.prompt, prompt);
+  assert.equal(host.room!.currentPlayerId, guest.playerId);
+  await host.wait(message => message.type === 'state' && message.room?.phase === 'between', start);
+  assert.equal(host.room!.lastWinnerId, null);
+  assert.ok(host.room!.players.every(player => player.lives === 0 && player.wins === 0));
+  assert.equal(host.room!.round, 1);
+});
+
 test('多人比赛并列加赛限定领先者，并允许完成后重新比赛', async t => {
+  const {WordRules} = await import('../shared/rules');
+  const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
   const settings: Settings = {
     ...structuredClone(defaultSettings), promptLength: 1, minAnswers: 1, initialSeconds: 1,
-    minimumSeconds: 1, startingLives: 1, bestOf: 3,
+    startingLives: 1, bestOf: 3,
     appearance: {initial: 'required', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'off'},
   };
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
@@ -410,6 +514,10 @@ test('多人比赛并列加赛限定领先者，并允许完成后重新比赛',
     for (const player of players) assert.equal((await player.request({type: 'ready', data: {ready: true}})).ok, true);
     const start = players[0].messages.length;
     assert.equal((await players[0].request({type: 'start', data: {}})).ok, true);
+    const winner = players[(round + 1) % players.length];
+    await players[0].wait(message => message.type === 'state' && message.room?.currentPlayerId === winner.playerId && message.room.players.filter(player => player.lives > 0).length === 1, start, 5000);
+    const answer = rules.cpuAnswer(players[0].room!.prompt!, settings, new Set(players[0].room!.history.map(item => item.word)))!;
+    await winner.request({type: 'submit', data: {word: answer.word, promptId: players[0].room!.prompt!.id}});
     await players[0].wait(message => message.type === 'state' && message.room?.round === round && message.room.phase !== 'playing', start, 5000);
     if (round === 3) {
       assert.equal(players[0].room!.phase, 'between');
@@ -426,6 +534,38 @@ test('多人比赛并列加赛限定领先者，并允许完成后重新比赛',
   for (const player of players) await player.request({type: 'ready', data: {ready: true}});
   assert.equal((await players[0].request({type: 'start', data: {}})).ok, true);
   assert.equal(players[0].room!.suddenDeath, false);
+});
+
+test('多人最后规定局平局后，累计胜局并列者继续加赛', async t => {
+  const {WordRules} = await import('../shared/rules');
+  const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
+  const settings = {...structuredClone(defaultSettings), initialSeconds: 1, startingLives: 1, maxLives: 1, bestOf: 3};
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const players = await Promise.all(['甲', '乙', '丙'].map(name => Client.connect(server.address, name)));
+  for (const player of players) t.after(() => player.close());
+  const host = players[0];
+  await host.request({type: 'create', data: {name: '末局平局', password: '', settings}});
+  for (const player of players.slice(1)) await player.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
+  for (let round = 1; round <= 3; round++) {
+    for (const player of players) await player.request({type: 'ready', data: {ready: true}});
+    const start = host.messages.length;
+    await host.request({type: 'start', data: {}});
+    if (round < 3) {
+      const winner = players[round === 1 ? 2 : 0];
+      await host.wait(message => message.type === 'state' && message.room?.currentPlayerId === winner.playerId && message.room.players.filter(player => player.lives > 0).length === 1, start);
+      const answer = rules.cpuAnswer(host.room!.prompt!, settings)!;
+      assert.equal((await winner.request({type: 'submit', data: {word: answer.word, promptId: host.room!.prompt!.id}})).ok, true);
+    }
+    await host.wait(message => message.type === 'state' && message.room?.phase === 'between', start);
+  }
+  assert.equal(host.room!.lastWinnerId, null);
+  assert.deepEqual(host.room!.players.map(player => player.wins), [1, 0, 1]);
+  assert.equal(host.room!.suddenDeath, true);
+  assert.equal((await players[1].request({type: 'ready', data: {ready: true}})).ok, false);
+  for (const player of [players[0], players[2]]) assert.equal((await player.request({type: 'ready', data: {ready: true}})).ok, true);
+  assert.equal((await host.request({type: 'start', data: {}})).ok, true);
+  assert.equal(host.room!.players.find(player => player.id === players[1].playerId)!.role, 'spectator');
 });
 
 test('公开房间编号、隐藏房间加入和房间内电脑回合', async t => {
@@ -470,7 +610,14 @@ test('公开房间编号、隐藏房间加入和房间内电脑回合', async t 
     assert.ok(secondAnswer);
     assert.equal((await third.request({type: 'submit', data: {word: secondAnswer.word, promptId: first.room!.prompt!.id}})).ok, true);
   }
+  const cpu = first.room!.players.find(item => item.cpu)!;
+  const cpuStart = first.messages.length;
+  await first.wait(message => message.type === 'state' && Boolean(message.room?.players.find(item => item.id === cpu.id)?.draft), cpuStart);
+  const partial = first.room!.players.find(item => item.id === cpu.id)!.draft;
+  assert.equal([...partial].length, 1);
   await first.wait(message => message.type === 'state' && (message.room?.history.length ?? 0) >= 3, first.messages.length, 5000);
+  const drafts = first.messages.slice(cpuStart).flatMap(message => message.type === 'state' ? [message.room?.players.find(item => item.id === cpu.id)?.draft ?? ''] : []).filter(Boolean);
+  assert.ok(new Set(drafts).size >= 2);
   assert.equal(first.room!.history.some(item => item.nickname === '电脑'), true);
   await first.request({type: 'leave', data: {}});
   await third.request({type: 'leave', data: {}});

@@ -27,7 +27,7 @@ async function connect(page: Page, nickname: string) {
 
 async function sampleMotion(page: Page, action: () => Promise<unknown>) {
   await page.evaluate(() => {
-    const samples: { y: number; alpha: number; newCellAlpha: number; originConnected: boolean; originScale: number; answerY: number; time: number }[] = [];
+    const samples: { y: number; alpha: number; newCellAlpha: number; originConnected: boolean; originScale: number; originLocalY: number; answerY: number; time: number }[] = [];
     Object.assign(window, { motionSamples: samples, motionFinished: false });
     const started = performance.now();
     const origin = document.querySelector('.prompt-part.prompt-origin');
@@ -38,6 +38,7 @@ async function sampleMotion(page: Page, action: () => Promise<unknown>) {
       samples.push({ y: prompt.getBoundingClientRect().y, alpha: supplement ? Number(getComputedStyle(supplement).opacity) : 0,
         newCellAlpha: newCell ? Number(getComputedStyle(newCell).opacity) : 0, originConnected: origin?.isConnected ?? false,
         originScale: origin ? new DOMMatrix(getComputedStyle(origin).transform).m11 : 0,
+        originLocalY: origin ? origin.getBoundingClientRect().y - origin.closest('.prompt-cell')!.getBoundingClientRect().y : 0,
         answerY: document.querySelector('.answer-cell')!.getBoundingClientRect().y, time: performance.now() - started });
       if (performance.now() - started < 1100) requestAnimationFrame(sample);
       else Object.assign(window, { motionFinished: true });
@@ -46,7 +47,7 @@ async function sampleMotion(page: Page, action: () => Promise<unknown>) {
   });
   await action();
   await page.waitForFunction(() => Reflect.get(window, 'motionFinished'));
-  return page.evaluate(() => Reflect.get(window, 'motionSamples') as { y: number; alpha: number; newCellAlpha: number; originConnected: boolean; originScale: number; answerY: number; time: number }[]);
+  return page.evaluate(() => Reflect.get(window, 'motionSamples') as { y: number; alpha: number; newCellAlpha: number; originConnected: boolean; originScale: number; originLocalY: number; answerY: number; time: number }[]);
 }
 
 async function assertLayout(page: Page) {
@@ -110,7 +111,7 @@ async function joinReadyPlayers(page: Page, code: string, count: number) {
 }
 
 test('自动连接、直接创建、分享链接和真实回合', async ({ browser }) => {
-  const desktop = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/', viewport: { width: 1440, height: 1000 } });
+  const desktop = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/', viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   const mobile = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const host = await desktop.newPage();
   const guest = await mobile.newPage();
@@ -170,6 +171,7 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
     expect(mergeFrames.some(frame => frame.newCellAlpha > 0 && frame.newCellAlpha < 1)).toBe(true);
     expect(mergeFrames.every(frame => frame.originConnected)).toBe(true);
     expect(mergeFrames.every(frame => Math.abs(frame.originScale - 1) < 0.001)).toBe(true);
+    expect(new Set(mergeFrames.map(frame => Math.round(frame.originLocalY * 10))).size).toBeGreaterThan(8);
     expect(new Set(mergeFrames.map(frame => Math.round(frame.answerY))).size).toBeGreaterThan(5);
     const motionStart = mergeFrames.findIndex(frame => frame.y - mergeFrames[0].y > .3);
     const motionFrames = mergeFrames.slice(motionStart);
@@ -181,7 +183,12 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
     await expect(active.locator('.answer-cells')).toBeVisible();
     await expect(active.locator('.prompt-layer-attached')).toBeVisible();
     await expect(active.locator('.prompt-origin').first()).toHaveCSS('color', 'rgb(34, 34, 34)');
-    await expect(active.locator('.prompt-supplement').first()).toHaveCSS('color', 'rgb(255, 173, 50)');
+    const currentColor = state.players.find(player => player.id === current)!.color;
+    await expect.poll(() => active.locator('.prompt').evaluate((element, color) => getComputedStyle(element).getPropertyValue('--supplement-color').trim() === color, currentColor)).toBe(true);
+    const watching = active === host ? guest : host;
+    await expect(watching.locator('.answer-character')).toHaveText([...answer]);
+    await expect(watching.getByLabel('输入答案')).toBeDisabled();
+    await expect(watching.locator('.answer-cell-caret')).toHaveCount(0);
     for (const [index, cell] of state.prompt!.cells.entries()) {
       if (cell.tone !== undefined) await expect(active.locator('.prompt-cell').nth(index).locator('.prompt-part-tone')).toHaveCSS('color', 'rgb(34, 34, 34)');
     }
@@ -205,6 +212,7 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
     const returnFrames = await sampleMotion(active, () => active.getByLabel('输入答案').press('Backspace'));
     expect(new Set(returnFrames.map(frame => Math.round(frame.y))).size).toBeGreaterThan(5);
     expect(returnFrames.some(frame => frame.alpha > 0 && frame.alpha < 1)).toBe(true);
+    expect(new Set(returnFrames.map(frame => Math.round(frame.originLocalY * 10))).size).toBeGreaterThan(8);
     await expect(active.locator('.prompt-layer-attached')).toHaveCount(0);
     await expect(active.locator('.answer-cell')).toHaveCount(1);
     await expect.poll(async () => {
@@ -214,15 +222,267 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
     }).toBe(true);
     await active.getByLabel('输入答案').fill(answer);
     await expect(active.locator('.prompt-layer-attached')).toBeVisible();
+    await host.evaluate(() => {
+      const samples: { x: number; y: number }[] = [];
+      const previousSamples: {angle: number; scale: number; color: string}[] = [];
+      Object.assign(window, { drumSamples: samples, drumFinished: false });
+      Reflect.set(window, 'previousArrowSamples', previousSamples);
+      const start = performance.now();
+      const sample = () => {
+        const hand = document.querySelector('.drum-hand-current');
+        if (hand) {
+          const matrix = new DOMMatrix(getComputedStyle(hand).transform);
+          samples.push({ x: matrix.a, y: matrix.b });
+        }
+        const previous = document.querySelector('.drum-hand-previous');
+        const shape = previous?.querySelector('.drum-hand-shape');
+        if (previous && shape) {
+          const matrix = new DOMMatrix(getComputedStyle(previous).transform);
+          previousSamples.push({angle: Math.atan2(matrix.b, matrix.a), scale: new DOMMatrix(getComputedStyle(shape).transform).a, color: getComputedStyle(shape).fill});
+        }
+        if (performance.now() - start < 1400) requestAnimationFrame(sample);
+        else Object.assign(window, { drumFinished: true });
+      };
+      requestAnimationFrame(sample);
+    });
     await active.getByRole('button', { name: '提交答案', exact: true }).click();
+    await expect(host.locator('.topology-answer')).toHaveCount(1);
     await expect.poll(() => hostState.room?.history.length).toBe(1);
     await expect.poll(() => guestState.room?.history.length).toBe(1);
+    await host.waitForFunction(() => Reflect.get(window, 'drumFinished'));
+    const transfer = await host.evaluate(() => {
+      const samples = Reflect.get(window, 'drumSamples') as { x: number; y: number }[];
+      const hand = document.querySelector('.drum-hand-current');
+      return { samples, current: hand?.getAttribute('data-player-id'), previous: document.querySelector('.drum-hand-previous')?.getAttribute('data-player-id'),
+        centerColor: getComputedStyle(document.querySelector('.topology-center')!).backgroundColor };
+    });
+    expect(new Set(transfer.samples.map(point => Math.round(point.x * 100))).size).toBeGreaterThan(12);
+    await expect.poll(() => host.locator('.drum-hand-current').evaluate(element => Math.abs(new DOMMatrix(getComputedStyle(element).transform).b))).toBeLessThan(.001);
+    expect(transfer.current).toBe(hostState.room!.currentPlayerId);
+    expect(transfer.previous).toBe(current);
+    expect(transfer.centerColor).toBe('rgb(255, 255, 255)');
+    const previousFrames = await host.evaluate(() => Reflect.get(window, 'previousArrowSamples') as {angle: number; scale: number; color: string}[]);
+    expect(previousFrames.some(frame => frame.scale > -.9 && frame.scale < .9)).toBe(true);
+    expect(new Set(previousFrames.map(frame => frame.color)).size).toBeGreaterThan(3);
+    expect(Math.max(...previousFrames.map(frame => frame.angle)) - Math.min(...previousFrames.map(frame => frame.angle))).toBeLessThan(.001);
+    const repeatPlayer = active === host ? guest : host;
+    await repeatPlayer.getByLabel('输入答案').fill(answer);
+    await expect(repeatPlayer.getByRole('status', {exact: true})).toHaveText('这个词之前输入过了');
+    expect(await repeatPlayer.locator('.answer-message').evaluate(element => element.getBoundingClientRect().top >= document.querySelector('.answer-editor')!.getBoundingClientRect().bottom)).toBe(true);
+    await repeatPlayer.evaluate(() => {
+      const root = document.querySelector('.answer-form .prompt')!;
+      const observer = new MutationObserver(() => {
+        if (!root.classList.contains('prompt-feedback')) return;
+        Reflect.set(window, 'errorColors', {outer: getComputedStyle(root).backgroundColor, cell: getComputedStyle(root.querySelector('.answer-cell-surface')!).backgroundColor});
+        observer.disconnect();
+      });
+      observer.observe(root, {attributes: true, attributeFilter: ['class']});
+    });
+    await repeatPlayer.getByRole('button', { name: '提交答案', exact: true }).click();
+    await expect(repeatPlayer.getByRole('status', { exact: true })).toHaveText('这个词之前输入过了');
+    await expect.poll(() => repeatPlayer.evaluate(() => Reflect.get(window, 'errorColors'))).toEqual({outer: 'rgba(0, 0, 0, 0)', cell: 'rgb(255, 240, 237)'});
+    expect(hostState.room!.history).toHaveLength(1);
+    await repeatPlayer.getByLabel('输入答案').fill('知识');
+    await expect(repeatPlayer.getByRole('status', { exact: true })).toBeEmpty();
+    await guest.evaluate(async (code: string) => {
+      const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`);
+      await new Promise<void>((resolve, reject) => {
+        socket.addEventListener('open', () => resolve(), { once: true });
+        socket.addEventListener('error', () => reject(new Error('观战连接失败')), { once: true });
+      });
+      for (const [id, command] of [
+        ['hello', { type: 'hello', data: { nickname: '观战者' } }],
+        ['join', { type: 'joinByCode', data: { code, password: '' } }],
+      ] as const) {
+        await new Promise<void>((resolve, reject) => {
+          const receive = (event: MessageEvent) => {
+            const message = JSON.parse(event.data) as ServerMessage;
+            if (message.type !== 'reply' || message.id !== id) return;
+            socket.removeEventListener('message', receive);
+            if (message.ok) resolve();
+            else reject(new Error(message.error));
+          };
+          socket.addEventListener('message', receive);
+          socket.send(JSON.stringify({ ...command, id }));
+        });
+      }
+    }, hostState.room!.roomPinyin);
+    await expect(host.locator('.topology-player')).toHaveCount(3);
+    await expect.poll(() => host.locator('.player-topology').evaluate(root => {
+      const center = root.querySelector('.topology-center')!.getBoundingClientRect();
+      const angles = [...root.querySelectorAll('.topology-player .topology-avatar')].map(element => {
+        const rect = element.getBoundingClientRect();
+        return Math.atan2(rect.y + rect.height / 2 - center.y - center.height / 2, rect.x + rect.width / 2 - center.x - center.width / 2);
+      }).sort((first, second) => first - second);
+      return angles.every((angle, index) => Math.abs(((angles[(index + 1) % 3] - angle + Math.PI * 2) % (Math.PI * 2)) - Math.PI * 2 / 3) < .01);
+    })).toBe(true);
+    await expect(host.locator('.drum-hand-previous')).toHaveAttribute('data-player-id', current!);
     expect(hostState.errors).toEqual([]);
     expect(guestState.errors).toEqual([]);
   } finally {
     await desktop.close();
     await mobile.close();
   }
+});
+
+test('鼓的节奏随真实倒计时加快', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const state = observe(page);
+  await connect(page, '传鼓玩家');
+  await page.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true }).click();
+  await page.getByRole('tab', { name: '规则设置', exact: true }).click();
+  await page.getByRole('button', { name: '自定义', exact: true }).click();
+  await page.getByLabel('每回合秒数', { exact: true }).fill('7');
+  await page.getByRole('button', { name: '保存规则', exact: true }).click();
+  await page.getByRole('tab', { name: '游戏', exact: true }).click();
+  await joinReadyPlayers(page, state.room!.roomPinyin, 1);
+  await page.getByRole('button', { name: '准备', exact: true }).click();
+  await page.getByRole('button', { name: '开始比赛', exact: true }).click();
+  await expect(page.locator('.drum-beat')).toHaveCSS('animation-duration', '0.85s');
+  await expect(page.locator('.drum-beat')).toHaveCSS('animation-duration', '0.5s');
+  await expect(page.locator('.drum-beat')).toHaveCSS('animation-duration', '0.3s');
+  await expect.poll(() => page.locator('.drum-beat').evaluate(element => element.getAnimations().length)).toBeGreaterThan(0);
+  await page.getByRole('tab', { name: '规则设置', exact: true }).click();
+  await page.getByRole('tab', { name: '游戏', exact: true }).click();
+  await expect(page.locator('.drum-hand-current')).toBeVisible();
+  await expect(page.getByLabel('当前提示')).toBeVisible();
+  expect(state.errors).toEqual([]);
+});
+
+test('全员观看实时草稿并在计时结束时播放自动提交结果', async ({ browser }) => {
+  const first = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
+  const second = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
+  try {
+    const host = await first.newPage(); const guest = await second.newPage();
+    const state = observe(host); const other = observe(guest);
+    await connect(host, '自动玩家');
+    await host.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true }).click();
+    await host.getByRole('tab', { name: '规则设置', exact: true }).click();
+    await host.getByRole('button', { name: '自定义', exact: true }).click();
+    await host.getByLabel('每回合秒数').fill('3');
+    await host.getByRole('button', { name: '保存规则', exact: true }).click();
+    await host.getByRole('tab', { name: '游戏', exact: true }).click();
+    await guest.goto(host.url());
+    await expect(guest.locator('.room-heading h1')).toBeVisible();
+    await host.getByRole('button', { name: '准备', exact: true }).click();
+    await guest.getByRole('button', { name: '准备', exact: true }).click();
+    for (const player of state.room!.players) {
+      const color = await host.evaluate(value => { const probe = document.createElement('div'); probe.style.color = value; return probe.style.color; }, player.color);
+      await expect(host.locator(`.topology-player[data-player-id="${player.id}"] .topology-avatar`)).toHaveCSS('border-top-color', color, { timeout: 1000 });
+    }
+    await host.getByRole('button', { name: '开始比赛', exact: true }).click();
+    await expect(host.getByLabel('当前提示')).toBeVisible();
+    const answer = rules.cpuAnswer(state.room!.prompt!, state.room!.settings)!.word;
+    await host.getByLabel('输入答案').fill(answer);
+    await expect(guest.locator('.answer-character')).toHaveText([...answer]);
+    await expect(guest.getByLabel('输入答案')).toBeDisabled();
+    await expect(guest.locator('.answer-cell-caret')).toHaveCount(0);
+    await expect.poll(() => other.room?.history.length).toBe(1);
+    await expect(guest.locator('.topology-answer')).toHaveCount(1);
+    expect(state.room!.players[0].lives).toBe(3);
+    await expect(guest.getByLabel('输入答案')).toBeEnabled({ timeout: 300 });
+    await expect(guest.getByLabel('输入答案')).toBeFocused({ timeout: 300 });
+    await expect(guest.locator('.topology-answer')).toHaveCount(0);
+    await expect(guest.getByLabel('输入答案')).toBeFocused({ timeout: 500 });
+    for (const player of state.room!.players) {
+      const color = await host.evaluate(value => { const probe = document.createElement('div'); probe.style.color = value; return probe.style.color; }, player.color);
+      await expect(host.locator(`.topology-player[data-player-id="${player.id}"] .topology-avatar`)).toHaveCSS('border-top-color', color, { timeout: 500 });
+    }
+    expect(state.errors).toEqual([]); expect(other.errors).toEqual([]);
+  } finally { await first.close(); await second.close(); }
+});
+
+test('已经结合的真实答案提交时保持原提示元素并直接返回', async ({ browser }) => {
+  const desktop = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
+  const mobile = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
+  try {
+    const host = await desktop.newPage(); const guest = await mobile.newPage();
+    const state = observe(host);
+    await connect(host, '连续提交');
+    await host.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true }).click();
+    await expect(host.locator('.room-heading h1')).toBeVisible();
+    await guest.goto(host.url());
+    await expect(guest.locator('.room-heading h1')).toBeVisible();
+    await host.getByRole('button', { name: '准备', exact: true }).click();
+    await guest.getByRole('button', { name: '准备', exact: true }).click();
+    await host.getByRole('button', { name: '开始比赛', exact: true }).click();
+    await expect(host.getByLabel('当前提示')).toBeVisible();
+    const answer = rules.cpuAnswer(state.room!.prompt!, state.room!.settings)!.word;
+    await host.getByLabel('输入答案').fill(answer);
+    await expect(host.locator('.prompt-layer-attached')).toBeVisible();
+    await expect.poll(() => host.locator('.prompt-layer').evaluate(element => element.getAnimations().length)).toBe(0);
+    await host.evaluate(() => {
+      Reflect.set(window, 'submittedOrigin', document.querySelector('.answer-form .prompt-origin'));
+      const samples: number[] = [];
+      Reflect.set(window, 'acceptedPositions', samples);
+      const start = performance.now();
+      const sample = () => {
+        samples.push(document.querySelector('.answer-form .prompt-layer')!.getBoundingClientRect().y);
+        if (performance.now() - start < 600) requestAnimationFrame(sample);
+        else Reflect.set(window, 'acceptedSampleComplete', true);
+      };
+      requestAnimationFrame(sample);
+    });
+    await host.getByRole('button', { name: '提交答案', exact: true }).click();
+    expect(await host.evaluate(() => (Reflect.get(window, 'submittedOrigin') as Element).isConnected)).toBe(true);
+    await expect(guest.getByLabel('输入答案')).toBeFocused({ timeout: 300 });
+    await guest.keyboard.insertText('知识');
+    await expect(guest.getByLabel('输入答案')).toHaveValue('知识');
+    await host.waitForFunction(() => Reflect.get(window, 'acceptedSampleComplete'));
+    const positions = await host.evaluate(() => Reflect.get(window, 'acceptedPositions') as number[]);
+    expect(positions.every((position, index) => index === 0 || position <= positions[index - 1] + 1)).toBe(true);
+  } finally { await desktop.close(); await mobile.close(); }
+});
+
+test('大厅房间卡片、电脑草稿、箭头方向和单行生命', async ({ browser }) => {
+  const creator = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
+  const observer = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
+  try {
+    const host = await creator.newPage(); const lobby = await observer.newPage();
+    const state = observe(host);
+    await connect(host, '卡片房主');
+    await host.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true }).click();
+    await expect(host.locator('.room-heading h1')).toBeVisible();
+    await connect(lobby, '大厅观看');
+    const card = lobby.locator('.lobby-room').filter({ hasText: state.room!.name });
+    await expect(card).toHaveCount(1);
+    await expect(lobby.locator('.lobby-room-name small')).toHaveCount(0);
+    await expect(card.locator('.lobby-mode-tag')).toHaveText('声母+音调');
+    for (const width of [320, 800, 1440]) {
+      await lobby.setViewportSize({ width, height: 900 });
+      await assertLayout(lobby);
+      await expect(card).toHaveCSS('border-radius', '8px');
+      await expect.poll(() => card.locator('.lobby-conditions > span').first().evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('1px');
+    }
+    await host.getByRole('button', { name: '添加电脑', exact: true }).click();
+    await host.setViewportSize({ width: 390, height: 844 });
+    expect(await host.locator('.topology-lives').evaluateAll(elements => elements.every(element => new Set([...element.querySelectorAll('svg')].map(heart => Math.round(heart.getBoundingClientRect().y))).size === 1))).toBe(true);
+    await host.getByRole('button', { name: '准备', exact: true }).click();
+    await host.getByRole('button', { name: '开始比赛', exact: true }).click();
+    await expect(host.getByLabel('当前提示')).toBeVisible();
+    await host.getByLabel('输入答案').fill(rules.cpuAnswer(state.room!.prompt!, state.room!.settings)!.word);
+    await host.getByRole('button', { name: '提交答案', exact: true }).click();
+    await expect.poll(() => state.room?.players.find(player => player.cpu)?.draft.length ?? 0, { intervals: [20, 40], timeout: 5000 }).toBe(1);
+    await expect(host.getByLabel('输入答案')).toBeDisabled();
+    await expect.poll(() => host.locator('.drum-hand-previous path').evaluate(element => (element as SVGGraphicsElement).getBBox().height)).toBe(20);
+    await expect.poll(() => host.locator('.drum-hand-current path').evaluate(element => (element as SVGGraphicsElement).getBBox().height)).toBe(20);
+    const arrow = await host.locator('.drum-hand-previous path').evaluate(element => {
+      const path = element as SVGPathElement;
+      const matrix = path.getCTM()!;
+      const points = Array.from({ length: 100 }, (_, index) => path.getPointAtLength(path.getTotalLength() * index / 100));
+      const tip = points.reduce((nearest, point) => point.x > nearest.x ? point : nearest);
+      const world = tip.matrixTransform(matrix);
+      const drum = document.querySelector('.topology-center')!.getBoundingClientRect();
+      const parent = path.closest('svg')!.getBoundingClientRect();
+      return {distance: Math.hypot(world.x + parent.x - drum.x - drum.width / 2, world.y + parent.y - drum.y - drum.height / 2)};
+    });
+    expect(arrow.distance).toBeGreaterThan(29);
+    expect(arrow.distance).toBeLessThan(34);
+    await expect.poll(() => state.room?.history.length).toBe(2);
+    await expect(host.getByLabel('输入答案')).toBeFocused({ timeout: 300 });
+    await host.keyboard.insertText('知识');
+    await expect(host.getByLabel('输入答案')).toHaveValue('知识');
+  } finally { await creator.close(); await observer.close(); }
 });
 
 test('隐藏房间通过分享链接输入密码加入', async ({ browser }) => {
@@ -288,8 +548,8 @@ test('组合提示附着后保留部首与字形部件', async ({ browser }) => 
     const active = room.players.find(player => player.id === room.currentPlayerId)!.nickname === '组合房主' ? host : guest;
     await active.getByLabel('输入答案', { exact: true }).fill(answer);
     await expect(active.locator('.prompt-layer-attached')).toBeVisible();
-    await expect(active.locator('.prompt-part-radical')).toHaveText(cell.radical!);
-    await expect(active.locator('.prompt-part-component')).toHaveText(cell.component!);
+    await expect(active.locator('.prompt-part-radical .device-glyph-text')).toBeVisible();
+    await expect.poll(() => active.locator('.device-glyph-original clipPath rect').count()).toBeGreaterThan(0);
     await expect(active.locator('.prompt-part-radical')).toHaveCSS('color', 'rgb(34, 34, 34)');
     expect(state.errors).toEqual([]);
   } finally {
@@ -338,6 +598,13 @@ test('五个模式入口和移动端页面保持可用', async ({ page }) => {
     await expect(page.getByRole('button', { name: '保存规则', exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '预览提示', exact: true })).toHaveCount(0);
   }
+  await page.getByRole('group', { name: '答案词库', exact: true }).getByRole('button', { name: '成语', exact: true }).click();
+  await expect.poll(() => state.room?.settings.dictionary).toBe('idioms');
+  await page.getByRole('button', { name: '字', exact: true }).click();
+  await expect.poll(() => state.room?.settings.dictionary).toBe('idioms');
+  expect(state.room!.settings.minLength).toBe(4);
+  await page.getByRole('group', { name: '答案词库', exact: true }).getByRole('button', { name: '全部词语', exact: true }).click();
+  await expect.poll(() => state.room?.settings.minLength).toBe(2);
   await page.getByRole('button', { name: '自定义', exact: true }).click();
   await expect(page.getByRole('group', { name: '声母', exact: true })).toBeVisible();
   const templates = page.locator('.custom-templates');
@@ -462,13 +729,12 @@ test('窄窗口活动面板默认收起，房间设置与局数在各宽度可�
   await page.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true }).click();
   await expect(page.locator('.site-footer')).toHaveCount(0);
   await expect(page.getByLabel('比赛局数')).toHaveText('第 1 局 / 3 局');
-  await expect(page.getByRole('button', { name: '打开音效', exact: true })).toBeVisible();
-  await page.getByLabel('音量', { exact: true }).fill('0.4');
-  await expect.poll(() => page.evaluate(() => localStorage.getItem('chuan-zi:audio-volume'))).toBe('0.4');
-  await page.getByRole('button', { name: '打开音效', exact: true }).click();
   await expect(page.getByRole('button', { name: '静音', exact: true })).toBeVisible();
+  await expect(page.getByLabel('音量', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '静音', exact: true }).click();
   await expect(page.getByRole('button', { name: '打开音效', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '打开音效', exact: true }).click();
+  await expect(page.getByRole('button', { name: '静音', exact: true })).toBeVisible();
   expect(state.errors).toEqual([]);
   await expect(page.getByRole('button', { name: '查看答案记录与聊天', exact: true })).toBeVisible();
   await expect(page.locator('.history-list')).toBeHidden();

@@ -7,35 +7,60 @@ export const commonRadicals = new Set(['氵', '扌', '忄', '艹', '宀', '讠',
 
 export class WordRules {
   private readonly entries: Map<string, WordEntry>;
-  private readonly index = new Map<string, Set<WordEntry>>();
+  private readonly index = new Map<string, Uint32Array>();
 
   constructor(public readonly data: DictionaryData) {
     this.entries = new Map(data.words.map(entry => [entry.word, entry]));
     if (!data.words.length || this.entries.size !== data.words.length) throw new Error('词库为空或包含重复词语');
+    for (const [letter, character] of Object.entries(data.characters)) {
+      if (!Object.keys(character.strokeParts ?? {}).length) continue;
+      if (!Number.isInteger(character.strokeCount) || character.strokeCount! <= 0) throw new Error(`汉字笔画数量无效：${letter}`);
+      if (Object.values(character.strokeParts!).some(indices => indices.some(index => index < 0 || index >= character.strokeCount!))) throw new Error(`汉字笔画索引无效：${letter}`);
+    }
+    const counts = new Map<string, number>();
     for (const entry of data.words) {
       const length = [...entry.word].length;
       if (!entry.readings.length || entry.readings.some(reading => [reading.syllables, reading.initials, reading.finals, reading.tones].some(values => values.length !== length))) {
         throw new Error(`词语完整读音字段不一致：${entry.word}`);
       }
-      const keys = new Set<string>();
-      const letters = [...entry.word];
-      for (const reading of entry.readings) {
-        for (let position = 0; position < length; position++) {
-          keys.add(`initial:${reading.initials[position]}`);
-          keys.add(`final:${reading.finals[position]}`);
-          keys.add(`tone:${reading.tones[position]}`);
-        }
-      }
-      for (const letter of letters) {
-        keys.add(`contains:${letter}`);
-        for (const radical of this.radicalsFor(letter)) keys.add(`radical:${radical}`);
-        for (const component of data.characters[letter]?.components ?? []) keys.add(`component:${component}`);
-      }
-      for (const key of keys) {
-        if (!this.index.has(key)) this.index.set(key, new Set());
-        this.index.get(key)!.add(entry);
-      }
+      for (const key of this.entryKeys(entry)) counts.set(key, (counts.get(key) ?? 0) + 1);
     }
+    for (const [key, count] of counts) { this.index.set(key, new Uint32Array(count)); counts.set(key, 0); }
+    data.words.forEach((entry, ordinal) => {
+      for (const key of this.entryKeys(entry)) {
+        const position = counts.get(key)!;
+        this.index.get(key)![position] = ordinal;
+        counts.set(key, position + 1);
+      }
+    });
+  }
+
+  private entryKeys(entry: WordEntry): Set<string> {
+    const keys = new Set<string>();
+    const letters = [...entry.word];
+    for (const reading of entry.readings) for (let position = 0; position < letters.length; position++) {
+      keys.add(`initial:${reading.initials[position]}`);
+      keys.add(`final:${reading.finals[position]}`);
+      keys.add(`tone:${reading.tones[position]}`);
+    }
+    for (const letter of letters) {
+      keys.add(`contains:${letter}`);
+      for (const radical of this.radicalsFor(letter)) keys.add(`radical:${radical}`);
+      for (const component of Object.keys(this.data.characters[letter]?.strokeParts ?? {})) keys.add(`component:${component}`);
+    }
+    return keys;
+  }
+
+  private indexed(pool: Uint32Array, ordinal: number): boolean {
+    let first = 0;
+    let last = pool.length - 1;
+    while (first <= last) {
+      const middle = (first + last) >>> 1;
+      if (pool[middle] === ordinal) return true;
+      if (pool[middle] < ordinal) first = middle + 1;
+      else last = middle - 1;
+    }
+    return false;
   }
 
   match(word: string, prompt: Prompt, settings: Settings, used = new Set<string>()): MatchResult {
@@ -50,8 +75,10 @@ export class WordRules {
   draft(word: string, prompt: Prompt, settings: Settings, used = new Set<string>()): MatchResult {
     if (!word) return { valid: false };
     const exact = this.entries.get(word);
-    if (exact && !used.has(word) && this.allowed(exact, settings)) return this.matchEntry(exact, prompt) ?? { valid: false };
-    return { valid: false };
+    if (!exact) return { valid: false, reason: '词库没有收录这个答案' };
+    if (used.has(word)) return { valid: false, reason: '本局已经使用这个答案' };
+    if (!this.allowed(exact, settings)) return { valid: false, reason: '答案不符合词库或长度设置' };
+    return this.matchEntry(exact, prompt) ?? { valid: false, reason: '答案没有满足当前提示' };
   }
 
   private allowed(entry: WordEntry, settings: Settings): boolean {
@@ -60,7 +87,11 @@ export class WordRules {
   }
 
   private radicalsFor(letter: string): string[] {
-    return (this.data.characters[letter]?.radicals ?? []).filter(radical => commonRadicals.has(radical) && letter !== radical);
+    const character = this.data.characters[letter];
+    return Object.keys(character?.strokeParts ?? {}).filter(radical => {
+      const length = character!.strokeParts![radical].length;
+      return commonRadicals.has(radical) && letter !== radical && length > 0 && length < character!.strokeCount!;
+    });
   }
 
   private matchEntry(entry: WordEntry, prompt: Prompt): MatchResult | undefined {
@@ -74,7 +105,7 @@ export class WordRules {
             && (cell.final === undefined || reading.finals[position] === cell.final)
             && (cell.tone === undefined || reading.tones[position] === cell.tone)
             && (cell.radical === undefined || this.radicalsFor(letters[position]).includes(cell.radical))
-            && (cell.component === undefined || character?.components.includes(cell.component))
+            && (cell.component === undefined || Boolean(character?.strokeParts?.[cell.component]?.length))
             && (cell.contains === undefined || letters.slice(position, position + [...cell.contains].length).join('') === cell.contains);
         })) return { valid: true, reading, offset };
       }
@@ -104,6 +135,7 @@ export class WordRules {
 
   generate(settings: Settings, used = new Set<string>()): Prompt {
     validateSettings(settings);
+    if (settings.mode === 'radical') settings = {...settings, promptLength: Math.random() < .5 ? 1 : 2, hiddenCount: 0};
     const candidates = this.data.words.filter(entry => this.allowed(entry, settings) && !used.has(entry.word));
     if (!candidates.length) throw new RuleError('当前词库没有符合设置的答案');
     const visibleCount = settings.promptLength - settings.hiddenCount;
@@ -141,8 +173,9 @@ export class WordRules {
             else cell.radical = radicals[Math.floor(Math.random() * radicals.length)];
           }
           if (type === 'component') {
-            if (!character?.components.length) complete = false;
-            else cell.component = character.components[Math.floor(Math.random() * character.components.length)];
+            const drawable = Object.keys(character?.strokeParts ?? {});
+            if (!drawable.length) complete = false;
+            else cell.component = drawable[Math.floor(Math.random() * drawable.length)];
           }
           if (type === 'contains') cell.contains = [...candidate.word][absolute];
         }
@@ -160,7 +193,7 @@ export class WordRules {
   examples(prompt: Prompt, settings: Settings, used = new Set<string>(), limit = 5): WordEntry[] {
     if (limit <= 0) return [];
     if (!this.relationsHold(prompt, settings)) return [];
-    const pools: Set<WordEntry>[] = [];
+    const pools: Uint32Array[] = [];
     for (const cell of prompt.cells) {
       for (const type of conditionTypes) {
         const value = cell[type];
@@ -173,11 +206,12 @@ export class WordRules {
         }
       }
     }
-    pools.sort((first, second) => first.size - second.size);
-    const source = pools.length ? pools[0] : this.data.words;
+    pools.sort((first, second) => first.length - second.length);
+    const source = pools.length ? pools[0] : this.data.words.keys();
     const result: WordEntry[] = [];
-    for (const entry of source) {
-      if (!used.has(entry.word) && this.allowed(entry, settings) && pools.every(pool => pool.has(entry)) && this.matchEntry(entry, prompt)) result.push(entry);
+    for (const ordinal of source) {
+      const entry = this.data.words[ordinal];
+      if (!used.has(entry.word) && this.allowed(entry, settings) && pools.every(pool => this.indexed(pool, ordinal)) && this.matchEntry(entry, prompt)) result.push(entry);
       if (result.length >= limit) break;
     }
     return result;

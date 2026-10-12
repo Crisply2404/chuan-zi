@@ -1,10 +1,10 @@
 {
-  "version": "2026-10-11",
-  "wordCount": 88177,
-  "idiomCount": 7133,
+  "version": "2026-10-13",
+  "wordCount": 89431,
+  "idiomCount": 7050,
   "sources": [
     {
-      "name": "CC-CEDICT contributors / cedict-json 1.3.20251213",
+      "name": "CC-CEDICT contributors / MDBG 2026-10-12",
       "license": "CC-BY-SA-4.0",
       "url": "https://cc-cedict.org/wiki/"
     },
@@ -30,8 +30,8 @@
     }
   ],
   "thuoclCount": 8519,
-  "thuoclWithCompleteReadings": 5042,
-  "characterCount": 5937,
+  "thuoclWithCompleteReadings": 5142,
+  "characterCount": 5945,
   "componentCharacterCount": 9574,
   "modifications": [
     "词语与长度筛选",

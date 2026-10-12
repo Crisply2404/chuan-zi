@@ -20,4 +20,4 @@ MDN 的 [Web Audio API 说明](https://developer.mozilla.org/en-US/docs/Web/API/
 
 ## 项目决定
 
-当前使用本地 CC0 鼓声与 Web Audio API 反馈音的混合方案。已加入 `public/audio/chuan-zi-drum.wav`，来源与处理记录保存在受版本控制的 `licenses/Bauchamp-130-combinaison-de-percussions-CC0.txt`，构建时复制到 `public/licenses/`。音频资源记录文件名称、来源地址、作者、许可证、处理方式和校验值。
+全部音效采用本地 CC0 录音，通过 Web Audio API 播放。单次自然鼓声来自 MrRentAPercussionist，正确、错误、倒计时和超时录音来自 Kenney Interface Sounds。每次反馈播放一个对应文件，换人只播放鼓声。完整来源、转换、SHA-256 和 CC0 许可保存在 `licenses/Game-Audio-Sources.txt`、`licenses/CC0-1.0.txt` 和 `licenses/Kenney-Interface-Sounds-CC0.txt`，构建时复制到 `public/licenses/`。素材与字体核查见 [素材许可记录](assets-and-audio-audit-2026-10-12.md)。

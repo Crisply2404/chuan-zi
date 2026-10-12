@@ -1,11 +1,64 @@
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { formatPinyin } from '../shared/pinyin';
 import type { DraftMatch, Prompt, PromptCell, Reading } from '../shared/types';
 
+type Glyph = { character: string; strokes: string[]; parts: Record<string, number[]> };
+const glyphCache = new Map<string, Promise<Glyph>>();
+
+function loadGlyph(character: string): Promise<Glyph> {
+  const cached = glyphCache.get(character);
+  if (cached) return cached;
+  const request = fetch(`${import.meta.env.BASE_URL}glyphs/${character.codePointAt(0)!.toString(16)}.json`).then(async response => {
+    if (!response.ok) throw new Error(`汉字笔画加载失败：${character}`);
+    const glyph = await response.json() as Glyph;
+    if (glyph.character !== character || !glyph.strokes.length) throw new Error(`汉字笔画资料无效：${character}`);
+    return glyph;
+  });
+  glyphCache.set(character, request);
+  return request;
+}
+
+function GlyphPart({ glyph, indices, original, attached, hint }: { glyph: Glyph; indices: number[]; original: boolean; attached: boolean; hint?: string }) {
+  const maskId = useId();
+  const paths = useRef<SVGGElement>(null);
+  const text = useRef<HTMLSpanElement>(null);
+  const hintText = useRef<HTMLSpanElement>(null);
+  const [regions, setRegions] = useState<{x: number; y: number; width: number; height: number}[]>([]);
+  useLayoutEffect(() => {
+    const all = paths.current!.getBBox();
+    if (!all.width || !all.height) throw new Error(`字形部件范围无效：${glyph.character}`);
+    setRegions(indices.map(index => {
+      const bounds = paths.current!.children[index] as SVGGraphicsElement;
+      const box = bounds.getBBox();
+      return {x: .08 + .84 * (box.x - all.x) / all.width, y: .1 + .78 * (all.y + all.height - box.y - box.height) / all.height,
+        width: .84 * box.width / all.width, height: .78 * box.height / all.height};
+    }));
+  }, [glyph, indices.join(':')]);
+  useLayoutEffect(() => {
+    if (!original) return;
+    animateOpacity(text.current!, attached ? 1 : 0);
+    animateOpacity(hintText.current!, attached ? 0 : 1);
+  }, [attached, original, regions]);
+  return <span className={`device-glyph ${original ? 'device-glyph-original' : 'device-glyph-supplement'}`} aria-hidden="true">
+    <svg className="device-glyph-measure" width="0" height="0"><defs><clipPath id={maskId} clipPathUnits="objectBoundingBox">
+      {regions.map((region, index) => <rect key={index} {...region} />)}
+    </clipPath></defs><g ref={paths}>{glyph.strokes.map((path, index) => <path key={index} d={path} />)}</g></svg>
+    {original && <span ref={hintText} className="device-glyph-hint" style={{opacity: attached ? 0 : 1}}>{hint}</span>}
+    <span ref={text} className="device-glyph-text" style={{clipPath: original ? `url(#${maskId})` : undefined, opacity: original ? attached ? 1 : 0 : 1}}>{glyph.character}</span>
+  </span>;
+}
+
 function ToneMark({ tone }: { tone: number }) {
-  const paths = ['', 'M5 12H27', 'M7 20L25 6', 'M5 7L16 21L27 7', 'M7 6L25 20'];
-  return <svg className="prompt-tone" viewBox="0 0 32 28" role="img" aria-label={formatPinyin(undefined, undefined, tone)}>
-    {tone === 5 ? <circle cx="16" cy="14" r="2.5" fill="currentColor" /> : <path d={paths[tone]} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
+  // 声调布局参考 Han Dou，MIT 许可见 licenses/HanDou.txt。
+  const paths = [
+    '',
+    'M3 11H17',
+    'M4 15L16 5',
+    'M3 7L10 15L17 7',
+    'M4 5L16 15',
+  ];
+  return <svg className="prompt-tone" viewBox="0 0 20 20" role="img" aria-label={formatPinyin(undefined, undefined, tone)}>
+    {tone === 5 ? <circle cx="10" cy="10" r="2" fill="currentColor" /> : <path d={paths[tone]} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
   </svg>;
 }
 
@@ -21,12 +74,29 @@ function displayPinyin(value: string, start: number, toneIndex: number): string 
   }).join('');
 }
 
-function PromptCellView({ cell, character, reading, position, cellIndex }: {
-  cell: PromptCell; character?: string; reading?: Reading; position?: number; cellIndex: number;
+function PromptCellView({ cell, character, reading, position, cellIndex, attached }: {
+  cell: PromptCell; character?: string; reading?: Reading; position?: number; cellIndex: number; attached: boolean;
 }) {
   const element = useRef<HTMLDivElement>(null);
   const [geometry, setGeometry] = useState<Record<string, CSSProperties>>({});
+  const transforms = useRef(new Map<string, LayoutFrame>());
   const hidden = Object.keys(cell).length === 0;
+  const zeroInitial = cell.initial === '';
+  const emptyPhonetic = zeroInitial || cell.final === '';
+  const [loadedGlyph, setGlyph] = useState<Glyph | null>(null);
+  const glyph = loadedGlyph?.character === character ? loadedGlyph : null;
+  useEffect(() => {
+    if (!character || (cell.radical === undefined && cell.component === undefined)) { setGlyph(null); return; }
+    let current = true;
+    loadGlyph(character).then(value => { if (current) setGlyph(value); });
+    return () => { current = false; };
+  }, [character, cell.radical, cell.component]);
+  if (glyph && [cell.radical, cell.component].some(part => part !== undefined && !glyph.parts[part]?.length)) throw new Error(`提示笔画映射缺失：${character}`);
+  const radicalStrokes = glyph && cell.radical !== undefined ? glyph.parts[cell.radical] ?? [] : [];
+  const componentStrokes = glyph && cell.component !== undefined ? (glyph.parts[cell.component] ?? []).filter(index => !radicalStrokes.includes(index)) : [];
+  const originalStrokes = [...radicalStrokes, ...componentStrokes];
+  const vector = glyph !== null && originalStrokes.length > 0;
+  const supplementStrokes = glyph?.strokes.flatMap((_, index) => !originalStrokes.includes(index) ? [index] : []) ?? [];
   const initial = reading && position !== undefined ? reading.initials[position] : cell.initial ?? '';
   const final = reading && position !== undefined ? reading.finals[position] : cell.final ?? '';
   const tone = reading && position !== undefined ? reading.tones[position] : cell.tone;
@@ -40,12 +110,13 @@ function PromptCellView({ cell, character, reading, position, cellIndex }: {
   const displayFinal = displayPinyin(final, initial.length, displayToneIndex);
   const visiblePinyin = (value: string, field: string, start: number) => pinyinTargets(value, field, start, -1, undefined);
   const parts = [
-    { field: 'initial', content: visiblePinyin(displayInitial, 'initial', 0), original: cell.initial !== undefined },
-    { field: 'final', content: visiblePinyin(displayFinal, 'final', initial.length), original: cell.final !== undefined },
+    { field: 'initial', content: initial ? visiblePinyin(displayInitial, 'initial', 0) : null, original: cell.initial !== undefined },
+    { field: 'final', content: final ? visiblePinyin(displayFinal, 'final', initial.length) : null, original: cell.final !== undefined },
     { field: 'tone', content: tone !== undefined ? <ToneMark tone={tone} /> : null, original: cell.tone !== undefined },
-    { field: 'radical', content: cell.radical, original: true },
-    { field: 'component', content: cell.component, original: true },
-    { field: 'character', content: cell.contains ?? character, original: cell.contains !== undefined },
+    { field: 'radical', content: vector && radicalStrokes.length ? <GlyphPart glyph={glyph!} indices={radicalStrokes} hint={cell.radical} original attached={attached} /> : cell.radical, original: true, vector: vector && radicalStrokes.length > 0 },
+    { field: 'component', content: vector ? componentStrokes.length ? <GlyphPart glyph={glyph!} indices={componentStrokes} hint={cell.component} original attached={attached} /> : null : cell.component, original: true, vector: vector && componentStrokes.length > 0 },
+    { field: 'character', content: vector && cell.contains === undefined ? <GlyphPart glyph={glyph!} indices={supplementStrokes} original={false} attached={attached} /> : cell.contains ?? character, original: cell.contains !== undefined, vector },
+    { field: 'zero', content: emptyPhonetic ? '∅' : null, original: true },
   ].filter(part => part.content !== undefined && part.content !== null && part.content !== '');
 
   useLayoutEffect(() => {
@@ -56,38 +127,55 @@ function PromptCellView({ cell, character, reading, position, cellIndex }: {
       for (const part of root.querySelectorAll<HTMLElement>('.prompt-part')) {
         const field = part.dataset.field!;
         const source = root.querySelector<HTMLElement>(`.prompt-hint-layout [data-field="${field}"]`);
-        const target = root.querySelector<HTMLElement>(`.prompt-complete-layout [data-field="${field}"]`);
+        const target = root.querySelector<HTMLElement>(`.prompt-complete-layout [data-field="${vector && ['radical', 'component'].includes(field) ? 'character' : field}"]`);
         const sourceBounds = source?.getBoundingClientRect();
         const targetBounds = target?.getBoundingClientRect();
-        const width = part.offsetWidth;
-        const height = part.offsetHeight;
-        if (!width || !height) continue;
         const destination = targetBounds ?? sourceBounds;
         if (!destination) continue;
         const start = sourceBounds ?? destination;
+        const sourceStyle = getComputedStyle(source ?? target!);
+        const targetStyle = getComputedStyle(target ?? source!);
         next[field] = {
           '--hint-x': `${start.x - bounds.x - root.clientLeft}px`, '--hint-y': `${start.y - bounds.y - root.clientTop}px`,
           '--complete-x': `${destination.x - bounds.x - root.clientLeft}px`, '--complete-y': `${destination.y - bounds.y - root.clientTop}px`,
+          '--hint-font-size': sourceStyle.fontSize, '--complete-font-size': targetStyle.fontSize,
+          '--hint-line-height': sourceStyle.lineHeight, '--complete-line-height': targetStyle.lineHeight,
+          '--hint-width': `${start.width}px`, '--complete-width': `${destination.width}px`,
+          '--hint-height': `${start.height}px`, '--complete-height': `${destination.height}px`,
         } as CSSProperties;
       }
-      setGeometry(next);
+      setGeometry(previous => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
     };
     measure();
     const observer = new ResizeObserver(measure);
     observer.observe(root);
     return () => observer.disconnect();
-  }, [cell, character, fullPinyin, initial, final, tone]);
+  }, [cell, character, fullPinyin, initial, final, tone, glyph, vector]);
+
+  useLayoutEffect(() => {
+    if (!Object.keys(geometry).length) return;
+    const root = element.current!;
+    const next = new Map<string, LayoutFrame>();
+    root.querySelectorAll<HTMLElement>('.prompt-part').forEach(part => {
+      const field = part.dataset.field!;
+      next.set(field, animateFlip(part, transforms.current.get(field), true));
+      if (part.classList.contains('prompt-supplement')) animateOpacity(part, attached ? 1 : 0);
+      if (part.classList.contains('prompt-empty-phonetic')) animateOpacity(part, attached ? 0 : 1);
+    });
+    transforms.current = next;
+  }, [geometry, attached]);
 
   function pinyinTargets(value: string, field: string, start: number, anchor = toneIndex, mark = tone) {
     return <span data-field={field}>
-      {[...value].map((letter, index) => <span className="prompt-letter" data-tone-anchor={start + index === anchor ? 'true' : undefined} key={index}>
+      {[...value].map((letter, index) => <span className="prompt-letter" data-diaeresis={letter === 'ü' ? 'true' : undefined} data-tone-anchor={start + index === anchor ? 'true' : undefined} key={index}>
         <span className={start + index === anchor && letter.toLowerCase() === 'i' ? 'prompt-letter-base prompt-letter-dotless' : 'prompt-letter-base'}>{start + index === anchor && letter.toLowerCase() === 'i' ? 'ı' : letter}</span>
         {start + index === anchor && mark !== undefined && <span className="prompt-tone-target" data-field="tone"><ToneMark tone={mark} /></span>}
       </span>)}
     </span>;
   }
-  return <div ref={element} data-cell-index={cellIndex} className={`prompt-cell ${hidden ? 'prompt-hidden' : ''} ${character ? 'prompt-attached-cell' : ''}`} aria-label={character ? `${character} ${fullPinyin}` : '提示位置'}>
+  return <div ref={element} data-cell-index={cellIndex} data-glyph-ready={!character || (cell.radical === undefined && cell.component === undefined) || glyph !== null} style={{ '--pinyin-length': Math.max(initial.length + final.length, 3) } as CSSProperties} className={`prompt-cell ${hidden ? 'prompt-hidden' : ''} ${character ? 'prompt-attached-cell' : ''}`} aria-label={character ? `${character} ${fullPinyin}` : hidden ? '不限条件' : zeroInitial ? '零声母' : emptyPhonetic ? '无韵母' : '提示位置'}>
     <div className="prompt-hint-layout" aria-hidden="true">
+      {emptyPhonetic && <span data-field="zero">∅</span>}
       <span className="prompt-hint-pinyin">
         {cell.initial !== undefined && pinyinTargets(cell.initial, 'initial', 0, hintToneIndex, cell.tone)}
         {cell.final !== undefined && pinyinTargets(cell.final, 'final', cell.initial?.length ?? 0, hintToneIndex, cell.tone)}
@@ -99,9 +187,9 @@ function PromptCellView({ cell, character, reading, position, cellIndex }: {
     </div>
     {character && <div className="prompt-complete-layout" aria-hidden="true">
       <span className="prompt-attached-hint">
-        {cell.radical !== undefined && <span data-field="radical">{cell.radical}</span>}
-        {cell.radical !== undefined && cell.component !== undefined && ' '}
-        {cell.component !== undefined && <span data-field="component">{cell.component}</span>}
+        {!vector && cell.radical !== undefined && <span data-field="radical">{cell.radical}</span>}
+        {!vector && cell.radical !== undefined && cell.component !== undefined && ' '}
+        {!vector && cell.component !== undefined && <span data-field="component">{cell.component}</span>}
       </span>
       <span className="prompt-input-character" data-field="character">{character}</span>
       <span className={`prompt-pinyin ${fullPinyin.length > 6 ? 'prompt-pinyin-long' : ''}`}>
@@ -112,9 +200,9 @@ function PromptCellView({ cell, character, reading, position, cellIndex }: {
     </div>}
     <div className="prompt-complete">
       {parts.map(part => <span key={part.field} data-field={part.field}
-        className={`prompt-part prompt-part-${part.field} ${part.original ? 'prompt-origin' : 'prompt-supplement'}`} style={geometry[part.field]}>{part.content}</span>)}
+        className={`prompt-part prompt-part-${part.field} ${part.original ? 'prompt-origin' : 'prompt-supplement'} ${part.vector ? 'prompt-part-vector' : ''} ${part.field === 'zero' ? 'prompt-empty-phonetic' : ''}`} style={geometry[part.field]}>{part.content}</span>)}
     </div>
-    {hidden && <span className="prompt-star">*</span>}
+    {hidden && <span className="prompt-unrestricted">∅</span>}
   </div>;
 }
 
@@ -122,38 +210,40 @@ const flipAnimations = new WeakMap<HTMLElement, Animation>();
 const opacityAnimations = new WeakMap<HTMLElement, Animation>();
 const easing = 'cubic-bezier(.16, 1, .3, 1)';
 
-function transformValue(element: HTMLElement): string {
-  const value = getComputedStyle(element).transform;
-  return value === 'none' ? 'matrix(1, 0, 0, 1, 0, 0)' : value;
+type LayoutFrame = { transform: string; fontSize?: string; lineHeight?: string; width?: string; height?: string };
+
+function layoutValue(element: HTMLElement, includeSize: boolean): LayoutFrame {
+  const style = getComputedStyle(element);
+  return {
+    transform: style.transform === 'none' ? 'matrix(1, 0, 0, 1, 0, 0)' : style.transform,
+    ...(includeSize ? { fontSize: style.fontSize, lineHeight: style.lineHeight, width: style.width, height: style.height } : {}),
+  };
 }
 
-function animateFlip(element: HTMLElement, previousTransform: string | undefined, reducedMotion: boolean): string {
+function animateFlip(element: HTMLElement, previous: LayoutFrame | undefined, includeSize = false): LayoutFrame {
   const active = flipAnimations.get(element);
-  const from = active ? transformValue(element) : previousTransform;
+  const from = active ? layoutValue(element, includeSize) : previous;
   active?.cancel();
   flipAnimations.delete(element);
-  const currentTransform = transformValue(element);
-  if (!from || reducedMotion || from === currentTransform) return currentTransform;
-  const animation = element.animate([
-    { transform: from },
-    { transform: currentTransform },
-  ], { duration: 700, easing, fill: 'both' });
+  const current = layoutValue(element, includeSize);
+  if (!from || JSON.stringify(from) === JSON.stringify(current)) return current;
+  const animation = element.animate([from, current], { duration: 700, easing, fill: 'both' });
   flipAnimations.set(element, animation);
   animation.onfinish = () => {
     if (flipAnimations.get(element) === animation) flipAnimations.delete(element);
     animation.cancel();
   };
-  return currentTransform;
+  return current;
 }
 
-function animateOpacity(element: HTMLElement, target: number, reducedMotion: boolean) {
+function animateOpacity(element: HTMLElement, target: number) {
   const active = opacityAnimations.get(element);
   const computed = Number.parseFloat(getComputedStyle(element).opacity);
-  const from = active ? computed : (element.dataset.opacityTarget ? Number(element.dataset.opacityTarget) : computed);
+  const from = active ? computed : (element.dataset.opacityTarget ? Number(element.dataset.opacityTarget) : 0);
   active?.cancel();
   opacityAnimations.delete(element);
   element.dataset.opacityTarget = String(target);
-  if (reducedMotion || !Number.isFinite(from) || Math.abs(from - target) < 0.001) return;
+  if (!Number.isFinite(from) || Math.abs(from - target) < 0.001) return;
   const animation = element.animate([
     { opacity: from },
     { opacity: target },
@@ -165,18 +255,18 @@ function animateOpacity(element: HTMLElement, target: number, reducedMotion: boo
   };
 }
 
-export function PromptView({ prompt, compact = false, draft = '', draftMatch, feedback = false, maxLength, cursor = 0, focused = false, answerInput, onSelectCharacter }: {
+export function PromptView({ prompt, compact = false, draft = '', draftMatch, feedback = false, maxLength, cursor = 0, focused = false, answerInput, onSelectCharacter, supplementColor = '#ffad32', settled = false, submitting = false, onCombined }: {
   prompt: Prompt; compact?: boolean; draft?: string; draftMatch?: DraftMatch; feedback?: boolean;
   maxLength?: number; cursor?: number; focused?: boolean; answerInput?: ReactNode; onSelectCharacter?: (index: number) => void;
+  supplementColor?: string; settled?: boolean; submitting?: boolean; onCombined?: () => void;
 }) {
   const characters = [...draft];
   const match = draftMatch && draftMatch.promptId === prompt.id && draftMatch.word === draft && draftMatch.offset !== null && draftMatch.reading
     ? {offset: draftMatch.offset, reading: draftMatch.reading} : null;
   const attached = match !== null && match.offset + prompt.cells.length <= characters.length;
-  const [visualAttached, setVisualAttached] = useState(false);
+  const [visualAttached, setVisualAttached] = useState(settled);
   useEffect(() => {
     if (!attached) { setVisualAttached(false); return; }
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { setVisualAttached(true); return; }
     let nextFrame = 0;
     const frame = requestAnimationFrame(() => { nextFrame = requestAnimationFrame(() => setVisualAttached(true)); });
     return () => { cancelAnimationFrame(frame); cancelAnimationFrame(nextFrame); };
@@ -197,26 +287,38 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
     '--answer-count': answerCount,
     '--prompt-shift': attached ? match.offset + prompt.cells.length / 2 - answerCount / 2 : 0,
     '--input-index': Math.min(cursor, Math.max(0, answerCount - 1)),
+    '--supplement-color': supplementColor,
   } as CSSProperties;
   const flipRoot = useRef<HTMLDivElement>(null);
-  const flipTransforms = useRef(new Map<string, string>());
+  const flipTransforms = useRef(new Map<string, LayoutFrame>());
+  useEffect(() => {
+    if (!submitting || !attached || !visualAttached) return;
+    const root = flipRoot.current!;
+    let frame = 0;
+    let stableFrames = 0;
+    const advance = () => {
+      const active = root.getAnimations({ subtree: true }).filter(animation => {
+        return animation.effect?.getComputedTiming().iterations !== Infinity && (animation.playState === 'running' || animation.pending);
+      });
+      active.forEach(animation => { animation.playbackRate = 8; });
+      const pendingGlyph = root.querySelector('.prompt-cell[data-glyph-ready="false"], .prompt-glyph-origin[data-merged="false"]');
+      stableFrames = pendingGlyph || active.length ? 0 : stableFrames + 1;
+      if (stableFrames >= 2) { onCombined?.(); return; }
+      frame = requestAnimationFrame(advance);
+    };
+    frame = requestAnimationFrame(advance);
+    return () => cancelAnimationFrame(frame);
+  }, [submitting, attached, visualAttached, onCombined]);
   useLayoutEffect(() => {
     const root = flipRoot.current;
     if (!root) return;
     const nodes = [
       ...Array.from(root.querySelectorAll<HTMLElement>('.prompt-layer, .answer-editor')),
-      ...Array.from(root.querySelectorAll<HTMLElement>('.prompt-part')),
     ];
-    const next = new Map<string, string>();
-    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const next = new Map<string, LayoutFrame>();
     nodes.forEach(node => {
-      const cellIndex = node.closest<HTMLElement>('.prompt-cell')?.dataset.cellIndex ?? '';
-      const key = node.classList.contains('prompt-part') ? `part:${cellIndex}:${node.dataset.field}` : node.classList.contains('prompt-layer') ? 'prompt-layer' : 'answer-editor';
-      next.set(key, animateFlip(node, flipTransforms.current.get(key), reducedMotion));
-    });
-    const targetAttached = attached && visualAttached;
-    root.querySelectorAll<HTMLElement>('.prompt-supplement').forEach(node => {
-      animateOpacity(node, targetAttached ? 1 : 0, reducedMotion);
+      const key = node.classList.contains('prompt-layer') ? 'prompt-layer' : 'answer-editor';
+      next.set(key, animateFlip(node, flipTransforms.current.get(key)));
     });
     flipTransforms.current = next;
   }, [draft, visualAttached, prompt.id, completion?.offset, answerCount]);
@@ -225,7 +327,7 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
       <div className="prompt-cells">
         {prompt.cells.map((cell, index) => <PromptCellView key={`${prompt.id}:${index}`} cell={cell}
           character={completion?.characters[completion.offset + index]}
-          reading={completion?.reading} position={completion ? index : undefined} cellIndex={index} />)}
+          reading={completion?.reading} position={completion ? index : undefined} cellIndex={index} attached={attached && visualAttached} />)}
       </div>
     </div>
     {answerCount > 0 && <div className={`answer-editor ${attached && visualAttached ? 'answer-editor-attached' : ''}`}>

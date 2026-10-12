@@ -31,7 +31,6 @@ export interface Settings {
   initialSeconds: number;
   randomMinSeconds: number;
   randomMaxSeconds: number;
-  minimumSeconds: number;
   bestOf: number;
   maxPlayers: number;
   bonusInitials: string[];
@@ -42,12 +41,12 @@ export const defaultSettings: Settings = {
   dictionary: 'all', minLength: 2, maxLength: 9, promptLength: 2, hiddenCount: 0,
   appearance: { initial: 'required', final: 'off', tone: 'random', radical: 'off', component: 'off', contains: 'off' },
   relations: [], toneScope: 'one', minAnswers: 2, maxAnswers: 20000,
-  startingLives: 3, maxLives: 5, timerMode: 'fixed', initialSeconds: 20,
-  randomMinSeconds: 10, randomMaxSeconds: 30, minimumSeconds: 5,
+  startingLives: 3, maxLives: 5, timerMode: 'fixed', initialSeconds: 10,
+  randomMinSeconds: 10, randomMaxSeconds: 30,
   bestOf: 3, maxPlayers: 8, bonusInitials: ['b', 'p', 'm', 'f', 'd', 't', 'n', 'l'],
 };
 
-export interface CharacterData { radicals: string[]; components: string[] }
+export interface CharacterData { radicals: string[]; components: string[]; strokeCount?: number; strokeParts?: Record<string, number[]> }
 export interface Reading { syllables: string[]; initials: string[]; finals: string[]; tones: number[] }
 export interface WordEntry { word: string; readings: Reading[]; idiom: boolean; df: number; frequency?: number; source: string[] }
 export interface DictionaryData {
@@ -65,28 +64,30 @@ export interface PromptCell {
 }
 export interface Prompt { cells: PromptCell[]; answerCount: number; id: string }
 export interface MatchResult { valid: boolean; reason?: string; reading?: Reading; offset?: number }
-export interface DraftMatch { word: string; promptId: string | null; offset: number | null; reading?: Reading }
+export interface DraftMatch { word: string; promptId: string | null; offset: number | null; reading?: Reading; reason?: string }
 export interface AnswerResult { accepted: boolean }
 
 export interface PlayerView {
-  id: string; nickname: string; online: boolean; ready: boolean;
+  id: string; nickname: string; online: boolean; ready: boolean; color: string;
   role: 'player' | 'spectator'; lives: number; wins: number;
   collected: string[]; draft: string; cpu: boolean;
 }
 export interface HistoryItem { playerId: string; nickname: string; word: string; at: number }
 export interface ChatMessage { id: string; nickname: string; text: string; at: number }
+export interface AcceptedAnswer { id: string; playerId: string; word: string; prompt: Prompt; match: DraftMatch; color: string; at: number }
 export interface RoomView {
   id: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string;
   hostId: string; protected: boolean; listed: boolean;
   phase: 'waiting' | 'playing' | 'between' | 'finished';
   settings: Settings; players: PlayerView[];
-  round: number; suddenDeath: boolean; currentPlayerId: string | null;
+  round: number; suddenDeath: boolean; currentPlayerId: string | null; previousPlayerId: string | null;
   prompt: Prompt | null; deadline: number | null; serverTime: number;
-  history: HistoryItem[]; chat: ChatMessage[];
+  history: HistoryItem[]; chat: ChatMessage[]; draftMatch: DraftMatch | null; acceptedAnswer: AcceptedAnswer | null;
   lastWinnerId: string | null; winnerIds: string[];
 }
 export interface LobbyRoom {
   id: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string; mode: ModeId;
+  dictionary: Settings['dictionary'];
   playerCount: number; maxPlayers: number; protected: boolean; listed: boolean;
   phase: RoomView['phase']; conditions: ConditionType[];
 }
@@ -105,7 +106,7 @@ export type ClientCommand =
   | {type: 'removeCpu'; data: Record<string, never>}
   | {type: 'start'; data: Record<string, never>}
   | {type: 'submit'; data: {word: string; promptId: string}}
-  | {type: 'draft'; data: {word: string}}
+  | {type: 'draft'; data: {word: string; promptId?: string}}
   | {type: 'chat'; data: {text: string}}
   | {type: 'transfer'; data: {playerId: string}}
   | {type: 'kick'; data: {playerId: string}}

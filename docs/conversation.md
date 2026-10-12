@@ -2290,3 +2290,1266 @@ Web Audio API 是播放与处理声音的浏览器接口，也可以播放项目
 任务 13 至 15 已标记为 `resolved`。任务与 Matt skill 的记录位于 `docs/project-discussion.md` 和 `.scratch/chuan-zi/issues/`：`/implement-spec` 负责实现，`/tdd` 负责行为测试，`/code-review` 完成 Standards 与 Spec 两轴复核；此前的 `/grill-with-docs`、`/prototype`、`/to-spec`、`/to-tickets` 也已经记录。
 
 验证结果：`npm run check` 通过；`npm test` 通过 34 项；`npm run build` 通过；`npm run test:browser` 通过 15 项；`git diff --check` 通过。工作树清洁，尚未推送远端。
+
+## 用户消息 39
+
+````text
+[$ask-matt](/Users/hco/.agents/skills/ask-matt/SKILL.md) 1.为什么你的补间动画还是瞬间完成的(如图2gif)
+
+2.而且你的注音也是没有在那个韵母对应字符上面正确的位置（如图1），你注音符号都高得和字要重合了。能不能参考一下汉兜的源代码，你先复刻然后我们再想办法。
+
+针对这两个问题，请用合适的matt skill去修复
+````
+
+附件原始文件路径未在本次工具环境中提供，尚未保存图 1 和图 2 GIF。
+
+## assistant 进度消息 216
+
+这次使用 Matt 的 `/diagnosing-bugs` 处理补间与声调位置问题，并用 `/tdd` 和 `/code-review` 验证修复。两项问题会记录到本地任务和聊天记录，浏览器检查会覆盖完整输入与附着过程。
+
+## assistant 进度消息 217
+
+验证会直接采样每个字母、声调和字格在动画中途的位置，并检查声调与元音的距离。这样可以确认实际运动过程和最终位置是否符合要求。
+
+## assistant 进度消息 218
+
+现有测试主要检查整行字格的移动，还需要覆盖格内声母、韵母与声调的位置变化。我会加入这项浏览器回归；汉兜的 `CharBlock.vue` 和 `ToneSymbol.vue` 已完整读取，可以据此核对声调布局。
+
+## assistant 进度消息 219
+
+浏览器检查已出现字段位置没有更新的失败结果。我正在确认更换完整答案时的读音与测量过程，保证回归检查覆盖你看到的具体变化。
+
+## assistant 进度消息 220
+
+已经复现瞬间移动：更换合法答案后，声调横坐标从 `28.84px` 直接变为 `34.40px`，中间位置数量为零。
+
+接下来核查三个原因：格内测量更新是否遗漏动画启动；可见文字与定位文字的字号是否不同；答案中间的匹配窗口是否读取了正确位置的拼音。它们分别可以通过逐帧位置、字体尺寸和“击报”的读音检查验证。
+
+## assistant 进度消息 221
+
+字段坐标在子组件中测量更新，动画却由父组件启动；子组件后续更新坐标时，父组件没有收到启动动画的变化。我会让每个提示格在坐标更新后执行补间，连续编辑时从当前动画位置继续。
+
+## assistant 进度消息 222
+
+字段补间的两项逐帧检查已经通过。另一个回归确认了中间窗口的读音问题：“击”需要读取 `jī`，“报”需要读取 `bào`；我会修正这个索引，然后检查声调与元音的距离。
+
+## assistant 进度消息 223
+
+声调距离检查也已复现问题：符号与元音之间有约 `11–16px` 的空隙。接下来采用汉兜的逐字母定位与声调图形，让拼音位于汉字上方，定位元素和可见文字使用相同字号，并保存它的 MIT 许可。
+
+## assistant 进度消息 224
+
+声调图形与拼音布局已接入，连续编辑和中间读音检查通过。最终几何检查仍有位置差异，我正在读取可见元素与定位元素的尺寸，继续修正符号位置。
+
+## assistant 进度消息 225
+
+目前声调的水平位置与目标元音相差约 `0.1px`，格内补间也有连续中间位置。还在调整无点 `ı` 上方的垂直间距，随后会检查不同元音、长拼音和手机宽度。
+
+## assistant 进度消息 226
+
+电脑宽度下的 `iu` 检查通过；`ü` 的声调位置正在按上方双点单独调整。验证会继续覆盖手机宽度、长拼音，以及提示附着后返回原位的运动过程。
+
+## assistant 进度消息 227
+
+提示附着、返回、连续更换答案，以及 `iu`、`ü`、长拼音的电脑和手机检查均已通过。接下来在真实联机回合中加入格内字段的逐帧检查；声调验收会测量图形笔画与元音字形的间距。
+
+## assistant 进度消息 228
+
+类型检查、生产构建和 34 项规则与联机测试已经通过，完整浏览器回归正在运行。现在使用 `/code-review` 并行审查本轮修改的项目规范和功能要求。
+
+## assistant 进度消息 229
+
+真实联机测试发现，我调整读音索引时漏看了服务端已经截取匹配窗口的读音。这导致客户端再次增加了匹配位置。我会修正客户端，并让专项测试使用与服务端一致的读音范围，再重新运行联机检查。
+
+## assistant 进度消息 230
+
+20 项浏览器回归已经全部通过，包括真实联机中的格内运动。审查发现，更换答案时新出现的韵母还需要渐渐显现；我会补充这项回归并完成修正。
+
+## assistant 进度消息 231
+
+新增韵母的渐显回归已经通过，Spec 复核也已通过。修复后的构建会重新运行完整浏览器检查，聊天记录、任务记录和汉兜许可记录正在同步更新。
+
+## assistant 进度消息 232
+
+最终检查已通过：34 项规则与联机测试、21 项浏览器测试，类型检查和生产构建均通过。任务记录会标记为完成，临时诊断脚本已经清理，汉兜许可已确认包含在构建产物中。
+
+## assistant 最终回复 233
+
+瞬间变化来自格内坐标更新没有触发补间，现已修复。附着、返回和补全显隐使用 700ms 先快后慢动画；声调采用汉兜的图形与逐元音定位，统一字号并保留 MIT 署名。
+
+使用 `/diagnosing-bugs`、`/tdd`、`/code-review`；34 项规则与联机测试、21 项浏览器测试及构建通过。聊天和任务记录已更新。
+
+本地地址：http://localhost:5173/ 。本次附件没有可读取的原始路径，尚未保存。
+
+## 用户消息 40
+
+日期：2026-10-12。时区：Asia/Shanghai。
+
+````text
+[$ask-matt](/Users/hco/.agents/skills/ask-matt/SKILL.md) 1.不用搞类似图1的这个音量滑动条，玩家自己调就完事。还有我目前听不到音效不知道为什么
+2.我这里补间动画依然是非常突兀的瞬间完成。不知道是怎么了，我这里跟你那边有什么区别吗？我们是不是应该更改方案，但是我明明看.scratch里还有正常的补间动画，虽然不是完全满意但是至少是有运动过程的
+3.如图2图3，提示格的注音符号太粗了，我认为注音符号的粗细应该跟拼音字母线条的粗细一致，至少让人看不出粗细的区别。不管是提示格的注音符号还是提示格附着后的注音符号还是补全部分的注音符号都是这样。
+4.我希望每个格子字在上，拼音在下。
+5.有的时候我发现会有一格提示格是空的，这是什么意思？空的那个提示格能不能写空集符号？
+6.我觉得要做之前说的“鼓的传递建议使用淡墨连线和橙色光点：从上一名玩家经过鼓，移动到当前玩家，倒计时减少时加快鼓的节奏。“
+7.同时我觉得联机服务也要实现，我们之前提过cloudflare和render，你认为这俩哪个更好。还是说你有其他更好的？给全候选项然后我们一起看看哪个最好
+````
+
+本轮图片附件的原始路径尚未提供。
+
+## assistant 进度消息 234
+
+音效和补间问题使用 `/diagnosing-bugs`，界面与传鼓效果使用 `/tdd` 和 `/code-review`；联机平台使用 `/research` 核查官方免费额度与部署条件。平台选择保留为讨论项，其余已明确的要求会继续实现和验证。
+
+## assistant 进度消息 235
+
+这次验证会覆盖真实联机页面，并检查生产构建、系统减少动态效果设置和实际音频输出。传鼓效果按你确认的淡墨连线与橙色光点实现；托管平台会比较免费额度、休眠机制和现有服务的适配情况。
+
+## assistant 进度消息 236
+
+源码目前默认关闭音效，并且把鼓声连续降低了两次音量；动画还会读取系统的“减少动态效果”设置。接下来会用音频能量和逐帧位置检查这些路径，同时调整格内顺序、声调笔画和空白提示标记。
+
+## assistant 进度消息 237
+
+本机的 macOS“减少动态效果”设置确实已开启，当前产品会因此直接跳到动画终点；`.scratch/` 原型没有这项判断。我会让提示附着这类必要运动保持连续过渡，并保留减少装饰动画的处理。音效检查也会覆盖首次点击后的自动解锁和静音状态。
+
+## assistant 进度消息 238
+
+减少动态效果的回归已经复现：位置从 `80px` 直接变为 `119px`，中间帧为零。检查顺序是系统设置、网页资源版本、主线程执行时间；当前证据已确认系统设置能够触发你描述的现象。声音验证会直接测量播放节点输出，检查启用状态、资源加载和音量。
+
+## assistant 进度消息 239
+
+声音检查确认：旧音量记录为零时，音效显示启用，输出峰值仍为零。删除应用音量设置后，真实鼓声峰值为 `0.078`，播放状态正常。空白提示格表示该位置不限制汉字，会显示 `∅`；它仍占据连续提示中的一个位置。
+
+## assistant 进度消息 240
+
+提示专项的十项检查已经通过，包括开启“减少动态效果”时的连续运动、汉字上方布局和 `∅`。声调改为自然宽度的线条图形，间距检查覆盖电脑、手机、`iu`、`ü` 和长拼音。传鼓正在加入真实回合验证，光点会经过中央鼓并到达当前玩家头像。
+
+## assistant 进度消息 241
+
+真实服务端、类型检查和规则测试已通过。现在运行完整 Chrome 回归，重点确认新传鼓路径不会影响多人布局、手机高度和聊天抽屉；完成后会更新托管研究和验证记录。
+
+## assistant 进度消息 242
+
+22 项完整浏览器检查全部通过，真实回合的橙色光点具有连续路径并经过中央鼓。托管研究目前确认五个适用候选：Render、Cloudflare、Railway、Oracle 和 Deno Deploy；正在核对各自的持续免费条件与商业使用条款，并进行代码审查。
+
+## 用户消息 41
+
+````text
+能不能不让macOS的“减少动态效果”影响我们的动画
+````
+
+## assistant 消息 243
+
+可以。游戏动画可以统一使用项目定义的时长和速度曲线，macOS 的“减少动态效果”不会改变它们。
+
+## assistant 进度消息 244
+
+游戏动画对系统减少动态效果的判断已经移除，鼓、方格和抽屉都使用项目自己的动画参数。审查还发现观战玩家加入时需要保留上一位玩家的传鼓来源，以及离开房间时的音频清理顺序；这两项正在完成真实状态回归。
+
+## assistant 进度消息 245
+
+零声母也会产生空白声母字段，例如“安”的声母为空；现在会用 `∅` 显示，并保留对应判定。托管比较已保存：长期免费运行建议 Cloudflare Durable Objects；直接运行现有 Node.js 服务测试可选择 Render，但需要接受空闲唤醒等待和重启后房间清除。
+
+## assistant 进度消息 246
+
+完整 Chrome 回归通过 24 项，覆盖真实传鼓、倒计时节奏、观战玩家加入、汉字上方布局、`∅` 提示和系统动态效果设置。音频输出与释放检查、生产构建及差异检查通过；比赛期间切换规则与游戏页面的挂载检查也已通过。
+
+
+## 用户消息 42
+
+日期：2026-10-12。时区：Asia/Shanghai。
+
+````text
+[$ask-matt](/Users/hco/.agents/skills/ask-matt/SKILL.md) [$reverse-engineer-anything](/Users/hco/.agents/skills/reverse-engineer-anything/SKILL.md) 之前的任务不小心中断了还没完成，请继续做。还有，除了之前的任务，我还要补充一些：
+
+1.如图一，怎么“到家““亲亲“这种词都能成为词语的，你选的什么词库。
+2.如图一，拼音的位置太下了，部分出框了，应该放高一点位置。
+3.我觉得应该全部使用cc0音效，你自己造的音效我觉得有点难听，那个换人响的两声好像电流声的，我不知道是cc0的网上免费可商用的音效还是你自己用api造的。你打鼓声就用专门的音效，别两种音效混合。还有确认下我们页面的一切素材都是免费可商用的吗，包括字体
+4.如图2，这个连线我不满意，你还是做成bombparty那样。你可以用REA reverse一下[https://jklm.fun/TAJH，](https://jklm.fun/TAJH，)看看jklm的bombparty的箭头是怎么做的，然后你可以仿照，记得鼓应该遮蔽箭头。即使你reverse不了也有我图3的参考图（可以保存进参考素材），包括你也可以看看bombparty使用的音效，然后也下载到参考素材，并进行参考。还有，我发现他这个箭头只是指着目前要作答的玩家，但我觉得我们我箭头可以做成类似钟表一样，指着上一个作答的玩家和目前在作答的玩家，这也算是一个创新了。
+5.我认为每轮到一个新玩家应该重新计时，默认是每个玩家给10s。
+6.我希望不仅是macOS，任何平台的什么设置都不要影响我们的动画让我们的补间动画无法播放，因为我们这是游戏。
+
+其实你最好把我们的任务记到一个地方，我记得matt skill是有说的，不然有的时候任务不小心中断了你可能就忘记之前什么任务了。
+````
+
+附件原文已保存：[图一](../reference-assets/user-attachments/2026-10-12/1.png)、[图二](../reference-assets/user-attachments/2026-10-12/2.png)、[图三](../reference-assets/user-attachments/2026-10-12/3.png)。图三同时保存至 BombParty 参考目录。
+
+## 用户消息 43
+
+````text
+<skill>
+<name>ask-matt</name>
+<path>/Users/hco/.agents/skills/ask-matt/SKILL.md</path>
+---
+name: ask-matt
+description: Ask which skill or flow fits your situation. A router over the skills in this repo.
+disable-model-invocation: true
+---
+
+# Ask Matt
+
+You don't remember every skill, so ask.
+
+A **flow** is a path through the skills. Most paths run along one **main flow**, and two **on-ramps** merge onto it. Everything else is standalone, or a vocabulary layer that runs underneath.
+
+## The main flow: idea → ship
+
+The route most work travels. You have an idea and want it built.
+
+1. **`/grill-with-docs`** sharpens the idea by interview. Start here whenever you are **working in a working directory**: it's stateful, retaining what it learns in `GLOSSARY.md` and ADRs. (No working directory? Use `/grill-me` instead, covered under Standalone. Both run the same `/grilling` primitive; `grill-with-docs` is the one that leaves a paper trail, which makes it the better of the two whenever a repo is there to leave it in.)
+2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype, bridged by **`/handoff`** in both directions (a prototype lives in its own directory, which is exactly what `/handoff` is for; see Phase boundaries):
+   - **`/handoff`** out, then open a fresh session against that file,
+   - **`/prototype`** to answer the question with throwaway code,
+   - **`/handoff`** back what you learned, and reference it from the original idea thread.
+3. **Branch: is this a multi-session build?**
+   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. Then work the tickets one of two ways:
+     - **`/implement`** per ticket, **`/clear`ing context between each one**. On a local tracker that's one file per ticket under `.scratch/<feature>/issues/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed. Each ticket is self-contained, so the last one's context is disposable.
+     - **`/implement-spec`** for the whole spec in one run. It reads the tickets as a **task graph**, runs implementer subagents across the ready **frontier** in parallel, and lands everything on one **integration branch**. Reach for it when you'd rather orchestrate the build than drive each ticket yourself.
+   - **No** → **`/implement`** right here, in the same context window.
+
+   Either way, the code gets built by driving **`/tdd`** (one red-green slice at a time) and closes out with **`/code-review`**, a two-axis review (Standards + Spec) of the diff. `/implement` runs both per ticket; `/implement-spec`'s implementers each drive `/tdd`, and it runs one `/code-review` over the integration branch. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review a branch or PR against a fixed point.
+
+   When the work goes up as a pull request, **`/pr`** shapes the body: the smallest visual that shows the change, before/after evidence that it works, and a one-way or two-way door call. It's model-invoked, so the agent reaches for it whenever it writes a PR.
+
+4. **`/retro`** closes the loop. After a build, and especially one that went sideways, it looks back over the session and suggests changes to the agent's **environment**, not the code: navigation pointers, automated checks, the coding standards `/code-review` enforces, steering files, tooling. Mechanical mistakes become deterministic checks; judgement calls become coding standards. The next build then starts from a better environment.
+
+### Context hygiene
+
+Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket. Run `/retro` in the session it's looking back on, before you clear; after clearing, point it at that session's log instead.
+
+The limit on this is the **[smart zone](https://www.aihero.dev/ai-coding-dictionary/smart-zone)**: the window (~150k tokens on state-of-the-art models) within which the model still reasons sharply. If a session approaches it before `/to-tickets`, don't push on degraded; `/compact` at the nearest phase boundary and carry on (see Phase boundaries).
+
+## On-ramps
+
+A starting situation that generates work, then merges onto the main flow.
+
+- **Bugs and requests piling up** → **`/triage`**. It moves issues through triage roles and produces agent-ready issues, which **`/implement`** later picks up.
+
+  Triage is only for issues **you didn't create**: bug reports, incoming feature requests, anything that arrives raw. Tickets that `/to-tickets` produced are already agent-ready, so **don't triage them**.
+
+- **Something's broken** → **`/diagnosing-bugs`**. For the hard ones: the bug that resists a first glance, the intermittent flake, the regression that crept in between two known-good states. It refuses to theorise until it has a **tight feedback loop** (one command that already goes red on *this* bug), then fixes with a regression test. Once the fix is in, run **`/retro`** in the same session to ask what would have prevented the bug; where the real finding is that there's no good seam to lock it down, that's a job for **`/improve-codebase-architecture`**.
+
+- **A huge, foggy effort: a greenfield project or a huge feature build, too big for one session** → **`/wayfinder`**, the most cognitively demanding flow here. When the way from here to the destination isn't visible yet, it charts a **shared map** of **decision tickets** on the issue tracker and resolves them one at a time, producing **decisions, not deliverables**, until the fog is pushed back and the way is clear. Where **`/grill-with-docs`** sharpens an idea you can hold in one session, wayfinder is for the idea you can't, and it's slower and denser, so save it for exactly that, never a well-scoped feature.
+
+  When the map clears, **it hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-tickets` and `/implement` as usual. Looping the map straight into `/implement` skips that collapse and throws the linked detail away, so go straight to `/implement` only when the effort turned out genuinely small.
+
+## Codebase health
+
+Not feature work, just upkeep.
+
+- **`/improve-codebase-architecture`** runs whenever you have a spare moment to keep the codebase good for agents to operate in. It surfaces **deepening opportunities**; picking one _generates an idea_ you can take into the main flow at `/grill-with-docs`. It's the survey that finds the candidates; **`/codebase-design`** (below) is the bench you design the chosen one on.
+
+## Vocabulary underneath
+
+Two model-invoked references that run *beneath* the other skills, each the single source of truth for its vocabulary. Reach for them directly when the **words**, not the process, are the problem; or let the skills above pull them in.
+
+- **`/domain-modeling`**: sharpen the project's *domain* language: challenge a fuzzy term, resolve an overloaded word ("account" doing three jobs), record a hard-to-reverse decision as an ADR. It's the active discipline `/grill-with-docs` drives to keep `GLOSSARY.md` a clean glossary.
+- **`/codebase-design`** is the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality) for designing a module's *shape*: a lot of behaviour behind a small interface at a clean seam. `/tdd` and `/improve-codebase-architecture` both speak it.
+
+## Phase boundaries
+
+A **phase** is a chunk of work inside a session: the grilling, the implementation, the QA. At the **boundary** between two of them you have five options, and picking between them is the fuzziest decision in this whole map:
+
+- **Continue**: stay put. Costs nothing, loses nothing.
+- **`/clear`**: empty the window, when nothing here matters to what's next.
+- **`/handoff`** writes a portable markdown file. Narrow: only for a **new harness**, a **new directory**, a **colleague**, or forking a side task **mid-phase**. What it buys is portability.
+- **Subagent**: send a tightly-scoped task to its own window and get a report back.
+- **`/compact`** compresses this context and seeds a fresh session with it. The **default**, at the bottom of the tree rather than the first reach.
+
+Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree: the five questions, the reasoning behind each branch, and why the primary-source cost makes **Continue** the one to rule out first. Make the decision **at** a boundary; mid-phase, continue or split the rest into subagents.
+
+## Standalone
+
+Off the main flow entirely.
+
+- **`/grill-me`**: the same relentless interview as `/grill-with-docs`, but **stateless**: it saves nothing locally and builds no `GLOSSARY.md`. Reach for it when you are **not working in a working directory** (sharpening a plan, a design, a piece of writing, anything with no repo under it). If you are in a working directory, use `/grill-with-docs` instead: it runs the same interview and leaves a paper trail, so it is strictly the better one.
+- **`/grilling`** is the interview primitive itself: rounds, the frontier, facts are the agent's job and decisions are yours. `/grill-me` and `/grill-with-docs` are the two named ways in, and `/triage`, `/wayfinder` and `/improve-codebase-architecture` all run it internally. Reach for it directly only when you want the interview with no wrapper around it.
+- **`/prototype`** is a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. Throwaway is a constraint on how the code is written, not a promise to destroy it: the answer folds into the real code, and the prototype itself is kept as a **primary source** on a `prototype/<name>` branch out of main, pointed at from the implementation issue. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
+- **`/research`**: delegate reading legwork to a **background agent**: it investigates a question against **primary sources**, then leaves a cited Markdown file in the repo. Keep working while it reads. The file it produces is something to take *into* the main flow at `/grill-with-docs`, since research feeds the thinking rather than replacing it.
+- **`/to-questionnaire`** comes in when the thing blocking you isn't in your head or the codebase but in **someone else's**, and it writes them a questionnaire to fill in. It's the inverse of `/grill-me`: instead of interviewing you about the subject, it interviews you about the **send** (who it's going to, what you need back) and aims the questions at the gap. What comes back is material for `/grill-with-docs` or `/to-spec`.
+- **`/wizard`** is for the steps only a **human** can take: provisioning infrastructure, setting up credentials or CI secrets, clicking through an unfamiliar third-party dashboard, running a one-off migration or cutover. It generates an interactive bash script that opens each URL, captures each value, and writes it into `.env` and GitHub secrets, so the procedure stops being something you re-explain to an agent every time. Model-invoked, so the agent reaches for it the moment it hits a wall only you can pass. If the agent could just do it itself, it should; this is for where a human is genuinely in the loop.
+- **`/wait-what`** is the corrective for a message that didn't land. Use it mid-conversation, inside any other skill, and the agent re-pitches what it just said with the context you were missing, in plain English, using the `GLOSSARY.md` vocabulary. It works after the fact; `/grill-with-docs` is the upfront cure, because a shared language agreed early is what stops the jargon arriving at all.
+- **`/teach`**: learn a concept over multiple sessions, using the current directory as a stateful workspace.
+- **`/writing-for-agents`** is the reference for writing documents agents consume: skills, AGENTS.md, pointed-at docs.
+
+## Precondition
+
+**`/setup-matt-pocock-skills`**: run before your first engineering flow to configure the issue tracker, triage labels, and doc layout the other skills assume. Custom issue trackers also work.
+
+</skill>
+````
+
+## 用户消息 44
+
+````text
+<skill>
+<name>reverse-engineer-anything</name>
+<path>/Users/hco/.agents/skills/reverse-engineer-anything/SKILL.md</path>
+---
+name: reverse-engineer-anything
+description: Reverse engineer native, managed, Electron/JavaScript, packaged, firmware, and browser targets with REA. Use shipped-artifact or requested runtime evidence to explain features, compare versions, decompile code, or guide a reconstruction. Skip REA for ordinary source-repository architecture analysis.
+metadata:
+  version: "37"
+  tool_count: 170
+---
+
+# REA
+
+Use REA when a claim depends on a shipped binary or package, decompilation,
+passive application runtime evidence, or comparison with
+behavior not established by available source. For ordinary analysis of a
+complete source repository, use normal repository tools and do not run REA
+readiness or provider commands.
+
+## Connect only when needed
+
+Installing this skill supplies instructions; it does not register the REA MCP
+server, install analysis engines, or add tools to an already-running agent.
+
+If REA tools are available and their registration is not known to be stale,
+proceed directly to the target. Do not run diagnostics or setup before every
+investigation. Use the connected server's actual tool list and input schemas;
+a skill installed from repository main may describe capabilities absent from
+an older npm release. Keep complete inline Evidence when that server does not
+advertise retained references.
+
+If tools are absent, a call is blocked by the client, or a required provider is
+unavailable, read [connection and recovery](references/connection-and-recovery.md).
+Diagnose the observed blocker, continue useful supported work, and resume the
+original task after repair. Client approval, shell PATH, registration and engine
+availability have different remedies; avoid repeating setup for all of them.
+
+Prefer an existing `rea` CLI. When none is installed and REA package acquisition
+is within the authorized scope, use `npx -y rea-agents@6.4.0` in its place.
+Configuration repair starts with a read-only setup plan; show paths, backups and
+skill replacement before applying authorized changes. Preserve existing approval
+and target-execution boundaries. REA setup never installs or upgrades unrelated
+software, including Node.js, npm, Homebrew, Java, Ghidra, IDA, JADX, Binwalk or Unblob.
+
+## Route the target first
+
+Choose the first tool from the target the user supplied. Use `open_binary` for
+active-target native or archive workflows; target-free tools take their own
+explicit path or endpoint and do not need it.
+
+- ASAR or extracted JavaScript/Electron tree:
+  `analyze_javascript_application`.
+- Archive/package member inventory (ZIP/APK/IPA/MSIX/AppX or DMG):
+  `open_binary` with the supplied local path; use `inspect_artifact` when its
+  graph and findings help answer the question.
+- Android APK code, classes, methods, or incoming references:
+  `inspect_android_package`, then focused Android tools when advertised.
+  Archive member inventory still uses the archive route above.
+- Managed PE/CLI assembly: `inspect_managed_artifact`.
+- Firmware image: `inspect_firmware_regions` when advertised. Use
+  `extract_firmware` when extraction is requested, with a caller-selected new
+  absolute output directory. These tools use caller-supplied Binwalk/Unblob on
+  Linux; see the [firmware guide](https://github.com/morluto/rea/blob/main/docs/firmware-analysis.md).
+- .NET NativeAOT PE/ELF: native Ghidra analysis. Native code can yield pseudocode;
+  consult the NativeAOT workflow in `references/native-and-artifacts.md` for
+  optional metadata recovery and its supported host/layout boundary.
+- User-owned browser page already open: `list_browser_targets`.
+- Retained HAR/native mitmproxy capture: `inspect_web_network_capture`. Select
+  original record ordinals when useful; inspect producer fields and byte/number
+  sidecars without fetching recorded URLs or claiming live attribution. See
+  [historical captures](https://github.com/morluto/rea/blob/main/docs/web-network-captures.md) for the exact upstream
+  profile and credential exclusions.
+- User-owned Electron runtime already open: `list_electron_targets`.
+- Explicit local EVM bytecode carrier: `inspect_evm_interface` with caller-selected
+  `raw` or `hex` encoding. Preserve carrier/decoded digests and treat selectors,
+  argument strings and mutability as inferred candidates; this performs no chain
+  lookup or target execution. See the
+  [EVM bytecode guide](https://github.com/morluto/rea/blob/main/docs/evm-bytecode.md).
+- Explicit Linux ELF file for offline layout, symbols, relocations or static
+  mitigation evidence: `inspect_binary_layout`. This target-free operation uses
+  caller-supplied pwntools without opening a disassembler database. Preserve its
+  raw locations and inference/coverage limits; see the
+  [offline binary guide](https://github.com/morluto/rea/blob/main/docs/binary-diagnostics.md).
+- Supplied Linux x86-64 ELF core: `inspect_recorded_crash`. Read every recorded
+  thread, raw note and source-bound register without opening a live target.
+  Historical PIDs do not select live processes. Request `include_debugger_context`
+  only when core-only mapping candidates help; see the
+  [recorded crash guide](https://github.com/morluto/rea/blob/main/docs/recorded-crashes.md).
+- PE resource type/name/language trees and static icon group references:
+  `inspect_pe_resources` with an explicit path. This portable operation requires
+  no active target or engine; opaque payloads retain file ranges and SHA-256.
+- Native executable, library, or analysis database: `open_binary`, then
+  use focused analysis tools directly; call `binary_overview` when metadata or
+  inventory context is useful and available from the selected provider.
+
+For an existing IDA MCP configuration, use `open_binary` with the original
+input binary and `provider_id: "ida"`; do not pass an `.idb` or `.i64` database.
+The legacy attached profile binds the already-open GUI input by SHA-256 and
+leaves its database open. The modern headless profile creates and closes an
+owned private database without saving. Installation and registration reuse
+[mrexodia/ida-pro-mcp](https://github.com/mrexodia/ida-pro-mcp); see the
+[IDA provider guide](https://github.com/morluto/rea/blob/main/docs/ida-provider.md).
+Proceed directly to `analyze_function`, pseudocode, or function/string searches
+after opening; IDA does not supply `binary_overview`. Consult session availability
+when composing broader workflows. Modern direct callers and unsupported dossier
+facets remain unknown; live IDA results are not replayed from snapshots.
+
+If the user says only "my app" without a name, path, or target already selected
+for this task, ask which app before searching for artifacts. Paths in unrelated
+saved reports and nearby test fixtures do not select the user's target. Resolve
+an actual human-readable app name to one clear installed artifact when possible;
+ask when matches are ambiguous. Never choose an example app on the user's behalf.
+
+In a target-free session, use `open_binary` to bind any archive/package or
+native target whose analysis tool operates on the active target. Do not call an
+unadvertised tool; inspect `binary_session` with `{}` and its
+`result.tool_availability` for availability reasons and remediation. The tool
+list stays complete; availability depends on the operation, target, and host.
+
+## Work summary-first
+
+Start with the default result and use its inline Evidence and graph context.
+For a JavaScript application or ELF layout whose size is unknown or large,
+call `analyze_javascript_application` or `inspect_binary_layout` with
+`"detail": "summary"`, then inspect the retained `parent_evidence_id` with
+`inspect_analysis_view`.
+Page module identities and select the returned `node_id` before requesting an
+item; a single file path can represent several graph roles. Do not repeat an
+identical analysis or rejected call without a changed input or resolved blocker.
+Recheck session state when a lifecycle change makes that status useful.
+Make a focused follow-up only when the
+returned result leaves a specific question unanswered.
+
+If MCP reports `resource_constraint` with `details.resource: "transport"`, call
+`inspect_analysis_view` with its reported same-session Evidence reference for a
+summary, one section/module, or a stable page. Use `trace_application_feature`
+once a seed is known, or call `export_evidence_bundle` to write the complete
+session to a selected path. The analysis remains complete in the ledger; avoid
+repeating it merely to request the same oversized response. Complete CLI JSON
+output also streams without a single MCP frame.
+
+When the retained parent ID is unknown, use `get_evidence_bundle` with
+`detail: "summary"` and exact filters for operation, target SHA-256,
+analysis-profile digest or canonical procedure address. Select its returned
+Evidence ID for the next view instead of requesting the complete bundle.
+`retention: "complete-record"` means the whole record is stored; native
+value-flow truncation and unknown metadata remain separate. For an exported
+portable bundle, use `rea inspect-evidence-bundle` with JSON containing `path`,
+`detail: "summary"` and the same `filters`. Reading that file still requires
+validating its full contents within the local memory budget.
+
+A client can also truncate a successful tool result without a REA transport
+error. Treat that preview as incomplete; use the retained parent ID for smaller
+views or export when the full record is needed. Do not parse the preview as
+canonical JSON or repeat the producer. For JavaScript, read the
+[module-view and trace recipes](references/javascript-applications.md) before
+drilling into a large graph; a broad bidirectional trace can expand unrelated
+containment relationships even after summary analysis.
+
+Every conclusion must distinguish observations, inferences, and unknowns. Cite
+Evidence IDs, preserve limitations and incomplete coverage, and never imply
+that static analysis observed execution. Runtime requests execute the declared
+target and lifecycle; do not broaden the target or action beyond those fields.
+
+Within the user's requested investigation, call available analysis tools
+directly. REA does not require permission grants or per-call approval flags.
+The agent client can independently require approval. Follow the declared request
+scope and the host's actual access requirements; use the recovery guide for an
+observed client-policy rejection.
+
+## Plan broader investigations
+
+For requests that span multiple features or subsystems, use a staged workflow:
+
+1. Turn the request into a checklist of questions and the evidence each answer
+   needs. Resolve target identity and constraints from the conversation and
+   workspace before asking for information again.
+2. Inspect the current REA session, artifact identity, saved analysis database,
+   bookmarks, and prior evidence. Reuse matching state; do not open duplicate
+   sessions or repeat identical analysis.
+3. Start with the smallest useful overview or inventory. Follow each question
+   from its entry point through relevant data and state changes to its result.
+   Batch related operations around a specific hypothesis, then expand only when
+   the returned evidence leaves a concrete gap.
+4. Inspect relevant packaged resources and configuration alongside code when
+   they affect the question. Use format-aware inventory and parsers; do not
+   infer behavior from filenames, strings, or layout alone.
+5. Corroborate a conclusion with the evidence type it requires. Use runtime
+   observation only when static evidence cannot answer the question and the
+   required host runtime and OS access are available. For JavaScript behavior,
+   run probes against the actual app through the available browser, Electron,
+   or process capture workflow.
+6. Decompose work into independent questions. When parallel workers are
+   available and the questions do not depend on one another, assign distinct
+   scopes, point workers to existing evidence, and ask them to return sources,
+   conclusions, and unresolved gaps. Otherwise, work sequentially.
+7. Keep a concise finding ledger linking each conclusion to Evidence IDs,
+   confidence/evidence type, search boundary, and remaining unknowns. Update
+   the shared index or investigation report so later passes can reuse results.
+
+Before finishing, revisit the original checklist. Mark each question as
+answered, partially answered, or unresolved based on its evidence; keep
+bounded negative searches bounded, and do not describe a broad investigation
+as complete while required questions remain open.
+
+## Read only the relevant guide
+
+- Native binaries, managed assemblies, archives, and extraction:
+  [references/native-and-artifacts.md](references/native-and-artifacts.md)
+- ASARs, extracted JavaScript, feature tracing, and version comparison:
+  [references/javascript-applications.md](references/javascript-applications.md)
+- Android APK declarations, classes, methods, and static references:
+  [references/android-applications.md](references/android-applications.md)
+- Passive browser/Electron observation and static/runtime reconciliation:
+  [references/runtime-observation.md](references/runtime-observation.md)
+- Evidence paging, comparisons, residual unknowns, and verification:
+  [references/evidence-workflows.md](references/evidence-workflows.md)
+
+## Finish the task
+
+Explain findings in plain language and tie them to returned evidence. When the
+user asks to build something, use normal coding tools and separate observed
+behavior from design choices. Close an opened native session with
+`close_binary` when the investigation is complete.
+
+</skill>
+````
+
+## assistant 进度消息 247
+
+继续处理，并把新增要求写入任务记录。BombParty 箭头和音效使用 `/reverse-engineer-anything` 获取证据；词库与素材许可使用 `/research`；拼音位置、每人 10 秒计时和动画使用 `/diagnosing-bugs`、`/tdd` 验证，完成后进行 `/code-review`。
+
+## assistant 问题 248
+
+“到家”也有“功夫到家”的固定含义，“亲亲”也有词典记录。游戏收录标准希望采用哪一种？我会继续处理其他已确定的任务。
+
+- 只接受独立词语、成语；排除“到家”“亲亲”等本次指出的口语组合
+- 保留有固定词义的词语，只排除临时组合与专业名称
+
+## assistant 进度消息 249
+
+普通词语和读音来自 CC-CEDICT。“到家”在其中解释为“达到很高程度”，“亲亲”也有独立记录；是否收录仍需要按游戏标准判断。当前换人会同时触发鼓声和正确答案的合成提示音，音效会改为全部使用 CC0 录音，并让换人只播放一次专门的鼓声。任务已集中记录在 `docs/tasks.md`。
+
+## 用户消息 45
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_cb71b34fee444207a74c2ad53a096533\",0]","question":"“到家”也有“功夫到家”的固定含义，“亲亲”也有词典记录。游戏收录标准希望采用哪一种？我会继续处理其他已确定的任务。","answer":"只接受独立词语、成语；排除“到家”“亲亲”等本次指出的口语组合"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 250
+
+拼音越过方格边界已经复现，底部超出约 `1.6px`。会检查拼音行位置、字体高度和方格内边距，并提高拼音行位置。REA 已取得 BombParty 客户端证据：它在 Canvas 中平滑旋转箭头，再绘制炸弹遮盖中心；我们的双指针会沿用这个层次关系。三张附件已保存。
+
+## assistant 进度消息 251
+
+已按你选定的标准排除“到家”和“亲亲”，数据重新生成后有 88,175 条词语。拼音边界检查、独立回合计时和双指针旋转检查通过；五个音效已换成 CC0 录音，换人只播放单次鼓声。字体使用设备已安装字体，素材许可已逐项记录。
+
+## 用户消息 46
+
+````text
+其实我的意思是网上有没有排除“口语“和“专词“的现成词库，专门给我这种游戏拿来用的，如果有的话我觉得都可以直接拿来用。
+````
+
+## assistant 进度消息 252
+
+你希望采用已经筛选好的游戏词库。我会调查同时排除口语组合和专业名称、并允许免费商业使用的现成数据，核查它的收录标准与授权。当前两条排除记录继续保留，其他任务继续验证。
+
+## assistant 问题 253
+
+确认现成词库的范围：你主要希望游戏使用哪些词语？我会据此核查现成词库的收录与商业许可。
+
+- 普通词语＋成语，排除口语组合与专业名称（延续当前玩法）
+- 只使用成语，可以采用已经维护的成语游戏词库
+
+## assistant 问题 254
+
+免费联机托管的五项候选已经核查。长期免费运行更推荐 Cloudflare Durable Objects（持久房间，需要适配服务）；Render 可直接部署当前代码，但空闲唤醒约一分钟、重启清除房间。你希望选择哪个方向？
+
+- Cloudflare Durable Objects：持久房间，完成服务适配
+- Render Free：直接部署当前服务，接受休眠与重启限制
+- 继续比较全部候选
+
+## assistant 进度消息 255
+
+35 项规则与联机测试、25 项 Chrome 测试已经通过。任务索引会加入项目读取要求，使用 `/writing-for-agents` 写明中断后应读取的记录。现成游戏词库研究仍在核查来源许可，当前无法确认符合全部条件的数据。
+
+## assistant 进度消息 256
+
+现成词库研究已找到人工复核的成语集合，普通词语加成语的完整集合仍未核实到同时满足排除标准和商业许可的来源。已实现的界面、计时和声音继续完成审查；词库采用范围会记录在任务中。
+
+## assistant 进度消息 257
+
+五个 CC0 音效均通过真实 AudioContext 输出检查，静音后输出为零。双指针动画和每人 10 秒计时已通过真实回合测试，Standards 审查没有发现待修正项。现成词库研究完成：本次未核实到符合全部条件的普通词语加成语集合，详细证据已保存。
+
+## assistant 进度消息 258
+
+Spec 审查补充了错误反馈与倒计时声音重叠的检查。播放层现在保留一个当前录音，错误反馈期间暂不播放倒计时音；真实声音检查和相关浏览器流程通过。Standards 与 Spec 审查均没有待修正项。
+
+## assistant 最终回复 259
+
+本次尚未核实到能直接替换完整词库、同时包含普通词语与成语、排除口语组合和专业名称、允许免费商用的现成数据。[研究记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/ready-game-lexicon-2026-10-12.md)保存了核查范围；当前继续使用 CC-CEDICT 与成语资料，“到家”“亲亲”已排除。
+
+- 拼音已提高，完整位于方格内，汉字在上。
+- 双指针连续旋转，分别指向上一位和当前玩家，中央鼓遮盖箭头。
+- 每名新玩家重新计时，默认 10 秒；错误提交减少一秒。
+- 全部声音使用 CC0 录音，换人只播放单次鼓声，音量由设备控制。
+- 系统“减少动态效果”设置不改变游戏动画；浏览器后台冻结仍属于浏览器运行限制。
+- 三张原始附件、BombParty 箭头和七个参考音效已保存。
+
+页面使用的素材允许免费商业使用，发布时保留对应署名与许可。字体使用设备已安装字体。[许可核查](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/assets-and-audio-audit-2026-10-12.md)、[任务与 Skill 记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/tasks.md)已更新。
+
+联机托管的适用候选：
+
+| 平台 | 主要条件 |
+| --- | --- |
+| Cloudflare Durable Objects | 免费额度、持久房间；需要适配服务与词库 |
+| Render Free | 可直接运行现有服务；空闲唤醒约一分钟，重启清除房间 |
+| Oracle Always Free | 资源充足；需要信用卡验证与服务器维护 |
+| Deno Deploy Free | 有免费额度；需要处理多实例状态 |
+| Railway Free | 每月 $1 额度，适合少量测试 |
+
+长期运行推荐 Cloudflare，直接公开测试可选择 Render。[完整比较](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/multiplayer-hosting-options-2026-10-12.md)。平台尚未选择，公开 WSS 尚未部署。
+
+35 项规则与联机测试、25 项浏览器测试、构建和两轴审查通过；五个音效的真实输出检查通过。本地：http://localhost:5173/ 。修改尚未提交、推送或发布。
+
+## 用户消息 47
+
+日期：2026-10-12。时区：Asia/Shanghai。
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_dabf645b828446d4875d2e6d5793bae4\",0]","question":"确认现成词库的范围：你主要希望游戏使用哪些词语？我会据此核查现成词库的收录与商业许可。","answer":"普通词语＋成语，排除口语组合与专业名称（延续当前玩法）"},{"questionItemId":"[\"request_user_input_async\",\"call_d20ee8cb794740cd8ecb1845301c144d\",0]","question":"免费联机托管的五项候选已经核查。长期免费运行更推荐 Cloudflare Durable Objects（持久房间，需要适配服务）；Render 可直接部署当前代码，但空闲唤醒约一分钟、重启清除房间。你希望选择哪个方向？","answer":"继续比较全部候选"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 260
+
+已记录你的确认：词库继续采用“普通词语＋成语，排除口语组合与专业名称”的范围；联机平台继续保留全部候选比较，不创建部署。
+
+## assistant 最终回复 261
+
+词库继续保留普通词语＋成语，按你确定的范围排除口语组合与专业名称。
+
+| 平台 | 免费条件 | 对当前游戏的影响 |
+| --- | --- | --- |
+| Cloudflare | 每日额度，128 MB 内存 | 可以实现持久房间；需要适配服务、计时和词库 |
+| Render | 512 MB，每月 750 实例小时 | 当前代码可直接运行；空闲 15 分钟后暂停，唤醒约一分钟 |
+| Oracle | Always Free 服务器额度 | 当前代码可运行；需要信用卡验证，自行维护系统和证书，实例可能被收回 |
+| Deno Deploy | 每月 150 GiB-hour 内存额度 | 需要验证兼容性、共享房间状态；按 768 MB 计算约可运行 200 小时 |
+| Railway | 每月 $1 | 当前代码可运行；额度适合少量测试，无法覆盖当前服务全天运行 |
+
+Cloudflare 适合减少服务器维护并保存房间；Render 的部署步骤最少；Oracle 适合愿意管理服务器的使用方式。Deno 和 Railway 的免费运行时间需要控制。
+
+中国大陆网络速度尚未实测，微信正式发布还需要符合备案要求的通信域名。平台继续保留为讨论项。[完整比较](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/multiplayer-hosting-options-2026-10-12.md)和[任务记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/tasks.md)已更新。
+
+## 用户消息 48
+
+日期：2026-10-13。时区：Asia/Shanghai。
+
+````text
+1.输入过的词再输入应该提示这个词之前输入过了同时拒绝，而不是直接拒绝提交
+2.如图1，这题的部首是两点水，所以我希望能改成冰的两点水部首（也就是左半边）是黑的，因为属于提示部分，而右半边是玩家的补全部分这样。而不是像现在这样部首单独列在左上角黑色。
+3.我希望如果一个题解不出来，就自动顺延到下一个人，一直到场上没人解出来才换题，而不是每个人都换题。
+````
+
+附件：[图一](../reference-assets/user-attachments/2026-10-13/1.png)、[图二](../reference-assets/user-attachments/2026-10-13/2.png)。
+
+## assistant 进度消息 262
+
+这三项使用 `/diagnosing-bugs`、`/tdd` 和 `/code-review` 处理；汉字内部的部首着色会核查可商用的字形数据。重复答案采用短暂文字反馈，超时后的题目按你要求保留到本轮玩家全部未答出，并同步记录任务与附件。
+
+## assistant 进度消息 263
+
+真实联机检查已复现超时立即换题。现在增加每道题的未答出玩家记录，题目会依次传递，直到仍在参赛的玩家全部未答出。部首资料有逐笔部件归属，“冰”的前两笔对应“冫”，可以用于汉字内部着色。
+
+## assistant 进度消息 264
+
+顺延题目和重复答案反馈已通过真实联机检查。“冰”的着色检查也通过：原部首两笔为黑色，其余四笔为橙色。接下来会检查嵌套部件、返回动画和不同屏幕尺寸，并把字形许可与可下载资料加入发布内容。
+
+## assistant 进度消息 265
+
+“冰”的逐笔颜色已经接入真实字形路径，研究数据确认前两笔属于冫。顺延题目和重复答案测试已经通过；当前正在收紧部首返回动画的断言，并运行全套回归。
+
+## assistant 进度消息 266
+
+37 项规则与联机测试、26 项浏览器测试通过。部首附着的逐帧检查读取到了连续中间状态，完整汉字中的颜色与笔画数量也通过核对。现在进行 Standards 与 Spec 审查，重点检查玩家离开、重复反馈清除和字形请求更新。
+
+## 用户消息 49
+
+````text
+[$ask-matt](/Users/hco/.agents/skills/ask-matt/SKILL.md) 4.如图1（我这条消息的图1），我希望这个箭头在只有两个人的时候应该是水平的，也就是每个人的箭头落点应该对齐人数等分的圆弧的中点，你明白我什么意思吗，三个人的话就应该是正好每个人之间差120度，箭头也是一样，而且三个人之间形成一个正三角形的关系，以此类推，这就是拓扑图，你核查一下看看现在是不是这样，有则改之无则加勉。
+5.我希望输入正确答案的人可以从那个的头像上方浮现答案（浮现的那个答案也是类似我们实格和虚格结合的风格）然后马上消失
+6.我希望其他人在输入的时候输入框的情况也能实时同步（像直播一样）给每一个人，然后我觉得可以每个人分配一个水墨颜色，其他人同步过来的补全部分是他对应的那个颜色，比如我是水墨蓝，那么我的补全部分颜色就是水墨蓝，同步给其他人看上去也是这样。每人分配的水墨颜色可以放在头像框。当然我希望其他人在输入的时候自己也能看到现在输入框是别人在输入而不是自己可以输入（不要文字提示，尝试用形象的方式提示，不过我还没想好用什么方式，你可以向我提问）
+7.如图2，这个按钮太大了
+8.我希望当我输入一个词后没等结合动画出来就马上回车发出去的时候，我们的动画能马上几乎瞬间（注意是几乎瞬间，不是去掉结合动画直接瞬移结合）加快到结合完毕然后再播放分开动画
+9.如图3，我希望规则里面在模式之前可以切换是使用普通词语还是成语还是全部词语，虽然默认是全部词语但我觉得肯定有玩家想体验成语版的前四个模式。
+10.如图4，我想知道为什么“空穴来风“没匹配上？不是默认使用全部词语吗，虽然我那把好像是调了成语然后最短答案调了4个字，但是我觉得这个词应该是成语吧，怎么发送不出去。
+11.还有，如果玩家在倒计时结束前输入了正确的答案但是没提交，目前好像还是会直接扣分。我觉得应该这样，只要输入了答案倒计时结束都应该检查一次，如果是正确答案那就马上快速播放结合动画并提交，像我这条消息第8点说的那样，也就是自动提交机制。
+````
+
+附件保存为本目录 `extra-1.png` 至 `extra-4.png`：`reference-assets/user-attachments/2026-10-13/`。
+
+## assistant 进度消息 267
+
+明白你说的拓扑关系：头像中心与箭头方向都按圆周等分，两人左右水平，三人相差 120°。这些新增要求继续使用 `/diagnosing-bugs`、`/tdd` 和 `/code-review`，并保留正在处理的前三项任务；实时同步、快速完成动画和超时自动提交需要一起核查服务端与页面状态。
+
+## assistant 问题 268
+
+别人在作答时，我建议用他的水墨颜色标记答案格边线和头像框，并隐藏你的光标；输入区域保持可观看，只有当前玩家能编辑。是否采用这个形象提示？
+
+- 采用颜色边线＋头像框＋隐藏光标（推荐）
+- 只显示头像框颜色，答案格保持原边线
+
+## 用户消息 50
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_0a409d8e989a4469b9babc3a7f1db1fe\",0]","question":"别人在作答时，我建议用他的水墨颜色标记答案格边线和头像框，并隐藏你的光标；输入区域保持可观看，只有当前玩家能编辑。是否采用这个形象提示？","answer":"采用颜色边线＋头像框＋隐藏光标（推荐）"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 269
+
+当前确认了前面三项实现状态，继续处理本轮新增的拓扑等分、答案浮现、多人输入同步、规则入口、自动提交和动画加速。词库模式会先核对“空穴来风”的实际数据与成语分类。
+
+## assistant 进度消息 270
+
+“空穴来风”确实已收录为成语。当前题目提示“宀”时，判定要求汉字的字典部首；“空”和“穴”的分类都是“穴”，所以这道题无法匹配。它们包含的“宀”可以满足字形部件条件。箭头倾斜也已确认来自头像整体容器的中心与头像中心不同，布局会统一使用头像中心。
+
+## assistant 进度消息 271
+
+服务端已经能够广播草稿匹配结果，并在倒计时结束时自动接受合法草稿，相关真实联机测试通过。各玩家颜色也由服务端统一分配，观看端会显示相同颜色。现在核查多人圆周布局与接受答案后的快速结合、返回和头像答案显示。
+
+## assistant 问题 272
+
+“空穴来风”已收录为成语；它包含“宀”的笔画，但“空”“穴”的字典部首归类为“穴”。部首模式是否按实际包含的常见部件形态匹配，让“空穴来风”也能回答“宀”？
+
+- 按实际部件形态匹配，接受这个答案（推荐）
+- 只按字典主要部首分类匹配
+
+## 用户消息 51
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_3bBKliN513STOrDiYNZK2ZGN\",0]","question":"“空穴来风”已收录为成语；它包含“宀”的笔画，但“空”“穴”的字典部首归类为“穴”。部首模式是否按实际包含的常见部件形态匹配，让“空穴来风”也能回答“宀”？","answer":"按实际部件形态匹配，接受这个答案（推荐）"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 273
+
+按你确认的规则，部首模式现在依据实际包含的常见部件形态匹配，“空穴来风”可以回答“宀”。圆周布局正在验证头像中心等角度，补全颜色已与头像框颜色一致；规则入口的词库切换也会保留到四个预设模式。
+
+## assistant 进度消息 274
+
+“空穴来风”按你确认的实际部件形态规则，可以回答“宀”。本轮正在完成真实联机验证和规格审查，验证结果会写入任务记录。
+
+## assistant 进度消息 275
+
+目前 28 项浏览器检查已经全部通过，Standards 与 Spec 审查也没有发现需要修正的问题。现在补齐 2026-10-13 的任务文件、验证记录和聊天原文，然后重新运行本地检查。
+
+## assistant 进度消息 276
+
+39 项规则与联机测试通过。本地服务已重新启动，正在确认最新部首规则下的双端输入同步、自定义组合提示和词库预设；任务 23 至 27 的详细记录已经保存。
+
+## assistant 进度消息 277
+
+规格审查补充了提交确认、下一位玩家的输入焦点和准备状态头像颜色三项检查。自动提交后的确认已通过真实 WebSocket 回归；浏览器检查会确保动画结束后可以立即输入，并持续显示各自水墨颜色。
+
+## assistant 进度消息 278
+
+准备和比赛中的头像框现在持续使用各自颜色，返回动画结束后自动恢复当前玩家的输入焦点。自动提交后的同一答案确认也会返回成功，相关回归检查通过；正在使用最新服务完成全套浏览器验证。
+
+## assistant 进度消息 279
+
+首次加载部首字形的真实网络延迟检查已经通过：笔画资源到达后连续加速完成结合，完整笔画显示完成才开始返回。提交动画现在依据字形和动画的完成状态决定顺序，后续生成的动画也会加速。
+
+## assistant 进度消息 280
+
+完整 29 项 Chrome 浏览器检查已通过，包含 450ms 字形资源延迟、提示附着、返回顺序、共享输入、头像颜色和输入焦点。39 项规则与联机测试、类型检查、生产构建和差异检查也已通过。
+
+## assistant 最终回复 281
+
+已继续处理并验证：
+
+- 重复答案显示“这个词之前输入过了”，拒绝并减少一秒。
+- 部首按实际部件形态匹配，“空穴来风”可以回答“宀”；提示笔画保持黑色，补全使用玩家水墨颜色。
+- 超时保留题目并顺延，全体参赛者未答出后换题；截止时自动提交合法答案。
+- 头像按圆周等分，两人水平、三人相差 120°。
+- 全员同步输入、匹配动画和玩家颜色；观看者隐藏光标。
+- 提前提交会连续加速结合，字形资源完成后才开始返回，并恢复下一位玩家输入焦点。
+- 模式上方提供词库选择，预设保留选择；展示复选框已缩小。
+
+验证结果：
+
+- `npm test`：39 项通过。
+- `npm run test:browser`：29 项通过。
+- `npm run check`、`npm run build`、`git diff --check`：通过。
+- 本地服务：<http://localhost:5173/>，联机服务健康检查通过。
+
+记录已更新：
+
+- [任务与 Skill 记录](</Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/tasks.md>)
+- [验证记录](</Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/verification.md>)
+- [聊天记录](</Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/conversation.md>)
+
+本轮使用 `diagnosing-bugs`、`tdd`、`code-review`、`research` 与 `reverse-engineer-anything`。修改尚未提交、推送或发布。
+
+## 用户消息 52
+
+````text
+[$ask-matt](/Users/hco/.agents/skills/ask-matt/SKILL.md) 1.我希望电脑能展示输入过程，但也别龟速输入，输入快点就行，别直接飞快提交了，不然我都看不清别人操作的时候是怎么样的
+2.如图1，我不满意现在的房间布局，我希望房间布局应该采取卡片式，类似jklm.fun这样的，类似图2（可以保存进bombparty的参考素材库），而且不用展示房主的名字，同时模式和规则啥的应该像标签一样附着在卡片上，而不是孤零零就放上去文字。
+3.联机托管平台你觉得选谁最好？我的主要玩家来源应该是中国大陆的玩家，选定了的话我们可以开始弄联机托管了。
+4.你还记得我之前说的“我希望当我输入一个词后没等结合动画出来就马上回车发出去的时候，我们的动画能马上几乎瞬间（注意是几乎瞬间，不是去掉结合动画直接瞬移结合）加快到结合完毕然后再播放分开动画“吗，请注意前提条件，是“没等结合动画出来就马上回车发出去“，也就是说，如果我等到结合动画都开始执行了的时候发出去，就不用又播放一次结合动画
+5.我发现我等另一个玩家输入完之后再回到我的回合，我是无法进行立即输入的，我还需要点一下输入框才能重新输入，我不希望，我希望是非常丝滑的体验，轮到我的回合我就要马上能输入。
+6.如图3，我不满意现在的箭头，我认为橙色箭头和灰色箭头的粗细应该一致，而且灰色箭头应该反向，即由玩家指向鼓。而且，我认为生命如果<=5应该在一行内显示完，不应该还要分到两行显示。
+````
+
+附件：[图一](../reference-assets/user-attachments/2026-10-13/card-1.png)、[图二](../reference-assets/user-attachments/2026-10-13/card-2.png)、[图三](../reference-assets/user-attachments/2026-10-13/card-3.png)。图二原文另存为 `reference-assets/bombparty/2026-10-13-room-cards.png`。
+
+## 用户消息 53
+
+````text
+<skill>
+<name>ask-matt</name>
+<path>/Users/hco/.agents/skills/ask-matt/SKILL.md</path>
+---
+name: ask-matt
+description: Ask which skill or flow fits your situation. A router over the skills in this repo.
+disable-model-invocation: true
+---
+
+# Ask Matt
+
+You don't remember every skill, so ask.
+
+A **flow** is a path through the skills. Most paths run along one **main flow**, and two **on-ramps** merge onto it. Everything else is standalone, or a vocabulary layer that runs underneath.
+
+## The main flow: idea → ship
+
+The route most work travels. You have an idea and want it built.
+
+1. **`/grill-with-docs`** sharpens the idea by interview. Start here whenever you are **working in a working directory**: it's stateful, retaining what it learns in `GLOSSARY.md` and ADRs. (No working directory? Use `/grill-me` instead, covered under Standalone. Both run the same `/grilling` primitive; `grill-with-docs` is the one that leaves a paper trail, which makes it the better of the two whenever a repo is there to leave it in.)
+2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype, bridged by **`/handoff`** in both directions (a prototype lives in its own directory, which is exactly what `/handoff` is for; see Phase boundaries):
+   - **`/handoff`** out, then open a fresh session against that file,
+   - **`/prototype`** to answer the question with throwaway code,
+   - **`/handoff`** back what you learned, and reference it from the original idea thread.
+3. **Branch: is this a multi-session build?**
+   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. Then work the tickets one of two ways:
+     - **`/implement`** per ticket, **`/clear`ing context between each one**. On a local tracker that's one file per ticket under `.scratch/<feature>/issues/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed. Each ticket is self-contained, so the last one's context is disposable.
+     - **`/implement-spec`** for the whole spec in one run. It reads the tickets as a **task graph**, runs implementer subagents across the ready **frontier** in parallel, and lands everything on one **integration branch**. Reach for it when you'd rather orchestrate the build than drive each ticket yourself.
+   - **No** → **`/implement`** right here, in the same context window.
+
+   Either way, the code gets built by driving **`/tdd`** (one red-green slice at a time) and closes out with **`/code-review`**, a two-axis review (Standards + Spec) of the diff. `/implement` runs both per ticket; `/implement-spec`'s implementers each drive `/tdd`, and it runs one `/code-review` over the integration branch. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review a branch or PR against a fixed point.
+
+   When the work goes up as a pull request, **`/pr`** shapes the body: the smallest visual that shows the change, before/after evidence that it works, and a one-way or two-way door call. It's model-invoked, so the agent reaches for it whenever it writes a PR.
+
+4. **`/retro`** closes the loop. After a build, and especially one that went sideways, it looks back over the session and suggests changes to the agent's **environment**, not the code: navigation pointers, automated checks, the coding standards `/code-review` enforces, steering files, tooling. Mechanical mistakes become deterministic checks; judgement calls become coding standards. The next build then starts from a better environment.
+
+### Context hygiene
+
+Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket. Run `/retro` in the session it's looking back on, before you clear; after clearing, point it at that session's log instead.
+
+The limit on this is the **[smart zone](https://www.aihero.dev/ai-coding-dictionary/smart-zone)**: the window (~150k tokens on state-of-the-art models) within which the model still reasons sharply. If a session approaches it before `/to-tickets`, don't push on degraded; `/compact` at the nearest phase boundary and carry on (see Phase boundaries).
+
+## On-ramps
+
+A starting situation that generates work, then merges onto the main flow.
+
+- **Bugs and requests piling up** → **`/triage`**. It moves issues through triage roles and produces agent-ready issues, which **`/implement`** later picks up.
+
+  Triage is only for issues **you didn't create**: bug reports, incoming feature requests, anything that arrives raw. Tickets that `/to-tickets` produced are already agent-ready, so **don't triage them**.
+
+- **Something's broken** → **`/diagnosing-bugs`**. For the hard ones: the bug that resists a first glance, the intermittent flake, the regression that crept in between two known-good states. It refuses to theorise until it has a **tight feedback loop** (one command that already goes red on *this* bug), then fixes with a regression test. Once the fix is in, run **`/retro`** in the same session to ask what would have prevented the bug; where the real finding is that there's no good seam to lock it down, that's a job for **`/improve-codebase-architecture`**.
+
+- **A huge, foggy effort: a greenfield project or a huge feature build, too big for one session** → **`/wayfinder`**, the most cognitively demanding flow here. When the way from here to the destination isn't visible yet, it charts a **shared map** of **decision tickets** on the issue tracker and resolves them one at a time, producing **decisions, not deliverables**, until the fog is pushed back and the way is clear. Where **`/grill-with-docs`** sharpens an idea you can hold in one session, wayfinder is for the idea you can't, and it's slower and denser, so save it for exactly that, never a well-scoped feature.
+
+  When the map clears, **it hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-tickets` and `/implement` as usual. Looping the map straight into `/implement` skips that collapse and throws the linked detail away, so go straight to `/implement` only when the effort turned out genuinely small.
+
+## Codebase health
+
+Not feature work, just upkeep.
+
+- **`/improve-codebase-architecture`** runs whenever you have a spare moment to keep the codebase good for agents to operate in. It surfaces **deepening opportunities**; picking one _generates an idea_ you can take into the main flow at `/grill-with-docs`. It's the survey that finds the candidates; **`/codebase-design`** (below) is the bench you design the chosen one on.
+
+## Vocabulary underneath
+
+Two model-invoked references that run *beneath* the other skills, each the single source of truth for its vocabulary. Reach for them directly when the **words**, not the process, are the problem; or let the skills above pull them in.
+
+- **`/domain-modeling`**: sharpen the project's *domain* language: challenge a fuzzy term, resolve an overloaded word ("account" doing three jobs), record a hard-to-reverse decision as an ADR. It's the active discipline `/grill-with-docs` drives to keep `GLOSSARY.md` a clean glossary.
+- **`/codebase-design`** is the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality) for designing a module's *shape*: a lot of behaviour behind a small interface at a clean seam. `/tdd` and `/improve-codebase-architecture` both speak it.
+
+## Phase boundaries
+
+A **phase** is a chunk of work inside a session: the grilling, the implementation, the QA. At the **boundary** between two of them you have five options, and picking between them is the fuzziest decision in this whole map:
+
+- **Continue**: stay put. Costs nothing, loses nothing.
+- **`/clear`**: empty the window, when nothing here matters to what's next.
+- **`/handoff`** writes a portable markdown file. Narrow: only for a **new harness**, a **new directory**, a **colleague**, or forking a side task **mid-phase**. What it buys is portability.
+- **Subagent**: send a tightly-scoped task to its own window and get a report back.
+- **`/compact`** compresses this context and seeds a fresh session with it. The **default**, at the bottom of the tree rather than the first reach.
+
+Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree: the five questions, the reasoning behind each branch, and why the primary-source cost makes **Continue** the one to rule out first. Make the decision **at** a boundary; mid-phase, continue or split the rest into subagents.
+
+## Standalone
+
+Off the main flow entirely.
+
+- **`/grill-me`**: the same relentless interview as `/grill-with-docs`, but **stateless**: it saves nothing locally, builds no `GLOSSARY.md`. Reach for it when you are **not working in a working directory** (sharpening a plan, a design, a piece of writing, anything with no repo under it). If you are in a working directory, use `/grill-with-docs` instead: it runs the same interview and leaves a paper trail, so it is strictly the better one.
+- **`/grilling`** is the interview primitive itself: rounds, the frontier, facts are the agent's job and decisions are yours. `/grill-me` and `/grill-with-docs` are the two named ways in, and `/triage`, `/wayfinder` and `/improve-codebase-architecture` all run it internally. Reach for it directly only when you want the interview with no wrapper around it.
+- **`/prototype`** is a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. Throwaway is a constraint on how the code is written, not a promise to destroy it: the answer folds into the real code, and the prototype itself is kept as a **primary source** on a `prototype/<name>` branch out of main, pointed at from the implementation issue. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
+- **`/research`**: delegate reading legwork to a **background agent**: it investigates a question against **primary sources**, then leaves a cited Markdown file in the repo. Keep working while it reads. The file it produces is something to take *into* the main flow at `/grill-with-docs`, since research feeds the thinking rather than replacing it.
+- **`/to-questionnaire`** comes in when the thing blocking you isn't in your head or the codebase but in **someone else's**, and it writes them a questionnaire to fill in. It's the inverse of `/grill-me`: instead of interviewing you about the subject, it interviews you about the **send** (who it's going to, what you need back) and aims the questions at the gap. What comes back is material for `/grill-with-docs` or `/to-spec`.
+- **`/wizard`** is for the steps only a **human** can take: provisioning infrastructure, setting up credentials or CI secrets, clicking through an unfamiliar third-party dashboard, running a one-off migration or cutover. It generates an interactive bash script that opens each URL, captures each value, writes them into `.env` and GitHub secrets, so the procedure stops being something you re-explain to an agent every time. Model-invoked, so the agent reaches for it the moment it hits a wall only you can pass. If the agent could just do it itself, it should; this is for where a human is genuinely in the loop.
+- **`/wait-what`** is the corrective for a message that didn't land. Use it mid-conversation, inside any other skill, and the agent re-pitches what it just said with the context you were missing, in plain English, using the `GLOSSARY.md` vocabulary. It works after the fact; `/grill-with-docs` is the upfront cure, because a shared language agreed early is what stops the jargon arriving at all.
+- **`/teach`**: learn a concept over multiple sessions, using the current directory as a stateful workspace.
+- **`/writing-for-agents`** is the reference for writing documents agents consume: skills, AGENTS.md, pointed-at docs.
+
+## Precondition
+
+**`/setup-matt-pocock-skills`**: run before your first engineering flow to configure the issue tracker, triage labels, doc layout the other skills assume. Custom issue trackers also work.
+
+</skill>
+````
+
+## assistant 进度消息 282
+
+本轮按 `ask-matt` 的工程路线处理：先把联机托管与新界面要求记录为任务，核查面向中国大陆玩家的托管条件，再用真实浏览器和 WebSocket 测试完成实现。你附带的房间卡片与传鼓参考图也会保存到 `reference-assets/bombparty/`。
+
+## assistant 进度消息 283
+
+托管选择会单独核对 Cloudflare Durable Objects、Render 和面向中国大陆访问的网络条件；这部分采用 `research`，来源只使用官方文档与当前仓库的部署配置。界面、输入和箭头问题采用 `diagnosing-bugs`、`tdd`，完成后继续做 `code-review`。
+
+## assistant 问题 284
+
+你之前要求免费托管。延续这个要求，我推荐 Cloudflare Workers + Durable Objects；免费方案没有中国大陆节点承诺，大陆连接质量需要实测。若大陆访问优先于免费，则推荐阿里云中国大陆服务器，需要购买服务器、域名并备案。本次选定哪一种？
+
+- Cloudflare 免费方案（推荐，延续免费要求）
+- 阿里云中国大陆服务器，接受费用与备案
+
+## 用户消息 54
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_70d27e614b7b4c1d82d26a73a191b8a7\",0]","question":"你之前要求免费托管。延续这个要求，我推荐 Cloudflare Workers + Durable Objects；免费方案没有中国大陆节点承诺，大陆连接质量需要实测。若大陆访问优先于免费，则推荐阿里云中国大陆服务器，需要购买服务器、域名并备案。本次选定哪一种？","answer":"Cloudflare 免费方案（推荐，延续免费要求）"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 285
+
+已选定 Cloudflare 免费方案。研究结论会写入部署记录：它适合继续保持免费与持久房间，但免费计划没有中国大陆节点承诺；中国大陆连接质量需要上线前实测。电脑逐字输入的真实服务端检查已经通过，接下来继续完成大厅卡片、箭头方向和提交动画状态。
+
+## assistant 进度消息 286
+
+Cloudflare 适配进入 `implement-spec`：服务需要保存房间状态、使用 alarm 处理计时与电脑输入，并核查词库在 128 MB 内存限制下的运行情况。公开部署还需要 Cloudflare 账户登录；我会把可运行的服务和验证完成后，再处理账户步骤。
+
+## assistant 问题 287
+
+Cloudflare 免费联机服务已经开始适配。你目前是否已有 Cloudflare 账户？这项信息用于准备账户登录与部署步骤。
+
+- 已有账户，可以使用 Wrangler 登录
+- 还没有账户，需要注册
+
+## 用户消息 55
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_743987bc90e34018b10a99a405a425e5\",0]","question":"Cloudflare 免费联机服务已经开始适配。你目前是否已有 Cloudflare 账户？这项信息用于准备账户登录与部署步骤。","answer":"已有账户，可以使用 Wrangler 登录"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 288
+
+Wrangler 已确认当前环境尚未登录 Cloudflare，正在等待浏览器授权链接。产品代码与本地服务仍在继续验证；登录完成后才会创建 Cloudflare 资源。
+
+## assistant 问题 289
+
+Wrangler 已在默认浏览器打开 Cloudflare 登录授权页面。请在该页面完成登录并允许授权；完成后告知我，我会继续部署经过本地验证的服务。
+
+- 已完成浏览器授权
+- 授权页面没有打开
+
+## assistant 进度消息 290
+
+大厅卡片、电脑逐字输入、双箭头方向和单行生命已经通过真实浏览器检查。提交后的提示字段保持原元素，已开始的结合过程会直接继续返回；新玩家收到回合后可以立即输入。Wrangler 的登录等待已经超时，公开部署仍等待账户授权。
+
+## assistant 进度消息 291
+
+Cloudflare 服务已经共用现有比赛规则，完整词库保留 88,175 个词语，条件索引使用紧凑数组。当前正在真实 workerd 中检查持久房间、WebSocket 恢复和 alarm 调度；界面变更也进入 Standards 与 Spec 审查。
+
+## 用户消息 56
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_73af0979bb6148fc80fe45fcea88df1c\",0]","question":"Wrangler 已在默认浏览器打开 Cloudflare 登录授权页面。请在该页面完成登录并允许授权；完成后告知我，我会继续部署经过本地验证的服务。","answer":"已完成浏览器授权"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 292
+
+收到授权完成的确认。我正在检查 Wrangler 的登录状态；本地 Cloudflare 检查已经验证持久房间、连接恢复和电脑输入，公开部署会使用完成审查的服务。
+
+## assistant 进度消息 293
+
+Wrangler 尚未收到登录凭据，上一次本地授权等待已超时。我已重新打开授权页面，请在这次新页面完成授权，命令正在接收登录结果。
+
+## assistant 进度消息 294
+
+Wrangler 登录已成功。Cloudflare 的真实运行检查通过五项：来源校验、密码房间、Hibernation 后恢复、草稿自动提交和电脑逐字输入；完整词库的运行内存测量也在 128 MB 限制内。正在完成服务集成与公开部署检查。
+
+## assistant 进度消息 295
+
+本地 Cloudflare 真实检查已经通过，服务分支包含两个提交：共享游戏核心和 Durable Object Worker。现在把这两个已验证的服务提交整合到当前工作区，再运行完整 Node、Cloudflare、浏览器和构建检查。
+
+## assistant 进度消息 296
+
+Cloudflare 服务已发布：`https://chuan-zi-online.tcoinsm.workers.dev`，公开健康检查返回正常。现在用真实公网 WebSocket 验证两名玩家的创建、加入、草稿同步、回合传递和重连，并生成自动连接这个服务的网页构建。
+
+## assistant 进度消息 297
+
+公开 Cloudflare WebSocket 已完成真实双端验证：创建房间、密码加入、草稿同步、答案提交、回合传递和身份重连均通过。`npm run build:pages` 生成的网页已自动写入公开 WSS 地址，个人网站仓库其它内容没有修改。
+
+## assistant 进度消息 298
+
+部首匹配增加了完整笔画数量核查，确保提示之外还有玩家补全的笔画；生成、草稿和提交共用这项规则。“空穴来风”回答“宀”的检查继续通过，更新后的服务正在完成发布验证。
+
+## assistant 最终回复 299
+
+- 电脑按 110ms 间隔逐字输入，完整答案停留 650ms 后提交。
+- 大厅已改为卡片，模式、词库和规则使用标签，隐藏房主名称。
+- 提交沿用已经开始的结合动画；轮到自己时立即取得输入焦点。
+- 两支箭头宽度一致，灰色指向鼓，橙色指向当前玩家；五个以内生命保持单行。
+
+Cloudflare 免费联机服务已发布并通过真实双端验证。网页产物已生成在 [dist](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/dist)，自动连接公开 WSS；以后运行 `npm run build:pages` 即可重新生成。
+
+46 项规则与联机测试、31 项浏览器检查、类型检查和构建通过。[任务与 Skill 记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/tasks.md)、聊天原文与附件已保存。
+
+中国大陆多运营商网络尚未测量；个人网站未发布更新，当前集成分支尚未提交。
+
+## 用户消息 57
+
+````text
+[$ask-matt](/Users/hco/.agents/skills/ask-matt/SKILL.md) 1.为什么图1图2这些词不符合条件？你能在网上找到更合适的词库吗，或者找到类似的会使用到中文词库的网站或者游戏我可以用rea逆向一下。
+2.我觉得灰箭头的动画不应该是旋转，而应该是翻转+变色，但具体怎么翻转我还没想好。这个意思是说，指向新玩家的黄箭头是旋转过去没错，但是原来黄箭头指向的玩家的灰箭头我觉得应该是原来的黄箭头反向然后变色。你可以问我问题。
+3.如图3，首先这个输入过了的提示都跟其他ui重合了，是不是应该放在我们输入格的下面，然后我觉得应该在玩家提交之前就提示，而不是提交后才提示这个词输入过了。
+4.如图4，这个输入错误的闪红是不是应该在格子内闪红更合理，而不是背景闪红？其实这个可以调研一下优秀的做法是怎么做的，比如macos输错密码的反馈，之类的（不过不知道这是不是一个好的参考）。
+5.如图五，部首模式下匹配结合后怎么字体会变？我不希望字体会变化，能不能维持原字体同时保持我们提示部分为黑补全部分为玩家色？还有部首模式的提示默认应该是给一个部首或者两个部首的几率各占一半。
+6.我认为最后两个玩家，第一个抽到新词的玩家死了，最后剩下的那个玩家不用回答让第一个玩家死了的那个问题，那就太没意思了，应该让最后剩下那个玩家也回答那个问题，如果他答不上来也是扣一格血，如果他只有一格血又答不上来那么就会平局。
+````
+
+附件保存为 `reference-assets/user-attachments/2026-10-13/feedback-1.png` 至 `feedback-5.png`。
+
+## 用户消息 58
+
+````text
+<skill>
+<name>ask-matt</name>
+<path>/Users/hco/.agents/skills/ask-matt/SKILL.md</path>
+---
+name: ask-matt
+description: Ask which skill or flow fits your situation. A router over the skills in this repo.
+disable-model-invocation: true
+---
+
+# Ask Matt
+
+You don't remember every skill, so ask.
+
+A **flow** is a path through the skills. Most paths run along one **main flow**, and two **on-ramps** merge onto it. Everything else is standalone, or a vocabulary layer that runs underneath.
+
+## The main flow: idea → ship
+
+The route most work travels. You have an idea and want it built.
+
+1. **`/grill-with-docs`** sharpens the idea by interview. Start here whenever you are **working in a working directory**: it's stateful, retaining what it learns in `GLOSSARY.md` and ADRs. (No working directory? Use `/grill-me` instead, covered under Standalone. Both run the same `/grilling` primitive; `grill-with-docs` is the one that leaves a paper trail, which makes it the better of the two whenever a repo is there to leave it in.)
+2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype, bridged by **`/handoff`** in both directions (a prototype lives in its own directory, which is exactly what `/handoff` is for; see Phase boundaries):
+   - **`/handoff`** out, then open a fresh session against that file,
+   - **`/prototype`** to answer the question with throwaway code,
+   - **`/handoff`** back what you learned, and reference it from the original idea thread.
+3. **Branch: is this a multi-session build?**
+   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. Then work the tickets one of two ways:
+     - **`/implement`** per ticket, **`/clear`ing context between each one**. On a local tracker that's one file per ticket under `.scratch/<feature>/issues/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed. Each ticket is self-contained, so the last one's context is disposable.
+     - **`/implement-spec`** for the whole spec in one run. It reads the tickets as a **task graph**, runs implementer subagents across the ready **frontier** in parallel, and lands everything on one **integration branch**. Reach for it when you'd rather orchestrate the build than drive each ticket yourself.
+   - **No** → **`/implement`** right here, in the same context window.
+
+   Either way, the code gets built by driving **`/tdd`** (one red-green slice at a time) and closes out with **`/code-review`**, a two-axis review (Standards + Spec) of the diff. `/implement` runs both per ticket; `/implement-spec`'s implementers each drive `/tdd`, and it runs one `/code-review` over the integration branch. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review a branch or PR against a fixed point.
+
+   When the work goes up as a pull request, **`/pr`** shapes the body: the smallest visual that shows the change, before/after evidence that it works, and a one-way or two-way door call. It's model-invoked, so the agent reaches for it whenever it writes a PR.
+
+4. **`/retro`** closes the loop. After a build, and especially one that went sideways, it looks back over the session and suggests changes to the agent's **environment**, not the code: navigation pointers, automated checks, the coding standards `/code-review` enforces, steering files, tooling. Mechanical mistakes become deterministic checks; judgement calls become coding standards. The next build then starts from a better environment.
+
+### Context hygiene
+
+Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket. Run `/retro` in the session it's looking back on, before you clear; after clearing, point it at that session's log instead.
+
+The limit on this is the **[smart zone](https://www.aihero.dev/ai-coding-dictionary/smart-zone)**: the window (~150k tokens on state-of-the-art models) within which the model still reasons sharply. If a session approaches it before `/to-tickets`, don't push on degraded; `/compact` at the nearest phase boundary and carry on (see Phase boundaries).
+
+## On-ramps
+
+A starting situation that generates work, then merges onto the main flow.
+
+- **Bugs and requests piling up** → **`/triage`**. It moves issues through triage roles and produces agent-ready issues, which **`/implement`** later picks up.
+
+  Triage is only for issues **you didn't create**: bug reports, incoming feature requests, anything that arrives raw. Tickets that `/to-tickets` produced are already agent-ready, so **don't triage them**.
+
+- **Something's broken** → **`/diagnosing-bugs`**. For the hard ones: the bug that resists a first glance, the intermittent flake, the regression that crept in between two known-good states. It refuses to theorise until it has a **tight feedback loop** (one command that already goes red on *this* bug), then fixes with a regression test. Once the fix is in, run **`/retro`** in the same session to ask what would have prevented the bug; where the real finding is that there's no good seam to lock it down, that's a job for **`/improve-codebase-architecture`**.
+
+- **A huge, foggy effort: a greenfield project or a huge feature build, too big for one session** → **`/wayfinder`**, the most cognitively demanding flow here. When the way from here to the destination isn't visible yet, it charts a **shared map** of **decision tickets** on the issue tracker and resolves them one at a time, producing **decisions, not deliverables**, until the fog is pushed back and the way is clear. Where **`/grill-with-docs`** sharpens an idea you can hold in one session, wayfinder is for the idea you can't, and it's slower and denser, so save it for exactly that, never a well-scoped feature.
+
+  When the map clears, **it hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-tickets` and `/implement` as usual. Looping the map straight into `/implement` skips that collapse and throws the linked detail away, so go straight to `/implement` only when the effort turned out genuinely small.
+
+## Codebase health
+
+Not feature work, just upkeep.
+
+- **`/improve-codebase-architecture`** runs whenever you have a spare moment to keep the codebase good for agents to operate in. It surfaces **deepening opportunities**; picking one _generates an idea_ you can take into the main flow at `/grill-with-docs`. It's the survey that finds the candidates; **`/codebase-design`** (below) is the bench you design the chosen one on.
+
+## Vocabulary underneath
+
+Two model-invoked references that run *beneath* the other skills, each the single source of truth for its vocabulary. Reach for them directly when the **words**, not the process, are the problem; or let the skills above pull them in.
+
+- **`/domain-modeling`**: sharpen the project's *domain* language: challenge a fuzzy term, resolve an overloaded word ("account" doing three jobs), record a hard-to-reverse decision as an ADR. It's the active discipline `/grill-with-docs` drives to keep `GLOSSARY.md` a clean glossary.
+- **`/codebase-design`** is the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality) for designing a module's *shape*: a lot of behaviour behind a small interface at a clean seam. `/tdd` and `/improve-codebase-architecture` both speak it.
+
+## Phase boundaries
+
+A **phase** is a chunk of work inside a session: the grilling, the implementation, the QA. At the **boundary** between two of them you have five options, and picking between them is the fuzziest decision in this whole map:
+
+- **Continue**: stay put. Costs nothing, loses nothing.
+- **`/clear`**: empty the window, when nothing here matters to what's next.
+- **`/handoff`** writes a portable markdown file. Narrow: only for a **new harness**, a **new directory**, a **colleague**, or forking a side task **mid-phase**. What it buys is portability.
+- **Subagent**: send a tightly-scoped task to its own window and get a report back.
+- **`/compact`** compresses this context and seeds a fresh session with it. The **default**, at the bottom of the tree rather than the first reach.
+
+Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree: the five questions, the reasoning behind each branch, and why the primary-source cost makes **Continue** the one to rule out first. Make the decision **at** a boundary; mid-phase, continue or split the rest into subagents.
+
+## Standalone
+
+Off the main flow entirely.
+
+- **`/grill-me`**: the same relentless interview as `/grill-with-docs`, but **stateless**: it saves nothing locally and builds no `GLOSSARY.md`. Reach for it when you are **not working in a working directory** (sharpening a plan, a design, a piece of writing, anything with no repo under it). If you are in a working directory, use `/grill-with-docs` instead: it runs the same interview and leaves a paper trail, so it is strictly the better one.
+- **`/grilling`** is the interview primitive itself: rounds, the frontier, facts are the agent's job and decisions are yours. `/grill-me` and `/grill-with-docs` are the two named ways in, and `/triage`, `/wayfinder` and `/improve-codebase-architecture` all run it internally. Reach for it directly only when you want the interview with no wrapper around it.
+- **`/prototype`** is a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. Throwaway is a constraint on how the code is written, not a promise to destroy it: the answer folds into the real code, and the prototype itself is kept as a **primary source** on a `prototype/<name>` branch out of main, pointed at from the implementation issue. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
+- **`/research`**: delegate reading legwork to a **background agent**: it investigates a question against **primary sources**, then leaves a cited Markdown file in the repo. Keep working while it reads. The file it produces is something to take *into* the main flow at `/grill-with-docs`, since research feeds the thinking rather than replacing it.
+- **`/to-questionnaire`** comes in when the thing blocking you isn't in your head or the codebase but in **someone else's**, and it writes them a questionnaire to fill in. It's the inverse of `/grill-me`: instead of interviewing you about the subject, it interviews you about the **send** (who it's going to, what you need back) and aims the questions at the gap. What comes back is material for `/grill-with-docs` or `/to-spec`.
+- **`/wizard`** is for the steps only a **human** can take: provisioning infrastructure, setting up credentials or CI secrets, clicking through an unfamiliar third-party dashboard, running a one-off migration or cutover. It generates an interactive bash script that opens each URL, captures each value, and writes it into `.env` and GitHub secrets, so the procedure stops being something you re-explain to an agent every time. Model-invoked, so the agent reaches for it the moment it hits a wall only you can pass. If the agent could just do it itself, it should; this is for where a human is genuinely in the loop.
+- **`/wait-what`** is the corrective for a message that didn't land. Use it mid-conversation, inside any other skill, and the agent re-pitches what it just said with the context you were missing, in plain English, using the `GLOSSARY.md` vocabulary. It works after the fact; `/grill-with-docs` is the upfront cure, because a shared language agreed early is what stops the jargon arriving at all.
+- **`/teach`**: learn a concept over multiple sessions, using the current directory as a stateful workspace.
+- **`/writing-for-agents`** is the reference for writing documents agents consume: skills, AGENTS.md, pointed-at docs.
+
+## Precondition
+
+**`/setup-matt-pocock-skills`**: run before your first engineering flow to configure the issue tracker, triage labels, and doc layout the other skills assume. Custom issue trackers also work.
+
+</skill>
+````
+
+## assistant 进度消息 300
+
+这轮使用 `diagnosing-bugs` 核查词语判定与反馈，使用 `research` 查找词库和同类游戏，再通过 `tdd`、`code-review` 完成实现与验证。箭头翻转和保持原字体的显示方式需要结合现有实现确认；消息原文、附件和任务会继续保存。
+
+## assistant 问题 301
+
+箭头交接时，是否采用“原黄色箭头留在原方向，沿箭头长度方向翻面并变灰，箭头尖端转为指向鼓；新黄色箭头同时旋转到下一位玩家”？
+
+- 采用这个翻面效果（推荐）
+- 原方向保持，箭头尖端与尾端平面变形并变灰
+
+目前普通汉字使用设备字体，逐笔着色使用另一套字形资料。要保证输入前后字形一致，是否接受全部答案格统一使用与笔画资料对应、免费可商用的字体？
+
+- 统一答案格字体，输入和结合保持一致（推荐）
+- 保留当前设备字体，继续研究对应的着色方式
+
+最后两人都在同题耗尽生命时，本局平局是否计入比赛总局数，双方都不增加胜局？
+
+- 计入总局数，双方不增加胜局（推荐）
+- 不计入总局数，重新进行这一局
+
+## assistant 进度消息 302
+
+“旋转”已收录，读音是 `xuán zhuǎn`；图一第二格要求第四声，因此这道提示无法匹配。“独享”没有收录在当前词库，属于词库覆盖问题。词库研究会核查常用词的完整读音，以及能供你研究的中文游戏。
+
+## 用户消息 59
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_331721c88835408590a4aa6f25ecc301\",0]","question":"箭头交接时，是否采用“原黄色箭头留在原方向，沿箭头长度方向翻面并变灰，箭头尖端转为指向鼓；新黄色箭头同时旋转到下一位玩家”？","answer":"采用这个翻面效果（推荐）"},{"questionItemId":"[\"request_user_input_async\",\"call_331721c88835408590a4aa6f25ecc301\",1]","question":"目前普通汉字使用设备字体，逐笔着色使用另一套字形资料。要保证输入前后字形一致，是否接受全部答案格统一使用与笔画资料对应、免费可商用的字体？","answer":"保留当前设备字体，继续研究对应的着色方式"},{"questionItemId":"[\"request_user_input_async\",\"call_331721c88835408590a4aa6f25ecc301\",2]","question":"最后两人都在同题耗尽生命时，本局平局是否计入比赛总局数，双方都不增加胜局？","answer":"计入总局数，双方不增加胜局（推荐）"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 303
+
+已记录你的三项确认：灰箭头采用翻面后变灰的交接效果，答案格继续使用设备字体，最后两人同题耗尽生命时计入局数并判定平局。接下来按这些决定补充任务和验证。
+
+## assistant 进度消息 304
+
+当前状态确认：
+
+- `旋转` 已收录，读音是 `xuán zhuǎn`；图一提示第二个声调是第四声，所以与“旋转”的第三声不一致。
+- `独享` 在当前 CC-CEDICT 派生词库没有记录，虽然 jieba 有词频，缺少词语级读音来源，不能直接加入。
+- 你确认的箭头交接、设备字体、平局规则已记录，接下来会实现并验证。
+
+## assistant 进度消息 305
+
+新版官方 CC-CEDICT 已确认收录“独享”，读音为 `dú xiǎng`；项目词库更新到这个固定快照后，`d-x` 的判定已经通过。原有排除规则继续生效。设备字体没有提供可直接选择的部首笔画资料，正在核查保持同一文字外形的着色方法。
+
+## assistant 问题 306
+
+设备字体可以保持同一汉字外形，并按部件所在区域显示黑色和玩家色；连笔或交叠处的颜色边界可能穿过笔画，无法保证逐笔精确。是否接受这个范围，继续保留当前设备字体？
+
+- 接受部件区域着色，保持设备字体
+- 必须逐笔精确，继续研究
+
+## 用户消息 60
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_86f920856ecc43399c249b40fb6e9f92\",0]","question":"设备字体可以保持同一汉字外形，并按部件所在区域显示黑色和玩家色；连笔或交叠处的颜色边界可能穿过笔画，无法保证逐笔精确。是否接受这个范围，继续保留当前设备字体？","answer":"接受部件区域着色，保持设备字体"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 307
+
+最后一名玩家继续同题、双方耗尽生命判定平局的真实联机检查已通过。按你确认的范围，部首着色将保留设备文字，通过部件区域覆盖颜色；连笔或交叠处的颜色边界可能穿过笔画。重复词提示已移到答案格下方，并在提交前显示。
+
+## assistant 进度消息 308
+
+新版 CC-CEDICT 资料已经加入研究结果，目前产品词库还需要重新核验全部筛选、许可说明和 Cloudflare 数据。设备字体区域着色实现正在运行浏览器检查，最后玩家同题与平局已经通过 Node WebSocket 检查。
+
+## assistant 进度消息 309
+
+48 项规则与联机测试、31 项浏览器检查已经通过。灰箭头的角度、翻面和颜色变化都有连续中间状态；重复提示的位置和格子内部错误反馈也通过检查。规格审查还补充了“多人累计胜局并列、最后一局平局”的加赛检查，正在完成这项验证。
+
+## assistant 进度消息 310
+
+50 项规则与联机测试、31 项浏览器检查已通过，新词库和同题平局规则也已更新到 Cloudflare。公网健康检查确认词库为 89,431 条，真实双人联机与静态网页分享加入再次通过。正在核对最后的审查结果和聊天原文。
+
+## assistant 进度消息 311
+
+你确认的部件区域着色会保持设备字体。当前实现已经通过功能测试，我会继续核对研究文档、任务状态和最终审查结果。
+
+## assistant 进度消息 312
+
+50 项规则与联机测试、31 项浏览器检查已通过。设备字体区域着色、箭头连续翻面和同题平局都有验证记录；我会使用 `writing-for-agents` 更新任务记录，并完成 `code-review` 的最终复核。
+
+## assistant 进度消息 313
+
+任务状态、词库统计、Cloudflare 内存记录和最终规格审查已经同步。现在执行最后一轮完整自动检查，确认当前工作区仍然可以构建和运行。
+
+## assistant 进度消息 314
+
+再次运行的 50 项规则与联机测试、TypeScript 检查均已通过。Pages 构建正在生成，联机服务已经使用当前数据；多人累计胜局并列时的加赛也通过了最终规格审查。
+
+## assistant 回复 315
+
+“旋转”读作 `xuán zhuǎn`，第二个字第三声，因此无法匹配图中的第四声提示。“独享”已随官方 CC-CEDICT 快照更新收录，可以回答 `d-x`。
+
+- 灰箭头保持方位，连续翻面并变灰；黄色箭头旋转到新玩家。
+- 重复词在输入时就在答案格下方提示；错误闪色限制在方格内部。
+- 部首结合保持设备字体，提示区域黑色、补全区域玩家色。连笔和交叠处采用你接受的区域颜色边界。
+- 部首预设生成一个或两个提示，概率各为一半。
+- 最后玩家继续回答同题；双方生命归零计为平局，计入局数且不增加胜局。多人累计胜局并列继续加赛。
+
+可供研究的游戏有[拼成语](https://allanchain.github.io/chinese-wordle/)和 [Chengyu Wordle](https://cheeaun.github.io/chengyu-wordle/)。目前没有核实到完全满足全部收录条件的现成词库；来源与许可详见[研究记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/chinese-game-lexicons-2026-10-13.md)。
+
+50 项规则与联机测试、31 项浏览器检查通过，类型检查和 Pages 构建通过。Cloudflare 已更新；`dist/` 已准备好，个人网站尚未发布本轮更新。
+
+聊天原文保存在[聊天记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/conversation.md)，任务、Skill 和验证结果保存在[任务记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/tasks.md)。

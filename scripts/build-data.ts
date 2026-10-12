@@ -1,18 +1,18 @@
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import cedict from 'cedict-json';
+import type { CedictEntry } from 'cedict-json';
 import { parse as csv } from 'csv-parse/sync';
 import { unzipSync, strFromU8 } from 'fflate';
 import jsonlines from 'jsonlines';
-import { parse as parseIds, flatten } from 'parse-ids';
+import { parse as parseIds, flatten, children, type IDS } from 'parse-ids';
 import { splitPinyin } from '../shared/pinyin';
 import type { CharacterData, DictionaryData, Reading, WordEntry } from '../shared/types';
 
 const componentVersion = 'bddc96d41bef78427ed0e034e9f7e31d71fd1b92';
 const hanWord = /^\p{Script=Han}+$/u;
 const provenance = [
-  { name: 'CC-CEDICT contributors / cedict-json 1.3.20251213', license: 'CC-BY-SA-4.0', url: 'https://cc-cedict.org/wiki/' },
+  { name: 'CC-CEDICT contributors / MDBG 2026-10-12', license: 'CC-BY-SA-4.0', url: 'https://cc-cedict.org/wiki/' },
   { name: 'THUOCL / THUNLP', license: 'MIT', url: 'https://github.com/thunlp/THUOCL' },
   { name: 'jieba / Sun Junyi', license: 'MIT', url: 'https://github.com/fxsjy/jieba/tree/67fa2e36e72f69d9134b8a1037b83fbb070b9775' },
   { name: 'Unicode Unihan 18.0.0', license: 'Unicode-3.0', url: 'https://www.unicode.org/Public/18.0.0/ucd/Unihan.zip' },
@@ -37,6 +37,9 @@ const retained = new Set(policy.retainedEverydayWords);
 const specialistDefinitions = policy.specialistDefinitionPatterns.map(pattern => new RegExp(pattern, 'i'));
 const excludedDefinitions = policy.excludedDefinitionPatterns.map(pattern => new RegExp(pattern, 'i'));
 const entries = new Map<string, WordEntry>();
+const cedictRaw = await readFile('data/sources/cc-cedict-2026-10-12.json');
+if (createHash('sha256').update(cedictRaw).digest('hex') !== 'fcf2d8875620d949854d18b091ac8dd8b7c38c18c0ce32c03cdf5ece00fee478') throw new Error('CC-CEDICT 数据来源校验失败');
+const cedict = JSON.parse(cedictRaw.toString('utf8')) as CedictEntry[];
 for (const item of cedict) {
   const length = [...item.simplified].length;
   if (length < 2 || length > 9 || !hanWord.test(item.simplified) || excluded.has(item.simplified)) continue;
@@ -80,15 +83,47 @@ for (const [codepoint, property, value] of radicalRows) {
 
 const componentMap = new Map<string, string[]>();
 const glyphRadicals = new Map<string, string>();
-interface Glyph { character: string; decomposition: string; radical: string }
+interface Glyph { character: string; decomposition: string; radical: string; matches: (number[] | null)[] }
+const strokeParts = new Map<string, Record<string, number[]>>();
+const glyphRecords = new Map<string, Glyph>();
+const occurrences = new Map<string, { component: string; indices: number[] }[]>();
 const parser = createReadStream('data/sources/makemeahanzi-dictionary.jsonl', { encoding: 'utf8' }).pipe(jsonlines.parse());
 for await (const raw of parser) {
   const glyph = raw as Glyph;
+  glyphRecords.set(glyph.character, glyph);
   const ids = parseIds(glyph.decomposition);
   if (!ids) throw new Error(`IDS 数据解析失败：${glyph.character} ${JSON.stringify(glyph.decomposition)}`);
   const components = flatten(ids).filter(item => item.type === 'char' && hanWord.test(item.char)).map(item => (item as { char: string }).char);
   componentMap.set(glyph.character, [...new Set(components.filter(item => item !== glyph.character))]);
   glyphRadicals.set(glyph.character, glyph.radical);
+  const parts: Record<string, number[]> = {};
+  const leaves: { component: string; indices: number[] }[] = [];
+  const collect = (node: IDS, path: number[]) => {
+    if (node.type === 'char') {
+      const indices = glyph.matches.flatMap((match, index) => match && path.every((value, position) => match[position] === value) ? [index] : []);
+      if (indices.length) parts[node.char] = [...new Set([...(parts[node.char] ?? []), ...indices])];
+      if (indices.length) leaves.push({ component: node.char, indices });
+    }
+    children(node).forEach((child, index) => collect(child, [...path, index]));
+  };
+  collect(ids, []);
+  strokeParts.set(glyph.character, parts);
+  occurrences.set(glyph.character, leaves);
+}
+const expanded = new Set<string>();
+function expandStrokeParts(character: string, visiting = new Set<string>()): Record<string, number[]> {
+  const parts = strokeParts.get(character) ?? {};
+  if (expanded.has(character) || visiting.has(character)) return parts;
+  const next = new Set([...visiting, character]);
+  for (const { component, indices } of occurrences.get(character) ?? []) {
+    const record = glyphRecords.get(component);
+    if (!record || component === character || indices.length !== record.matches.length) continue;
+    for (const [nested, mapped] of Object.entries(expandStrokeParts(component, next))) {
+      parts[nested] = [...new Set([...(parts[nested] ?? []), ...mapped.map(index => indices[index])])].sort((first, second) => first - second);
+    }
+  }
+  expanded.add(character);
+  return parts;
 }
 function allComponents(character: string, visited = new Set<string>()): Set<string> {
   if (visited.has(character)) return visited;
@@ -100,10 +135,12 @@ for (const [character, info] of Object.entries(characters)) {
   info.components = [...allComponents(character)].filter(item => item !== character).sort();
   const glyphRadical = glyphRadicals.get(character);
   if (glyphRadical && info.radicals.length) info.radicals = [...new Set([...info.radicals, glyphRadical])];
+  info.strokeParts = expandStrokeParts(character);
+  info.strokeCount = glyphRecords.get(character)?.matches.length;
 }
 
 const words = [...entries.values()].sort((first, second) => first.word.localeCompare(second.word, 'zh-Hans'));
-const data: DictionaryData = { words, characters, metadata: { version: '2026-10-11', wordCount: words.length, idiomCount: words.filter(entry => entry.idiom).length, sources: provenance } };
+const data: DictionaryData = { words, characters, metadata: { version: '2026-10-13', wordCount: words.length, idiomCount: words.filter(entry => entry.idiom).length, sources: provenance } };
 await mkdir('data/sources', { recursive: true });
 await writeFile('data/dictionary.json', `${JSON.stringify(data)}\n`);
 await writeFile('data/components.json', `${JSON.stringify(Object.fromEntries([...componentMap]), null, 2)}\n`);

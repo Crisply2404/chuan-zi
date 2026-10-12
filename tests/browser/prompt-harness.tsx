@@ -12,6 +12,12 @@ const cases: Record<string, { cells: PromptCell[]; word: string }> = {
   vowel: { cells: [{ final: 'i', tone: 1 }], word: '知识' },
   consonant: { cells: [{ initial: 'm', tone: 1 }], word: '姆妈' },
   sliding: { cells: [{ initial: 'j' }, { initial: 'b', tone: 4 }], word: '打击报复' },
+  tone2: { cells: [{ final: 'iu', tone: 2 }], word: '牛奶' },
+  tone3: { cells: [{ final: 'ü', tone: 3 }], word: '女儿' },
+  long: { cells: [{ final: 'uang', tone: 1 }], word: '窗户' },
+  hidden: { cells: [{ initial: 'sh' }, {}, { initial: 'b' }], word: '生生不息' },
+  zeroInitial: { cells: [{ initial: '' }], word: '安心' },
+  radical: { cells: [{ radical: '冫' }], word: '冰凉' },
 };
 const name = new URLSearchParams(location.search).get('case') || 'sliding';
 const selected = cases[name];
@@ -21,10 +27,19 @@ if (!rules.match(selected.word, prompt, defaultSettings).valid) throw new Error(
 
 function Harness() {
   const [word, setWord] = useState('');
+  const [phase, setPhase] = useState<'editing' | 'merging' | 'returning'>('editing');
   const result = rules.match(word, prompt, defaultSettings);
+  const offset = result.offset ?? null;
+  const reading = result.reading && offset !== null ? {
+    syllables: result.reading.syllables.slice(offset, offset + prompt.cells.length),
+    initials: result.reading.initials.slice(offset, offset + prompt.cells.length),
+    finals: result.reading.finals.slice(offset, offset + prompt.cells.length),
+    tones: result.reading.tones.slice(offset, offset + prompt.cells.length),
+  } : undefined;
   return <main style={{ width: 'min(660px, calc(100% - 40px))', margin: '80px auto' }}>
-    <PromptView prompt={prompt} draft={word} maxLength={9} draftMatch={{ word, promptId: prompt.id, offset: result.offset ?? null, reading: result.reading }} />
+    <PromptView prompt={prompt} draft={phase === 'returning' ? '' : word} maxLength={9} draftMatch={{ word, promptId: prompt.id, offset, reading }} submitting={phase === 'merging'} onCombined={() => setPhase('returning')} />
     <label>测试答案<input aria-label="测试答案" value={word} onChange={event => setWord(event.target.value)} /></label>
+    <button type="button" disabled={!result.valid} onClick={() => setPhase('merging')}>提交合法答案</button>
   </main>;
 }
 

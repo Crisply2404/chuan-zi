@@ -106,13 +106,13 @@ Unihan 主要提供汉字级数据。它不能单独提供完整中文词语、�
 
 ## 当前游戏资料
 
-当前游戏词库 `data/dictionary.json` 包含 88,177 个词语，其中 7,133 个列入成语集合；THUOCL 中有 5,042 个候选获得完整 CC-CEDICT 读音。生成规则、筛选文件及完整统计见 `data/README.md`、`data/policy.json`、`data/build-report.json`。常见程度排序采用 jieba 固定版本的 MIT 词频资料，专业领域筛选依据词条释义和明确保留文件，研究见 `docs/everyday-word-sources-2026-10-11.md`。
+当前游戏词库 `data/dictionary.json` 采用 CC-CEDICT / MDBG `2026-10-12T08:13:53Z` 固定快照，包含 89,431 个词语，其中 7,050 个列入成语集合；THUOCL 中有 5,142 个候选获得完整 CC-CEDICT 读音。生成规则、筛选文件及完整统计见 `data/README.md`、`data/policy.json`、`data/build-report.json`。常见程度排序采用 jieba 固定版本的 MIT 词频资料，专业领域筛选依据词条释义和明确保留文件，研究见 `docs/everyday-word-sources-2026-10-11.md`。
 
 资料按来源保存许可：CC-CEDICT 的词语与拼音部分按 CC BY-SA 4.0 发布；THUOCL 原始候选和 DF 保留 MIT；Unicode 部首保留 Unicode License v3。词语数据的修改包括长度与释义筛选、完整读音去重、拼音条件字段生成和成语分类。单局条件使用同一匹配窗口与同一套完整读音，候选数量按实际交集统计。
 
-字形部件使用 Make Me a Hanzi 的 `dictionary.txt`，固定版本 `bddc96d41bef78427ed0e034e9f7e31d71fd1b92`，共 9,574 个汉字记录。已完整阅读官方 README 与 COPYING。COPYING 将 dictionary 文件明确授予 LGPL-3.0-or-later，允许免费商业使用。原始 dictionary、来源版本、修改后的直接部件文件以及 LGPL/GPL 完整许可均随项目保留。游戏未使用其 graphics 文件。
+字形部件使用 Make Me a Hanzi 的 `dictionary.txt`，固定版本 `bddc96d41bef78427ed0e034e9f7e31d71fd1b92`，共 9,574 个汉字记录。dictionary 采用 LGPL-3.0-or-later，逐笔 graphics 采用 Arphic Public License，均允许免费商业使用。原始资料、版本、修改后资料与完整许可随项目保留，研究见 `radical-stroke-data-2026-10-13.md`。
 
-字形结构使用 `parse-ids` 读取 IDS，递归整理实际部件。部首分类来自 Unihan 18.0.0 的 `kRSUnicode`，常用部首书写形式由 Make Me a Hanzi 的独立 `radical` 字段补充。例如清、澈的部首集合可以接受 `水` 和 `氵`。缺少字形资料的汉字保留空的部件集合。
+字形结构使用 `parse-ids` 读取 IDS，递归整理实际部件。字典分类来自 Unihan 18.0.0 的 `kRSUnicode`。游戏部首条件按实际常见部件形态匹配，要求 `strokeParts` 中存在真实笔画映射，且汉字包含其他笔画。清、澈可以回答氵，空穴来风可以回答宀；生成、草稿与提交使用相同映射。缺少字形资料的汉字保留空的部件集合。
 
 来源文件与 SHA-256 见 `data/sources.json`。原始资料保存于 `data/sources/`，生成过程使用 JSON、JSON Lines、CSV/TSV、ZIP 与 IDS 的现有库。词条直接维护入口为 JSON；重新生成所需的持续排除设置保存在 `policy.json`。
 

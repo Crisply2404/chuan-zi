@@ -12,7 +12,7 @@ VITE_WS_URL=wss://game.example.com npm run build
 
 构建输出位于 `dist/`。把输出内容发布到 GitHub Pages 的对应目录。网页根据构建时的 `VITE_WS_URL` 自动连接 WSS 地址；本地开发网页使用同源 `/ws`，Vite 将它代理到电脑上的 `127.0.0.1:8787`。
 
-GitHub Pages 提供静态文件，持续运行的房间、共享计时和 WebSocket 连接由独立 Node.js 服务处理。HTTPS 网页连接 WSS 服务；`localhost` 开发页面可以连接本地 WS 服务。
+GitHub Pages 提供静态文件，持续运行的房间、回合计时和 WebSocket 连接由独立 Node.js 服务处理。HTTPS 网页连接 WSS 服务；`localhost` 开发页面可以连接本地 WS 服务。
 
 ## 联机服务
 
@@ -44,13 +44,15 @@ docker run --name chuan-zi -p 8787:8787 -e ALLOWED_ORIGINS=https://crisply2404.g
 
 ## 发布状态
 
-本项目提供网页构建与可运行的 Node.js 服务端。公开 WSS 服务尚未部署；发布者取得服务地址后，通过 `VITE_WS_URL` 构建网页。玩家打开网页即可自动连接。
+2026-10-13：Cloudflare 免费服务已发布。健康地址为 `https://chuan-zi-online.tcoinsm.workers.dev/health`，WebSocket 地址为 `wss://chuan-zi-online.tcoinsm.workers.dev/ws`。`npm run build:pages` 生成自动连接这个服务的 `dist/`；普通 `npm run build` 继续供本地 `/ws` 验证使用。大陆访问条件见 [本轮托管研究](multiplayer-hosting-research-2026-10-13.md)。
 
-## Render 部署建议
+公开 `/health` 与真实双人 WebSocket 已通过创建、密码加入、草稿同步、答案提交、回合传递和身份重连验证。Cloudflare 部署版本为 `112692ad-f4bf-4d04-b2c8-a358297dc326`，使用 2026-10-12 CC-CEDICT 快照，完整词库 89,431 条。本机网络验证已经完成，中国大陆多运营商网络测量尚未完成。
 
-用户目前没有公开服务器。当前推荐 Render Free 运行已有 Node.js 服务：它支持公网 WSS，网页可以通过构建时的 `VITE_WS_URL` 自动连接，玩家无需填写服务地址。部署参数、免费实例限制和微信小程序条件见 [联机服务研究](multiplayer-hosting-research-2026-10-11.md)。Render 免费实例重启后会清除内存房间，适合网页测试；公开发布前需要接受这个条件或迁移到持久化服务。
+## 托管配置
 
-Cloudflare Workers 与 Durable Objects 可以提供持久化房间，但当前 Node.js `ws` 服务需要重新实现 WebSocket、SQLite 和 alarm 调度，当前词库索引也超过 Workers 单个 isolate 的内存限制。它保留为后续平台方案。
+用户选择 Cloudflare 免费联机服务。网页通过构建时的 `VITE_WS_URL` 自动连接，玩家无需填写服务地址。部署参数、免费条件和中国大陆网络研究见 [本轮联机研究](multiplayer-hosting-research-2026-10-13.md)。
+
+Cloudflare Workers 与 SQLite Durable Objects 提供持久化房间，WebSocket Hibernation 保留连接，alarm 处理回合与电脑动作；词库索引适应 Workers 的 128 MB 内存。五项候选的研究仍保存在 [免费托管研究](multiplayer-hosting-options-2026-10-12.md)。
 
 `render.yaml` 提供免费 Web Service 的 Blueprint 配置。用户登录 Render 后连接保存服务源码的仓库并创建 Blueprint，平台读取该文件部署；等待 `/health` 返回 `ok: true` 后，使用公开服务地址生成网页，例如 `VITE_WS_URL=wss://chuan-zi-server.onrender.com npm run build`。实际子域名以 Render 为准。
 
