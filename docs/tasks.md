@@ -44,7 +44,7 @@
 | 52：寻路收录核查 | resolved | diagnosing-bugs | CC-CEDICT 无此词，jieba 有词频记录；已核查匹配失败原因 |
 | 53：main 开发与网页自动发布 | resolved | research、tdd、code-review | main 自动触发成功，个人网站仅发布产物；公开网页创建、加入、奖励与资料包检查通过 |
 | 54：聊天记录格式 | resolved | writing-for-agents | 81 条用户消息保持顺序，assistant 记录仅保留最终回复，skill 仅保留名称 |
-| 55：页面空间与宽窗口侧栏 | in-progress | diagnosing-bugs、tdd、code-review | 1920px 房间宽度实测 1184px，宽窗口改为常驻右侧活动栏，验证手机与各页面 |
+| 55：页面空间与宽窗口侧栏 | resolved | diagnosing-bugs、tdd、code-review | 43 项浏览器检查和大屏专项通过，main 自动发布成功，公开页面宽度与常驻侧栏通过 |
 | 56：jieba 补充词库评估 | resolved | research | 建议采用审核后的候选，许可与完整差集统计已核查，词库内容保持当前状态 |
 | 57：个人网站源码检查 | resolved | research | 公开 main 文件列表没有项目源目录；workflow 仅发布 dist，5,778 个产物与 ZIP 检查通过 |
 
