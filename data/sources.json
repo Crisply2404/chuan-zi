@@ -1,6 +1,7 @@
 {
-  "generatedAt": "2026-10-13",
+  "generatedAt": "2026-10-14",
   "sources": [
+    {"name": "万象词库 / amzxyz RIME-LMDG", "version": "5da3670129a82aeb0b20c3081d48c4f05ebd794b", "license": "CC-BY-4.0", "url": "https://github.com/amzxyz/RIME-LMDG/tree/5da3670129a82aeb0b20c3081d48c4f05ebd794b", "file": "data/sources/wanxiang-jichu-2026-10-14.dict.yaml", "sha256": "491a80628719f6eeabf7d1eb040a86c872175736a6a6c63f702f6f87e32230a8"},
     { "name": "CC-CEDICT contributors / MDBG", "version": "2026-10-12T08:13:53Z", "license": "CC-BY-SA-4.0", "url": "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.txt.gz", "file": "data/sources/cc-cedict-2026-10-12.json", "sha256": "fcf2d8875620d949854d18b091ac8dd8b7c38c18c0ce32c03cdf5ece00fee478", "originalFile": "data/sources/cc-cedict-2026-10-12.txt.gz", "originalSha256": "a04c03deb9aab384df952d99194099a17d628ff57d11c8b132fe0519e691a247", "parser": "matt-tingen/cedict-json@b9d9f9da3bc5e307e43de91b2189c047b2cbce8b CedictParser" },
     { "name": "jieba / Sun Junyi", "version": "67fa2e36e72f69d9134b8a1037b83fbb070b9775", "license": "MIT", "url": "https://github.com/fxsjy/jieba", "file": "data/sources/jieba-dict.txt", "sha256": "7197c3211ddd98962b036cdf40324d1ea2bfaa12bd028e68faa70111a88e12a8" },
     { "name": "THUOCL / THUNLP", "version": "f694ce779b2a066bfdff2c71a0bd7cfff81fe1ef", "license": "MIT", "url": "https://github.com/thunlp/THUOCL", "file": "THUOCL_chengyu.txt", "sha256": "c339d5d6e37d4f8ecdcb82f2a02b7fdfc66796f0a5215155f2aff8a77e89a7eb" },

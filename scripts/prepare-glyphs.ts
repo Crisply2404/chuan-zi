@@ -26,6 +26,7 @@ for await (const rawGlyph of parser) {
 await writeFile('public/glyphs/index.json', JSON.stringify({ files: filenames, license: '../licenses/MakeMeAHanzi-APL.txt', mappingLicense: '../licenses/MakeMeAHanzi-LGPL.txt' }));
 const archive = new AdmZip();
 for (const file of ['data/sources/makemeahanzi-graphics.jsonl', 'data/sources/makemeahanzi-dictionary.jsonl', 'licenses/MakeMeAHanzi-APL.txt', 'licenses/MakeMeAHanzi-COPYING.txt', 'licenses/MakeMeAHanzi-LGPL.txt', 'licenses/GPL-3.0.txt']) archive.addLocalFile(file, file.slice(0, file.lastIndexOf('/')));
+archive.addFile('licenses/ARPHICPL.TXT', await readFile('licenses/MakeMeAHanzi-APL.txt'));
 for (const filename of filenames) archive.addLocalFile(`public/glyphs/${filename}`, 'glyphs');
 archive.addFile('README.txt', Buffer.from('汉字笔画与部件资料。2026-10-13。路径采用 Arphic Public License，部件映射采用 LGPL-3.0-or-later。修改：按汉字提取路径，加入 IDS 与逐笔部件索引；完整原始数据、可编辑的修改 JSON 与许可均在此文件中。glyphs 中每份 JSON 保存完整笔画路径和部件对应的笔画索引，可以直接修改并按原许可发布。'));
 await writeFile('public/glyphs-source.zip', archive.toBuffer());

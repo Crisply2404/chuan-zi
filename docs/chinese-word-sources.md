@@ -106,16 +106,18 @@ Unihan 主要提供汉字级数据。它不能单独提供完整中文词语、�
 
 ## 当前游戏资料
 
-当前游戏词库 `data/dictionary.json` 采用 CC-CEDICT / MDBG `2026-10-12T08:13:53Z` 固定快照，包含 89,431 个词语，其中 7,050 个列入成语集合；THUOCL 中有 5,142 个候选获得完整 CC-CEDICT 读音。生成规则、筛选文件及完整统计见 `data/README.md`、`data/policy.json`、`data/build-report.json`。常见程度排序采用 jieba 固定版本的 MIT 词频资料，专业领域筛选依据词条释义和明确保留文件，研究见 `docs/everyday-word-sources-2026-10-11.md`。
+当前游戏词库 `data/dictionary.json` 采用 CC-CEDICT / MDBG `2026-10-12T08:13:53Z` 固定快照与审核后的万象补充，包含 89,098 个词语，其中 7,047 个列入成语集合；THUOCL 中有 5,142 个候选获得完整 CC-CEDICT 读音。全部有效答案受统一字形覆盖检查。生成规则、筛选文件及完整统计见 `data/README.md`、`data/policy.json`、`data/build-report.json`。常见程度排序采用 jieba 固定版本的 MIT 词频资料，专业领域筛选依据词条释义和明确保留文件，研究见 `docs/everyday-word-sources-2026-10-11.md`。
 
 资料按来源保存许可：CC-CEDICT 的词语与拼音部分按 CC BY-SA 4.0 发布；THUOCL 原始候选和 DF 保留 MIT；Unicode 部首保留 Unicode License v3。词语数据的修改包括长度与释义筛选、完整读音去重、拼音条件字段生成和成语分类。单局条件使用同一匹配窗口与同一套完整读音，候选数量按实际交集统计。
 
 字形部件使用 Make Me a Hanzi 的 `dictionary.txt`，固定版本 `bddc96d41bef78427ed0e034e9f7e31d71fd1b92`，共 9,574 个汉字记录。dictionary 采用 LGPL-3.0-or-later，逐笔 graphics 采用 Arphic Public License，均允许免费商业使用。原始资料、版本、修改后资料与完整许可随项目保留，研究见 `radical-stroke-data-2026-10-13.md`。
 
-字形结构使用 `parse-ids` 读取 IDS，递归整理实际部件。字典分类来自 Unihan 18.0.0 的 `kRSUnicode`。游戏部首条件按实际常见部件形态匹配，要求 `strokeParts` 中存在真实笔画映射，且汉字包含其他笔画。清、澈可以回答氵，空穴来风可以回答宀；生成、草稿与提交使用相同映射。缺少字形资料的汉字保留空的部件集合。
+字形结构使用 `parse-ids` 读取 IDS，递归整理实际部件。字典分类来自 Unihan 18.0.0 的 `kRSUnicode`。游戏部首条件按实际常见部件形态匹配，要求 `strokeParts` 中存在真实笔画映射，且汉字包含其他笔画。清、澈可以回答氵，空穴来风可以回答宀；生成、草稿与提交使用相同映射。有效答案排除未覆盖汉字，原始资料继续保留。全部格子的楷体由相同笔画路径生成，部首着色使用原始路径。
 
 来源文件与 SHA-256 见 `data/sources.json`。原始资料保存于 `data/sources/`，生成过程使用 JSON、JSON Lines、CSV/TSV、ZIP 与 IDS 的现有库。词条直接维护入口为 JSON；重新生成所需的持续排除设置保存在 `policy.json`。
 
 官方核查资料：Make Me a Hanzi 固定版本 README、COPYING、LGPL 与完整 dictionary JSON Lines；Unicode 18.0.0 CJKRadicals 完整文件和 Unicode License v3。部件数据采用 LGPL-3.0-or-later，修改后的相应资料继续保留来源许可；词语部分采用 CC BY-SA 4.0，来源署名为 CC-CEDICT contributors。
 
 易误写提醒保存于 `data/common-mistakes.json`，每项只记录用户明确提供的错误写法与正确写法，网页、Node 服务和 Cloudflare 共用。当前一组，研究见 `common-misspellings-research-2026-10-13.md`。
+
+万象词库采用固定基础文件与 CC BY 4.0。作为经过审核的词形与完整读音补充，入口为 `data/wanxiang-supplement.json`，当前收录“寻路 / xún lù”。研究依据见 `xunlu-supplement-lexicons-2026-10-14.md`；既有 CC-CEDICT 派生资料继续按 CC BY-SA 4.0 发布。

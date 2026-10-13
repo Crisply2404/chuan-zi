@@ -1,4 +1,4 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { formatPinyin } from '../shared/pinyin';
 import type { DraftMatch, Prompt, PromptCell, Reading } from '../shared/types';
 
@@ -19,32 +19,18 @@ function loadGlyph(character: string): Promise<Glyph> {
 }
 
 function GlyphPart({ glyph, indices, original, attached, hint }: { glyph: Glyph; indices: number[]; original: boolean; attached: boolean; hint?: string }) {
-  const maskId = useId();
-  const paths = useRef<SVGGElement>(null);
-  const text = useRef<HTMLSpanElement>(null);
+  const vector = useRef<SVGSVGElement>(null);
   const hintText = useRef<HTMLSpanElement>(null);
-  const [regions, setRegions] = useState<{x: number; y: number; width: number; height: number}[]>([]);
-  useLayoutEffect(() => {
-    const all = paths.current!.getBBox();
-    if (!all.width || !all.height) throw new Error(`字形部件范围无效：${glyph.character}`);
-    setRegions(indices.map(index => {
-      const bounds = paths.current!.children[index] as SVGGraphicsElement;
-      const box = bounds.getBBox();
-      return {x: .08 + .84 * (box.x - all.x) / all.width, y: .1 + .78 * (all.y + all.height - box.y - box.height) / all.height,
-        width: .84 * box.width / all.width, height: .78 * box.height / all.height};
-    }));
-  }, [glyph, indices.join(':')]);
   useLayoutEffect(() => {
     if (!original) return;
-    animateOpacity(text.current!, attached ? 1 : 0);
+    animateOpacity(vector.current!, attached ? 1 : 0);
     animateOpacity(hintText.current!, attached ? 0 : 1);
-  }, [attached, original, regions]);
-  return <span className={`device-glyph ${original ? 'device-glyph-original' : 'device-glyph-supplement'}`} aria-hidden="true">
-    <svg className="device-glyph-measure" width="0" height="0"><defs><clipPath id={maskId} clipPathUnits="objectBoundingBox">
-      {regions.map((region, index) => <rect key={index} {...region} />)}
-    </clipPath></defs><g ref={paths}>{glyph.strokes.map((path, index) => <path key={index} d={path} />)}</g></svg>
-    {original && <span ref={hintText} className="device-glyph-hint" style={{opacity: attached ? 0 : 1}}>{hint}</span>}
-    <span ref={text} className="device-glyph-text" style={{clipPath: original ? `url(#${maskId})` : undefined, opacity: original ? attached ? 1 : 0 : 1}}>{glyph.character}</span>
+  }, [attached, original, indices.join(':')]);
+  return <span className={`stroke-glyph ${original ? 'prompt-glyph-origin' : 'prompt-glyph-supplement'}`} aria-hidden="true">
+    {original && <span ref={hintText} className="stroke-glyph-hint" style={{opacity: attached ? 0 : 1}}>{hint}</span>}
+    <svg ref={vector} className="stroke-glyph-vector" viewBox="0 0 1024 1024" style={{opacity: original && !attached ? 0 : 1}}>
+      <g transform="scale(1,-1) translate(0,-900)">{indices.map(index => <path key={index} data-stroke-index={index} d={glyph.strokes[index]} fill="currentColor" />)}</g>
+    </svg>
   </span>;
 }
 
@@ -212,7 +198,7 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
 }
 
 const flipAnimations = new WeakMap<HTMLElement, Animation>();
-const opacityAnimations = new WeakMap<HTMLElement, Animation>();
+const opacityAnimations = new WeakMap<HTMLElement | SVGElement, Animation>();
 const easing = 'cubic-bezier(.16, 1, .3, 1)';
 
 type LayoutFrame = { transform: string; fontSize?: string; lineHeight?: string; width?: string; height?: string };
@@ -241,7 +227,7 @@ function animateFlip(element: HTMLElement, previous: LayoutFrame | undefined, in
   return current;
 }
 
-function animateOpacity(element: HTMLElement, target: number) {
+function animateOpacity(element: HTMLElement | SVGElement, target: number) {
   const active = opacityAnimations.get(element);
   const computed = Number.parseFloat(getComputedStyle(element).opacity);
   const from = active ? computed : (element.dataset.opacityTarget ? Number(element.dataset.opacityTarget) : 0);
@@ -270,12 +256,14 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
     ? {offset: draftMatch.offset, reading: draftMatch.reading} : null;
   const attached = match !== null && match.offset + prompt.cells.length <= characters.length;
   const [visualAttached, setVisualAttached] = useState(settled);
+  useLayoutEffect(() => {if (submitting && attached) setVisualAttached(true);}, [submitting, attached]);
   useEffect(() => {
     if (!attached) { setVisualAttached(false); return; }
+    if (submitting) return;
     let nextFrame = 0;
     const frame = requestAnimationFrame(() => { nextFrame = requestAnimationFrame(() => setVisualAttached(true)); });
     return () => { cancelAnimationFrame(frame); cancelAnimationFrame(nextFrame); };
-  }, [attached, prompt.id]);
+  }, [attached, prompt.id, submitting]);
   const [previousMatch, setPreviousMatch] = useState<{ offset: number; reading: Reading; characters: string[]; promptId: string } | null>(null);
   useEffect(() => {
     if (attached) {
@@ -296,24 +284,6 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
   } as CSSProperties;
   const flipRoot = useRef<HTMLDivElement>(null);
   const flipTransforms = useRef(new Map<string, LayoutFrame>());
-  useEffect(() => {
-    if (!submitting || !attached || !visualAttached) return;
-    const root = flipRoot.current!;
-    let frame = 0;
-    let stableFrames = 0;
-    const advance = () => {
-      const active = root.getAnimations({ subtree: true }).filter(animation => {
-        return animation.effect?.getComputedTiming().iterations !== Infinity && (animation.playState === 'running' || animation.pending);
-      });
-      active.forEach(animation => { animation.playbackRate = 8; });
-      const pendingGlyph = root.querySelector('.prompt-cell[data-glyph-ready="false"], .prompt-glyph-origin[data-merged="false"]');
-      stableFrames = pendingGlyph || active.length ? 0 : stableFrames + 1;
-      if (stableFrames >= 2) { onCombined?.(); return; }
-      frame = requestAnimationFrame(advance);
-    };
-    frame = requestAnimationFrame(advance);
-    return () => cancelAnimationFrame(frame);
-  }, [submitting, attached, visualAttached, onCombined]);
   useLayoutEffect(() => {
     const root = flipRoot.current;
     if (!root) return;
@@ -327,6 +297,28 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
     });
     flipTransforms.current = next;
   }, [draft, visualAttached, prompt.id, completion?.offset, answerCount]);
+  useLayoutEffect(() => {
+    if (!submitting || !attached || !visualAttached) return;
+    const root = flipRoot.current!;
+    const finish = () => {
+      const active = root.getAnimations({subtree: true}).filter(animation =>
+        animation.effect?.getComputedTiming().iterations !== Infinity && (animation.playState === 'running' || animation.pending)
+      );
+      active.forEach(animation => animation.finish());
+      return active.length;
+    };
+    finish();
+    let frame = 0;
+    let stableFrames = 0;
+    const advance = () => {
+      const active = finish();
+      stableFrames = active || root.querySelector('.prompt-cell[data-glyph-ready="false"]') ? 0 : stableFrames + 1;
+      if (stableFrames >= 2) { onCombined?.(); return; }
+      frame = requestAnimationFrame(advance);
+    };
+    frame = requestAnimationFrame(advance);
+    return () => cancelAnimationFrame(frame);
+  }, [submitting, attached, visualAttached, onCombined]);
   return <div ref={flipRoot} className={`prompt ${compact ? 'prompt-compact' : ''} ${answerCount > 0 ? 'prompt-with-answer' : ''} ${feedback ? 'prompt-feedback' : ''}`} style={style} aria-label="当前提示">
     <div className={`prompt-layer ${attached && visualAttached ? 'prompt-layer-attached' : ''}`}>
       <div className="prompt-cells">

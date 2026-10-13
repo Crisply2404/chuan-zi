@@ -1,3 +1,4 @@
+@font-face { font-family: 'Chuan Zi Kai'; src: url('/fonts/chuan-zi-kai.otf') format('opentype'); font-display: block; }
 :root {
   font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-size: 14px;
@@ -178,20 +179,20 @@ h3 { font-size: 13px; font-weight: 600; }
 .prompt-layer-attached { transform: translate(calc(-50% + var(--prompt-shift) * (var(--cell-size) + var(--cell-gap))), var(--merge-distance)); }
 .prompt-cells, .answer-cells { display: flex; justify-content: center; gap: var(--cell-gap); }
 .prompt-cell { --pinyin-font-size: min(18px, calc(var(--cell-size) * .29), calc((var(--cell-size) - 8px) / (var(--pinyin-length) * .62))); flex: 0 0 var(--cell-size); width: var(--cell-size); aspect-ratio: 1; position: relative; display: flex; align-items: center; justify-content: center; flex-direction: column; border: 1px solid #bdbdbd; background: #fff; padding: 2px; gap: 2px; transition: border-color .18s, background .18s; }
-.prompt-input-character { font-size: min(25px, calc(var(--cell-size) * .43)); line-height: 1.1; font-family: 'Noto Serif SC', 'Songti SC', serif; }
+.prompt-input-character { font-size: min(25px, calc(var(--cell-size) * .43)); line-height: 1.1; font-family: 'Chuan Zi Kai'; }
 .prompt-glyph { display: block; width: 100%; height: 100%; overflow: visible; }
 .prompt-glyph-target { position: absolute; top: 0; width: 54%; height: 54%; }
 .prompt-part-vector { width: var(--hint-width); height: var(--hint-height); }
 .prompt-layer-attached .prompt-part-vector { width: var(--complete-width); height: var(--complete-height); }
-.device-glyph { display: inline-block; width: 1em; height: 1.1em; position: relative; font: inherit; }
-.device-glyph-measure { position: absolute; overflow: hidden; }
-.device-glyph-text, .device-glyph-hint { position: absolute; inset: 0; text-align: center; font: inherit; }
+.stroke-glyph { display: inline-block; width: 1em; height: 1.1em; position: relative; font: inherit; }
+.stroke-glyph-hint { position: absolute; inset: 0; text-align: center; font: inherit; }
+.stroke-glyph-vector { position: absolute; top: .05em; left: 0; width: 1em; height: 1em; overflow: visible; }
 .prompt-part-radical, .prompt-part-component { z-index: 2; }
 .prompt-part-character { z-index: 1; }
 .prompt-glyph-origin { color: #222; }
 .prompt-glyph-supplement { color: var(--supplement-color, #ffad32); }
 .prompt-hint-layout { position: absolute; inset: 2px; display: flex; align-items: center; justify-content: center; gap: 3px; flex-wrap: wrap; font-size: min(21px, calc(var(--cell-size) * .34)); line-height: 1.2; visibility: hidden; }
-.prompt-hint-character { display: inline-flex; align-items: center; justify-content: center; gap: 3px; max-width: calc(var(--cell-size) - 8px); font-family: 'Noto Serif SC', 'Songti SC', serif; font-size: min(21px, calc((var(--cell-size) - 8px - (var(--hint-glyph-count) - 1) * 3px) / var(--hint-glyph-count))); }
+.prompt-hint-character { display: inline-flex; align-items: center; justify-content: center; gap: 3px; max-width: calc(var(--cell-size) - 8px); font-family: 'Chuan Zi Kai'; font-size: min(21px, calc((var(--cell-size) - 8px - (var(--hint-glyph-count) - 1) * 3px) / var(--hint-glyph-count))); }
 .prompt-hint-character:empty { display: none; }
 .prompt-hint-combined { inset: 0; }
 .prompt-hint-combined .prompt-hint-character { position: absolute; top: calc(var(--cell-size) * .03); height: calc(var(--cell-size) * .45); font-size: min(25px, calc(var(--cell-size) * .43), calc((var(--cell-size) - 8px - (var(--hint-glyph-count) - 1) * 3px) / var(--hint-glyph-count))); line-height: 1.1; }
@@ -212,7 +213,7 @@ h3 { font-size: 13px; font-weight: 600; }
 .prompt-tone-target .prompt-tone { width: 100%; height: 100%; display: block; }
 .prompt-complete { position: absolute; inset: 0; }
 .prompt-part { position: absolute; left: 0; top: 0; transform: translate(var(--hint-x, 0px), var(--hint-y, 0px)); white-space: nowrap; font-size: var(--hint-font-size); line-height: var(--hint-line-height); will-change: transform; }
-.prompt-part-character, .prompt-part-radical, .prompt-part-component { font-family: 'Noto Serif SC', 'Songti SC', serif; }
+.prompt-part-character, .prompt-part-radical, .prompt-part-component { font-family: 'Chuan Zi Kai'; }
 .prompt-part-initial, .prompt-part-final { display: inline-flex; align-items: center; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .prompt-part-tone { width: var(--hint-width); height: var(--hint-height); aspect-ratio: 1; }
 .prompt-part-tone .prompt-tone { width: 100%; height: 100%; display: block; }
@@ -234,7 +235,7 @@ h3 { font-size: 13px; font-weight: 600; }
 .answer-cells { position: relative; z-index: 1; }
 .answer-cell { flex: 0 0 var(--cell-size); width: var(--cell-size); aspect-ratio: 1; position: relative; display: flex; justify-content: center; align-items: center; cursor: text; }
 .answer-cell-surface { position: absolute; inset: 0; border: 1px dashed #cfcfcf; background: #fff; animation: cell-appear .7s cubic-bezier(.16,1,.3,1) both; }
-.answer-character { position: relative; font-size: min(25px, calc(var(--cell-size) * .43)); line-height: 1.1; font-family: 'Noto Serif SC', 'Songti SC', serif; color: #333; transition: opacity .7s cubic-bezier(.16,1,.3,1); }
+.answer-character { position: relative; font-size: min(25px, calc(var(--cell-size) * .43)); line-height: 1.1; font-family: 'Chuan Zi Kai'; color: #333; transition: opacity .7s cubic-bezier(.16,1,.3,1); }
 .answer-cell-attached .answer-character { opacity: 0; }
 .answer-cell-caret::after { content: ''; position: absolute; left: 4px; top: 28%; width: 1px; height: 44%; background: #555; z-index: 4; animation: caret-blink 1s step-end infinite; }
 .answer-cell-empty.answer-cell-caret::after { left: 50%; }

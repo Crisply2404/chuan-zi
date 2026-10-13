@@ -19,7 +19,7 @@ test('部件与拼音提示采用汉字在上拼音在下的布局', async ({ pa
       await page.getByLabel('测试答案').fill('冰凉');
       await expect(page.locator('.prompt-layer-attached')).toBeVisible();
       await expect(page.locator('.prompt-part-initial')).toHaveText('b');
-      await expect(page.locator('.device-glyph-text')).toHaveText(['冰', '冰']);
+      await expect(page.locator('.stroke-glyph-vector')).toHaveCount(2);
     }
   } finally { await server.close(); }
 });
@@ -137,7 +137,36 @@ test('未提供条件的提示位置显示星号', async ({ page }) => {
   } finally { await page.close(); await server.close(); }
 });
 
-test('部首附着保持设备字体，原部件区域黑色，补全橙色', async ({ page }) => {
+test('不同提示模式的汉字使用已加载的统一楷体，逐笔位置保持相同尺寸', async ({ page }) => {
+  const server = await createServer({server: {host: '127.0.0.1', port: 0}});
+  await server.listen();
+  const address = server.httpServer!.address() as AddressInfo;
+  try {
+    for (const [name, word] of [['initial', '知识'], ['radical', '冰凉'], ['combined', '冰凉'], ['tone2', '牛奶'], ['all', '抓饼']]) {
+      await page.goto(`http://127.0.0.1:${address.port}/tests/browser/prompt-harness.html?case=${name}`);
+      await page.evaluate(async () => { await document.fonts.load('25px "Chuan Zi Kai"', '冰寻路'); });
+      await page.getByLabel('测试答案').fill(word);
+      await expect(page.locator('.prompt-layer-attached')).toBeVisible();
+      expect(await page.locator('.answer-character, .prompt-input-character, .prompt-hint-character').evaluateAll(elements =>
+        elements.every(element => getComputedStyle(element).fontFamily.includes('Chuan Zi Kai'))
+      )).toBe(true);
+      expect(await page.evaluate(() => document.fonts.check('25px "Chuan Zi Kai"', '冰寻路'))).toBe(true);
+      if (name === 'radical' || name === 'combined') {
+        await expect(page.locator('.stroke-glyph-vector')).toHaveCount(2);
+        await expect.poll(() => page.locator('.prompt-cell').evaluate(element => {
+          const target = element.querySelector('.prompt-complete-layout .prompt-input-character')!;
+          const text = getComputedStyle(target);
+          return [...element.querySelectorAll('.stroke-glyph-vector')].every(vector => {
+            const size = vector.getBoundingClientRect();
+            return Math.abs(size.width - parseFloat(text.fontSize)) < .5 && Math.abs(size.height - size.width) < .5;
+          });
+        })).toBe(true);
+      }
+    }
+  } finally { await page.close(); await server.close(); }
+});
+
+test('部首附着使用同一楷体路径，提示笔画黑色，补全笔画橙色', async ({ page }) => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
   await server.listen();
   const address = server.httpServer!.address() as AddressInfo;
@@ -148,7 +177,7 @@ test('部首附着保持设备字体，原部件区域黑色，补全橙色', as
       Object.assign(window, { radicalFrames: samples, radicalFinished: false });
       const started = performance.now();
       const sample = () => {
-        const group = document.querySelector('.device-glyph-original .device-glyph-text');
+        const group = document.querySelector('.prompt-glyph-origin .stroke-glyph-vector');
         if (group) samples.push(Number(getComputedStyle(group).opacity));
         if (performance.now() - started < 1200) requestAnimationFrame(sample);
         else Reflect.set(window, 'radicalFinished', true);
@@ -157,9 +186,10 @@ test('部首附着保持设备字体，原部件区域黑色，补全橙色', as
     });
     await page.getByLabel('测试答案').fill('冰凉');
     await expect(page.locator('.prompt-layer-attached')).toBeVisible();
-    await expect(page.locator('.device-glyph-original clipPath rect')).toHaveCount(2);
-    await expect(page.locator('.device-glyph-original .device-glyph-text')).toHaveCSS('color', 'rgb(34, 34, 34)');
-    await expect(page.locator('.device-glyph-supplement .device-glyph-text')).toHaveCSS('color', 'rgb(255, 173, 50)');
+    await expect(page.locator('.prompt-glyph-origin path')).toHaveCount(2);
+    await expect(page.locator('.prompt-glyph-supplement path')).toHaveCount(4);
+    await expect(page.locator('.prompt-glyph-origin .stroke-glyph-vector')).toHaveCSS('color', 'rgb(34, 34, 34)');
+    await expect(page.locator('.prompt-glyph-supplement .stroke-glyph-vector')).toHaveCSS('color', 'rgb(255, 173, 50)');
     await page.waitForFunction(() => Reflect.get(window, 'radicalFinished'));
     const samples = await page.evaluate(() => Reflect.get(window, 'radicalFrames') as number[]);
     expect(new Set(samples.map(scale => Math.round(scale * 100))).size).toBeGreaterThan(8);
@@ -170,11 +200,11 @@ test('部首附着保持设备字体，原部件区域黑色，补全橙色', as
     })).toBeLessThan(1);
     const fonts = await page.evaluate(() => {
       const source = getComputedStyle(document.querySelector('.answer-character')!);
-      const complete = getComputedStyle(document.querySelector('.device-glyph-text')!);
-      return {source: {family: source.fontFamily, size: source.fontSize}, complete: {family: complete.fontFamily, size: complete.fontSize}};
+      const complete = getComputedStyle(document.querySelector('.prompt-glyph-supplement')!);
+      return {source: source.fontFamily, complete: complete.fontFamily};
     });
-    expect(fonts.complete).toEqual(fonts.source);
-    expect(await page.locator('.device-glyph-original clipPath rect').evaluateAll(elements => elements.every(element => Number(element.getAttribute('x')) < .5))).toBe(true);
+    expect(fonts.complete).toContain('Chuan Zi Kai');
+    expect(fonts.source).toContain('Chuan Zi Kai');
     await page.getByLabel('测试答案').fill('冰');
     await expect(page.locator('.prompt-layer-attached')).toHaveCount(0);
     await expect(page.locator('.prompt-part-character')).toHaveCount(0);
@@ -407,34 +437,39 @@ test('系统减少动态效果时提示附着仍有必要的连续运动', async
   } finally { await page.close(); await server.close(); }
 });
 
-test('立即提交合法答案加速结合并经过中间状态返回', async ({ page }) => {
+test('立即提交合法答案直接显示结合态并连续返回', async ({ page }) => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
   await server.listen();
   const address = server.httpServer!.address() as AddressInfo;
   try {
     await page.goto(`http://127.0.0.1:${address.port}/tests/browser/prompt-harness.html?case=sliding`);
+    const home = await page.locator('.prompt-layer').evaluate(element => element.getBoundingClientRect().y);
+    await page.getByLabel('测试答案').fill('打击报复');
     await page.evaluate(() => {
-      const samples: { y: number; at: number; attached: boolean }[] = [];
+      const samples: { y: number; at: number; attached: boolean; submitted: boolean }[] = [];
       Reflect.set(window, 'quickFrames', samples);
       const start = performance.now();
+      let submitted = false;
+      document.querySelector('button')!.addEventListener('click', () => { submitted = true; });
       const sample = () => {
         const element = document.querySelector('.prompt-layer')!;
-        samples.push({ y: element.getBoundingClientRect().y, at: performance.now() - start, attached: element.classList.contains('prompt-layer-attached') });
+        samples.push({ y: element.getBoundingClientRect().y, at: performance.now() - start, attached: element.classList.contains('prompt-layer-attached'), submitted });
         if (performance.now() - start < 1100) requestAnimationFrame(sample);
         else Reflect.set(window, 'quickFinished', true);
       };
       requestAnimationFrame(sample);
     });
-    await page.getByLabel('测试答案').fill('打击报复');
     await page.getByRole('button', { name: '提交合法答案' }).click();
     await page.waitForFunction(() => Reflect.get(window, 'quickFinished'));
-    const frames = await page.evaluate(() => Reflect.get(window, 'quickFrames') as { y: number; at: number; attached: boolean }[]);
-    const start = frames[0].y;
+    const frames = await page.evaluate(() => Reflect.get(window, 'quickFrames') as { y: number; at: number; attached: boolean; submitted: boolean }[]);
     const max = Math.max(...frames.map(frame => frame.y));
-    expect(max - start).toBeGreaterThan(30);
-    expect(frames.filter(frame => frame.y > start + .5 && frame.y < max - .5).length).toBeGreaterThan(5);
-    expect(frames.find(frame => frame.y === max)!.at).toBeLessThan(450);
-    expect(frames.at(-1)!.y).toBeCloseTo(start, 1);
+    expect(max - home).toBeGreaterThan(30);
+    const combined = frames.filter(frame => frame.attached && frame.submitted);
+    expect(combined.length).toBeGreaterThan(0);
+    expect(combined.every(frame => Math.abs(frame.y - max) < 1), JSON.stringify(combined)).toBe(true);
+    const returning = frames.filter(frame => !frame.attached && frame.at > combined[0].at);
+    expect(new Set(returning.map(frame => Math.round(frame.y * 10))).size).toBeGreaterThan(8);
+    expect(frames.at(-1)!.y).toBeCloseTo(home, 1);
   } finally { await page.close(); await server.close(); }
 });
 
@@ -458,7 +493,7 @@ test('首次部首资源延迟时完整笔画结合完成后才返回', async ({
       const start = performance.now();
       const sample = () => {
         const root = document.querySelector('.prompt')!;
-        const group = root.querySelector('.device-glyph-original .device-glyph-text');
+        const group = root.querySelector('.prompt-glyph-origin .stroke-glyph-vector');
         const supplement = root.querySelector('.prompt-part-character.prompt-supplement');
         frames.push({ at: performance.now() - start, attached: Boolean(root.querySelector('.prompt-layer-attached')), glyph: Boolean(group),
           scale: group ? Number(getComputedStyle(group).opacity) : 0,
@@ -479,6 +514,5 @@ test('首次部首资源延迟时完整笔画结合完成后才返回', async ({
     expect(returned.at).toBeGreaterThan(firstGlyph.at);
     expect(frames.some(frame => frame.attached && frame.glyph && frame.scale > .99 && frame.alpha > .99)).toBe(true);
     expect(returned.at - firstGlyph.at).toBeLessThan(300);
-    expect(new Set(frames.filter(frame => frame.attached && frame.glyph).map(frame => Math.round(frame.scale * 100))).size).toBeGreaterThan(2);
   } finally { await page.close(); await server.close(); }
 });

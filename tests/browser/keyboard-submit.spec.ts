@@ -40,7 +40,7 @@ test('手机可见高度缩小时答案和奖励目标都保持可见', async ({
   } finally {await context.close();}
 });
 
-test('IME 确认汉字后的独立提交立即发送，动画继续补全', async ({page}) => {
+test('IME 确认汉字后的独立提交立即发送', async ({page}) => {
   const state = roomState(page);
   await start(page);
   const answer = rules.cpuAnswer(state.room!.prompt!, state.room!.settings)!;

@@ -441,6 +441,7 @@ test('已经结合的真实答案提交后立即使用新提示并连续返回',
     await expect(host.locator('.room-heading h1')).toBeVisible();
     await guest.goto(host.url());
     await expect(guest.locator('.room-heading h1')).toBeVisible();
+    await Promise.all([host, guest].map(page => page.evaluate(async () => { await document.fonts.load('25px "Chuan Zi Kai"', '知识'); })));
     await host.getByRole('button', { name: '准备', exact: true }).click();
     await guest.getByRole('button', { name: '准备', exact: true }).click();
     await host.getByRole('button', { name: '开始比赛', exact: true }).click();
@@ -595,8 +596,8 @@ test('组合提示附着后保留部首与字形部件', async ({ browser }) => 
     const active = room.players.find(player => player.id === room.currentPlayerId)!.nickname === '组合房主' ? host : guest;
     await active.getByLabel('输入答案', { exact: true }).fill(answer);
     await expect(active.locator('.prompt-layer-attached')).toBeVisible();
-    await expect(active.locator('.prompt-part-radical .device-glyph-text')).toBeVisible();
-    await expect.poll(() => active.locator('.device-glyph-original clipPath rect').count()).toBeGreaterThan(0);
+    await expect(active.locator('.prompt-part-radical .stroke-glyph-vector')).toBeVisible();
+    await expect.poll(() => active.locator('.prompt-glyph-origin path').count()).toBeGreaterThan(0);
     await expect(active.locator('.prompt-part-radical')).toHaveCSS('color', 'rgb(34, 34, 34)');
     expect(state.errors).toEqual([]);
   } finally {

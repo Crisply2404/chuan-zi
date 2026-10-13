@@ -3,7 +3,7 @@ import {readdir, readFile} from 'node:fs/promises';
 import {join} from 'node:path';
 import AdmZip from 'adm-zip';
 
-const allowed = /^(index\.html|licenses\.html|favicon\.svg|assets\/[^/]+\.(js|css)|audio\/[^/]+\.(wav|txt)|licenses\/[^/]+\.txt|glyphs\/[a-z0-9]+\.json|glyphs-source\.zip)$/;
+const allowed = /^(index\.html|licenses\.html|favicon\.svg|assets\/[^/]+\.(js|css)|audio\/[^/]+\.(wav|txt)|fonts\/chuan-zi-kai\.otf|licenses\/[^/]+\.(txt|TXT)|glyphs\/[a-z0-9]+\.json|glyphs-source\.zip)$/;
 const source = /(^|\/)(src|server|shared|scripts|docs|reference-assets|\.git|node_modules)\/|\.(ts|tsx|map|md)$/i;
 
 async function files(directory: string, prefix = ''): Promise<string[]> {
@@ -27,7 +27,7 @@ for (const path of paths) {
     const archive = new AdmZip(await readFile(join('dist', path)));
     for (const entry of archive.getEntries()) {
       assert.ok(!source.test(entry.entryName), `资料包包含项目源码：${entry.entryName}`);
-      assert.ok(/^(data\/sources\/[^/]+\.jsonl|glyphs\/[a-z0-9]+\.json|licenses\/[^/]+\.txt|README\.txt)$/.test(entry.entryName), `资料包存在未允许的文件：${entry.entryName}`);
+      assert.ok(/^(data\/sources\/[^/]+\.jsonl|glyphs\/[a-z0-9]+\.json|licenses\/[^/]+\.(txt|TXT)|README\.txt)$/.test(entry.entryName), `资料包存在未允许的文件：${entry.entryName}`);
     }
   }
 }

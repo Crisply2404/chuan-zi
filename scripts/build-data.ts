@@ -7,6 +7,8 @@ import { unzipSync, strFromU8 } from 'fflate';
 import jsonlines from 'jsonlines';
 import { parse as parseIds, flatten, children, type IDS } from 'parse-ids';
 import { splitPinyin } from '../shared/pinyin';
+import {parse as parseTable} from 'csv-parse';
+import {z} from 'zod';
 import type { CharacterData, DictionaryData, Reading, WordEntry } from '../shared/types';
 
 const componentVersion = 'bddc96d41bef78427ed0e034e9f7e31d71fd1b92';
@@ -17,6 +19,7 @@ const provenance = [
   { name: 'jieba / Sun Junyi', license: 'MIT', url: 'https://github.com/fxsjy/jieba/tree/67fa2e36e72f69d9134b8a1037b83fbb070b9775' },
   { name: 'Unicode Unihan 18.0.0', license: 'Unicode-3.0', url: 'https://www.unicode.org/Public/18.0.0/ucd/Unihan.zip' },
   { name: `Make Me a Hanzi / ${componentVersion}`, license: 'LGPL-3.0-or-later', url: `https://github.com/skishore/makemeahanzi/tree/${componentVersion}` },
+  {name: '万象词库 / amzxyz RIME-LMDG', license: 'CC-BY-4.0', url: 'https://github.com/amzxyz/RIME-LMDG/tree/5da3670129a82aeb0b20c3081d48c4f05ebd794b'},
 ];
 
 const thuoclRaw = await readFile('THUOCL_chengyu.txt');
@@ -64,6 +67,30 @@ for (const item of cedict) {
   }
   if (!entry.readings.some(value => value.syllables.join(' ') === reading.syllables.join(' '))) entry.readings.push(reading);
 }
+
+const supplement = z.object({version: z.literal(1), sourceVersion: z.literal('5da3670129a82aeb0b20c3081d48c4f05ebd794b'), entries: z.array(z.object({
+  word: z.string().regex(/^\p{Script=Han}{2,9}$/u), pinyin: z.string().min(1), idiom: z.boolean(), review: z.string().min(1),
+}).strict())}).strict().parse(JSON.parse(await readFile('data/wanxiang-supplement.json', 'utf8')));
+const supplementKeys = new Set(supplement.entries.map(entry => `${entry.word}:${entry.pinyin}`));
+if (supplementKeys.size !== supplement.entries.length) throw new Error('万象补充词条重复');
+const wanxiangRaw = await readFile('data/sources/wanxiang-jichu-2026-10-14.dict.yaml');
+if (createHash('sha256').update(wanxiangRaw).digest('hex') !== '491a80628719f6eeabf7d1eb040a86c872175736a6a6c63f702f6f87e32230a8') throw new Error('万象词库数据来源校验失败');
+const table = createReadStream('data/sources/wanxiang-jichu-2026-10-14.dict.yaml', {encoding: 'utf8'}).pipe(parseTable({from_line: 8, delimiter: '\t', quote: false, skip_empty_lines: true}));
+for await (const row of table) {
+  if (!supplementKeys.has(`${row[0]}:${row[1]}`)) continue;
+  const approved = supplement.entries.find(entry => entry.word === row[0] && entry.pinyin === row[1])!;
+  if (excluded.has(approved.word)) throw new Error(`万象补充词条在排除集合中：${approved.word}`);
+  const parts = approved.pinyin.split(/\s+/).map(splitPinyin);
+  if (parts.length !== [...approved.word].length || parts.some(part => !/^[a-zü]+$/u.test(part.syllable))) throw new Error(`万象补充读音无效：${approved.word}`);
+  const reading: Reading = {syllables: parts.map(part => `${part.syllable}${part.tone}`), initials: parts.map(part => part.initial), finals: parts.map(part => part.final), tones: parts.map(part => part.tone)};
+  const entry = entries.get(approved.word) ?? {word: approved.word, readings: [], idiom: approved.idiom, df: frequency.get(approved.word) ?? 0, frequency: everydayFrequency.get(approved.word) ?? 0, source: []};
+  if (!entry.readings.some(value => value.syllables.join(' ') === reading.syllables.join(' '))) entry.readings.push(reading);
+  if (!entry.source.includes('Wanxiang')) entry.source.push('Wanxiang');
+  if (everydayFrequency.has(approved.word) && !entry.source.includes('jieba')) entry.source.push('jieba');
+  entries.set(approved.word, entry);
+  supplementKeys.delete(`${approved.word}:${approved.pinyin}`);
+}
+if (supplementKeys.size) throw new Error(`万象原始词库缺少已审核词条：${[...supplementKeys].join('、')}`);
 
 const usedCharacters = new Set([...entries.keys()].flatMap(word => [...word]));
 const characters: Record<string, CharacterData> = {};
@@ -139,12 +166,13 @@ for (const [character, info] of Object.entries(characters)) {
   info.strokeCount = glyphRecords.get(character)?.matches.length;
 }
 
-const words = [...entries.values()].sort((first, second) => first.word.localeCompare(second.word, 'zh-Hans'));
-const data: DictionaryData = { words, characters, metadata: { version: '2026-10-13', wordCount: words.length, idiomCount: words.filter(entry => entry.idiom).length, sources: provenance } };
+const words = [...entries.values()].filter(entry => [...entry.word].every(character => glyphRecords.has(character))).sort((first, second) => first.word.localeCompare(second.word, 'zh-Hans'));
+const usableCharacters = new Set(words.flatMap(entry => [...entry.word]));
+const data: DictionaryData = { words, characters, metadata: { version: '2026-10-14', wordCount: words.length, idiomCount: words.filter(entry => entry.idiom).length, sources: provenance } };
 await mkdir('data/sources', { recursive: true });
 await writeFile('data/dictionary.json', `${JSON.stringify(data)}\n`);
 await writeFile('data/components.json', `${JSON.stringify(Object.fromEntries([...componentMap]), null, 2)}\n`);
 await copyFile('node_modules/cedict-json/LICENSE', 'licenses/CC-CEDICT.txt');
 const coveredIdioms = words.filter(entry => frequency.has(entry.word)).length;
-await writeFile('data/build-report.json', `${JSON.stringify({ ...data.metadata, thuoclCount: frequency.size, thuoclWithCompleteReadings: coveredIdioms, characterCount: Object.keys(characters).length, componentCharacterCount: componentMap.size, modifications: ['词语与长度筛选', '排除专名及指定释义', '完整读音去重', 'Unihan 部首映射', 'IDS 字形部件递归整理'] }, null, 2)}\n`);
+await writeFile('data/build-report.json', `${JSON.stringify({ ...data.metadata, thuoclCount: frequency.size, thuoclWithCompleteReadings: coveredIdioms, characterCount: Object.keys(characters).length, usableCharacterCount: usableCharacters.size, glyphExcludedWordCount: entries.size - words.length, uncoveredCharacterCount: Object.keys(characters).filter(character => !glyphRecords.has(character)).length, componentCharacterCount: componentMap.size, modifications: ['词语与长度筛选', '排除专名及指定释义', '完整读音去重', '万象审核补充', '排除字形未覆盖答案', 'Unihan 部首映射', 'IDS 字形部件递归整理'] }, null, 2)}\n`);
 console.log(JSON.stringify({ wordCount: words.length, idiomCount: data.metadata.idiomCount, thuoclWithCompleteReadings: coveredIdioms, characterCount: Object.keys(characters).length }));
