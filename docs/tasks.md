@@ -40,7 +40,7 @@
 | 48：个人随机奖励声母 | resolved | grilling、tdd、code-review | 五个目标、集齐重新抽取、最少重复、开关和单候选通过 |
 | 49：提示窗口与最短长度 | resolved | grilling、tdd、code-review | 片段自由匹配、不同长度提示、成语默认四格通过 |
 | 50：逐笔画字体选择 | resolved | research | 两套逐笔字形及许可已核查，交互样本通过十八个汉字与四种宽度检查，等待用户选择 |
-| 51：奖励条件选择 | in-progress | grilling、tdd、code-review | 韵母、部首、声母优先级、候选与生命奖励通过真实联机及浏览器检查，审查进行中 |
+| 51：奖励条件选择 | resolved | grilling、tdd、code-review | 韵母、部首、声母优先级，字形部件与部首分别判断；候选与生命奖励通过真实联机及浏览器检查 |
 | 52：寻路收录核查 | resolved | diagnosing-bugs | CC-CEDICT 无此词，jieba 有词频记录；已核查匹配失败原因 |
 | 53：main 开发与网页自动发布 | in-progress | research、tdd | 切换 main，配置私有源码仓库触发个人网站构建与 Pages 发布 |
 | 54：聊天记录格式 | resolved | writing-for-agents | 81 条用户消息保持顺序，assistant 记录仅保留最终回复，skill 仅保留名称 |

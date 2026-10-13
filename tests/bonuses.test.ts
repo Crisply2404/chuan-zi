@@ -18,6 +18,8 @@ test('奖励优先选择提示中未使用的韵母、部首、声母', () => {
   const all = withPromptSlots(defaultSettings, [{...emptyPromptSlot(), final: 'required', initial: 'required', radical: true}]);
   assert.equal(resolveBonusType(all), null);
   assert.deepEqual(bonusCandidates(all), []);
+  const component = withPromptSlots(defaultSettings, [{...emptyPromptSlot(), final: 'required', component: true}]);
+  assert.equal(resolveBonusType(component), 'radical');
 });
 
 test('自定义可以选择未用于提示的奖励类型，条件变化自动重新选择', () => {

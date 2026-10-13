@@ -3,8 +3,8 @@ import type {BonusType, CharacterData, Reading, Settings} from './types';
 
 export function availableBonusTypes(settings: Settings): BonusType[] {
   return bonusPriority.filter(type => {
-    if (settings.promptSlots) return !settings.promptSlots.some(slot => type === 'radical' ? slot.radical || slot.component : slot[type] !== 'off');
-    return settings.appearance[type] === 'off' && (type !== 'radical' || settings.appearance.component === 'off');
+    if (settings.promptSlots) return !settings.promptSlots.some(slot => type === 'radical' ? slot.radical : slot[type] !== 'off');
+    return settings.appearance[type] === 'off';
   });
 }
 
