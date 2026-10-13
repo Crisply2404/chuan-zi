@@ -300,7 +300,6 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
     const previousSlots = returning ? Math.max(returning.prompt.cells.length, previousCount) : 0;
     const previousSize = returning ? Math.min(62, (root.clientWidth - (previousSlots - 1) * gap) / previousSlots) : 0;
     const distance = (previousSize + rowGap) / 2;
-    const previousWidth = previousSlots ? previousSlots * previousSize + (previousSlots - 1) * gap : 0;
     const next = new Map<string, LayoutFrame>();
     nodes.forEach(node => {
       const key = node.classList.contains('prompt-layer') ? 'prompt-layer' : 'answer-editor';
@@ -309,7 +308,7 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
         if (returning.match.offset === null) throw new Error('已接受答案缺少匹配位置');
         const shift = returning.match.offset + returning.prompt.cells.length / 2 - previousCount / 2;
         origin = {transform: key === 'prompt-layer'
-          ? `matrix(1, 0, 0, 1, ${-previousWidth / 2 + shift * (previousSize + gap)}, ${distance})`
+          ? `matrix(1, 0, 0, 1, ${-node.getBoundingClientRect().width / 2 + shift * (previousSize + gap)}, ${distance})`
           : `matrix(1, 0, 0, 1, 0, ${-distance})`};
       }
       next.set(key, animateFlip(node, flipTransforms.current.get(key), false, origin));

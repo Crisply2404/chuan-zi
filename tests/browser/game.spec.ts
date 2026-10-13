@@ -478,15 +478,24 @@ test('已经结合的真实答案提交后立即使用新提示并连续返回',
   } finally { await desktop.close(); await mobile.close(); }
 });
 
-test('立即提交后下一位玩家从结合位置返回并立即编辑最新题目', async ({browser}) => {
-  const first = await browser.newContext({baseURL: 'http://localhost:4173/chuan-zi/'});
-  const second = await browser.newContext({baseURL: 'http://localhost:4173/chuan-zi/'});
+for (const width of [1440, 320]) test(`${width}px 立即提交后下一位玩家从结合位置返回并立即编辑最新题目`, async ({browser}) => {
+  const first = await browser.newContext({baseURL: 'http://localhost:4173/chuan-zi/', viewport: {width, height: 900}});
+  const second = await browser.newContext({baseURL: 'http://localhost:4173/chuan-zi/', viewport: {width, height: 900}});
   try {
     const host = await first.newPage(); const guest = await second.newPage();
     const state = observe(host);
     await connect(host, '即时提交');
     await host.locator('.page-heading').getByRole('button', {name: '创建房间', exact: true}).click();
     await expect(host.locator('.room-heading h1')).toBeVisible();
+    if (width === 320) {
+      await host.getByRole('tab', {name: '规则设置', exact: true}).click();
+      await host.getByRole('button', {name: '自定义', exact: true}).click();
+      await host.getByLabel('答案最短字数', {exact: true}).fill('7');
+      await host.getByLabel('答案最长字数', {exact: true}).fill('7');
+      await host.getByLabel('可用答案下限', {exact: true}).fill('1');
+      await host.getByRole('button', {name: '保存规则', exact: true}).click();
+      await host.getByRole('tab', {name: '游戏', exact: true}).click();
+    }
     await guest.goto(host.url());
     await expect(guest.locator('.room-heading h1')).toBeVisible();
     await Promise.all([host, guest].map(page => page.evaluate(async () => { await document.fonts.load('25px "Chuan Zi Kai"', '知识'); })));
@@ -495,7 +504,7 @@ test('立即提交后下一位玩家从结合位置返回并立即编辑最新�
     await host.getByRole('button', {name: '开始比赛', exact: true}).click();
     await expect(host.getByLabel('当前提示')).toBeVisible();
     await guest.evaluate(() => {
-      const frames: {editable: boolean; sourceY: number | null; hints: string[]}[] = [];
+      const frames: {editable: boolean; sourceY: number | null; sourceX: number | null; width: number; hints: string[]}[] = [];
       Reflect.set(window, 'nextTurnFrames', frames);
       const start = performance.now();
       const sample = () => {
@@ -504,6 +513,7 @@ test('立即提交后下一位玩家从结合位置返回并立即编辑最新�
         const transform = animation?.effect instanceof KeyframeEffect ? animation.effect.getKeyframes()[0].transform : undefined;
         frames.push({editable: !(document.querySelector('input[aria-label="输入答案"]') as HTMLInputElement).disabled,
           sourceY: typeof transform === 'string' ? new DOMMatrix(transform).m42 : null,
+          sourceX: typeof transform === 'string' ? new DOMMatrix(transform).m41 : null, width: layer.getBoundingClientRect().width,
           hints: [...layer.querySelectorAll('.prompt-hint-layout')].map(element => element.textContent!)});
         if (performance.now() - start < 1400) requestAnimationFrame(sample);
         else Reflect.set(window, 'nextTurnComplete', true);
@@ -511,17 +521,23 @@ test('立即提交后下一位玩家从结合位置返回并立即编辑最新�
       requestAnimationFrame(sample);
     });
     const answer = rules.cpuAnswer(state.room!.prompt!, state.room!.settings)!.word;
+    const match = rules.match(answer, state.room!.prompt!, state.room!.settings);
+    const count = Math.min([...answer].length + 1, state.room!.settings.maxLength);
     await host.getByLabel('输入答案').fill(answer);
-    const distance = await host.locator('.answer-form .prompt-cell').first().evaluate(element =>
-      (element.getBoundingClientRect().width + parseFloat(getComputedStyle(element.closest('.prompt')!).getPropertyValue('--row-gap'))) / 2
-    );
+    const geometry = await host.locator('.answer-form .prompt-cell').first().evaluate(element => {
+      const style = getComputedStyle(element.closest('.prompt')!);
+      const size = element.getBoundingClientRect().width;
+      return {distance: (size + parseFloat(style.getPropertyValue('--row-gap'))) / 2, size, gap: parseFloat(style.getPropertyValue('--cell-gap'))};
+    });
+    const shift = (match.offset! + state.room!.prompt!.cells.length / 2 - count / 2) * (geometry.size + geometry.gap);
     await host.getByRole('button', {name: '提交答案', exact: true}).click();
     await expect(guest.getByLabel('输入答案')).toBeFocused({timeout: 300});
     await guest.waitForFunction(() => Reflect.get(window, 'nextTurnComplete'));
-    const frames = await guest.evaluate(() => Reflect.get(window, 'nextTurnFrames') as {editable: boolean; sourceY: number | null; hints: string[]}[]);
+    const frames = await guest.evaluate(() => Reflect.get(window, 'nextTurnFrames') as {editable: boolean; sourceY: number | null; sourceX: number | null; width: number; hints: string[]}[]);
     const returning = frames.filter(frame => frame.editable && frame.sourceY !== null);
     expect(returning.length).toBeGreaterThan(3);
-    expect(returning[0].sourceY).toBeCloseTo(distance, 1);
+    expect(returning[0].sourceY).toBeCloseTo(geometry.distance, 1);
+    expect(returning[0].sourceX! + returning[0].width / 2).toBeCloseTo(shift, 0);
     const hints = state.room!.prompt!.cells.map(cell => [cell.radical, cell.component, cell.contains, cell.initial === '' || cell.final === '' ? '∅' : '', cell.initial, cell.final].filter(value => value !== undefined).join(''));
     expect(returning[0].hints).toEqual(hints);
     await guest.keyboard.insertText('知识');
