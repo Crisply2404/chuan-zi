@@ -8,7 +8,6 @@ const data = z.object({
   entries: z.array(z.object({
     incorrect: word,
     correct: word,
-    sources: z.array(z.object({title: z.string().min(1), url: z.string().url()})).min(1),
   })),
 }).parse(source);
 

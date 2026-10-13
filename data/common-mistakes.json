@@ -2,24 +2,6 @@
   "version": "2026-10-13",
   "license": "CC0-1.0",
   "entries": [
-    {
-      "incorrect": "不可置否",
-      "correct": "不置可否",
-      "sources": [
-        {"title": "教育部《重編國語辭典修訂本》不置可否", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=21272"}
-      ]
-    },
-    {"incorrect": "再接再励", "correct": "再接再厉", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：再接再厲", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=138352&la=0&powerMode=0"}]},
-    {"incorrect": "一愁莫展", "correct": "一筹莫展", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：一籌莫展", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=149626&la=0&powerMode=0"}]},
-    {"incorrect": "迫不急待", "correct": "迫不及待", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：迫不及待", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=22553&la=0&powerMode=0"}]},
-    {"incorrect": "穿流不息", "correct": "川流不息", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：川流不息", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=125788&la=0&powerMode=0"}]},
-    {"incorrect": "甘败下风", "correct": "甘拜下风", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：甘拜下風", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=69741&q=1&word=%E7%94%98%E6%8B%9C%E4%B8%8B%E9%A2%A8"}]},
-    {"incorrect": "天翻地复", "correct": "天翻地覆", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：天翻地覆", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=52855&q=1&word=%E5%A4%A9%E7%BF%BB%E5%9C%B0%E8%A6%86"}]},
-    {"incorrect": "言简意骇", "correct": "言简意赅", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：言簡意賅", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=155036&q=1&word=%E8%A8%80%E7%B0%A1%E6%84%8F%E8%B3%85"}]},
-    {"incorrect": "一股作气", "correct": "一鼓作气", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：一鼓作氣", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=149263&q=1&word=%E4%B8%80%E9%BC%93%E4%BD%9C%E6%B0%A3"}]},
-    {"incorrect": "金榜提名", "correct": "金榜题名", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：金榜題名", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=93973&q=1&word=%E9%87%91%E6%A6%9C%E9%A1%8C%E5%90%8D"}]},
-    {"incorrect": "沤心沥血", "correct": "呕心沥血", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：嘔心瀝血", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=147680&q=1&word=%E5%98%94%E5%BF%83%E7%80%9D%E8%A1%80"}]},
-    {"incorrect": "食不裹腹", "correct": "食不果腹", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：食不果腹", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=127752&la=0&powerMode=0"}]},
-    {"incorrect": "草管人命", "correct": "草菅人命", "sources": [{"title": "天华学院：100个常见别字", "url": "https://thyy.sthu.edu.cn/28/b3/c947a10419/page.htm"}, {"title": "教育部辞典：草菅人命", "url": "https://dict.revised.moe.edu.tw/dictView.jsp?ID=141584&q=1&word=%E8%8D%89%E8%8F%85%E4%BA%BA%E5%91%BD"}]}
+    {"incorrect": "不可置否", "correct": "不置可否"}
   ]
 }

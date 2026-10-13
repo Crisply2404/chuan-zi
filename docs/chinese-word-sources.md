@@ -118,4 +118,4 @@ Unihan 主要提供汉字级数据。它不能单独提供完整中文词语、�
 
 官方核查资料：Make Me a Hanzi 固定版本 README、COPYING、LGPL 与完整 dictionary JSON Lines；Unicode 18.0.0 CJKRadicals 完整文件和 Unicode License v3。部件数据采用 LGPL-3.0-or-later，修改后的相应资料继续保留来源许可；词语部分采用 CC BY-SA 4.0，来源署名为 CC-CEDICT contributors。
 
-易误写提醒保存于 `data/common-mistakes.json`，记录项目人工核查的词形对应与来源链接，网页、Node 服务和 Cloudflare 共用。当前 13 组，研究见 `common-misspellings-research-2026-10-13.md`。
+易误写提醒保存于 `data/common-mistakes.json`，每项只记录用户明确提供的错误写法与正确写法，网页、Node 服务和 Cloudflare 共用。当前一组，研究见 `common-misspellings-research-2026-10-13.md`。

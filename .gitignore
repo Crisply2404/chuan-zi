@@ -1,5 +1,6 @@
 .scratch/
 .research/
+.wrangler/
 node_modules/
 dist/
 .env

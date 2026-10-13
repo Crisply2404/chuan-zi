@@ -17,6 +17,7 @@
 
 - 讨论 BombParty 规则时，阅读 `docs/bombparty-rules.md`；每项规则保留来源和核实状态。
 - 讨论「击鼓传字」的玩法、平台或界面时，阅读 `docs/project-discussion.md`；明确区分用户已经确定的内容、待讨论的建议和待回答的问题。
+- 维护 `data/common-mistakes.json` 时，只添加用户亲自发现并明确要求收录的词语；每项仅保存 `incorrect` 与 `correct`。
 - BombParty 的公开规则研究结果保存在 `docs/bombparty-rules.md`；引用规则时保留来源和核实状态，不把未核实的服务器行为写成确定规则。
 - 中文词语、拼音和部首数据的来源研究保存在 `docs/chinese-word-sources.md`；使用外部数据前阅读来源和许可证记录。
 - 使用或讨论 `THUOCL_chengyu.txt` 时，完整阅读 `docs/thuocl-audit.md`；随 THUOCL 数据保留 `licenses/THUOCL.txt` 中的版权声明和许可文本。
