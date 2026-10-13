@@ -1,0 +1,44 @@
+name: Publish chuan-zi to personal site
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chuan-zi-pages
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Check shared and Cloudflare types
+        run: npm run check
+      - name: Verify rules and multiplayer
+        run: npm test
+      - name: Build and inspect public artifact
+        run: npm run build:pages
+
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.PERSONAL_SITE_TOKEN }}
+    steps:
+      - name: Publish verified commit through personal site workflow
+        run: gh workflow run deploy.yml --repo Crisply2404/Crisply2404.github.io --ref main -f chuan_zi_ref="$GITHUB_SHA"

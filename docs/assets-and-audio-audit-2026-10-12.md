@@ -48,7 +48,7 @@
 | 电脑词频参考 | [Jieba.txt](../licenses/Jieba.txt) | MIT 允许免费商业使用，保留版权与许可 |
 | Unicode 部首资料 | [Unicode.txt](../licenses/Unicode.txt) | Unicode License v3 允许免费商业使用，保留版权与许可 |
 | 字形部件资料 | [MakeMeAHanzi-COPYING.txt](../licenses/MakeMeAHanzi-COPYING.txt)、[MakeMeAHanzi-LGPL.txt](../licenses/MakeMeAHanzi-LGPL.txt) | LGPL-3.0-or-later 允许商业使用；分发相关资料时保留许可并提供对应资料与修改 |
-| 汉字逐笔路径 | [MakeMeAHanzi-APL.txt](../licenses/MakeMeAHanzi-APL.txt)、[逐笔资料研究](radical-stroke-data-2026-10-13.md) | Arphic Public License 允许免费商业使用；保留版权、完整许可与修改说明，提供原始资料、修改资料和生成源文件下载 |
+| 汉字逐笔路径 | [MakeMeAHanzi-APL.txt](../licenses/MakeMeAHanzi-APL.txt)、[逐笔资料研究](radical-stroke-data-2026-10-13.md) | Arphic Public License 允许免费商业使用；保留版权、完整许可与修改说明，提供原始资料、可编辑修改数据和完整许可下载 |
 
 `scripts/prepare-public.ts` 在构建时将 `licenses/` 全部复制到 `public/licenses/`，另复制 React、Lucide 和 pinyin-utils 的许可。页面当前使用的素材和资料均有允许免费商业使用的许可；发布时需要保留上表的署名和资料许可条件。
 

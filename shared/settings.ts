@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { conditionTypes, modeIds } from './types';
 import {slotHasCondition} from './prompt-slots';
+import {bonusCandidates, resolveBonusType} from './bonuses';
+import {bonusFinalCandidates, bonusRadicalCandidates} from './bonus-candidates';
 
 const appearance = z.enum(['off', 'random', 'required']);
 const conditionType = z.enum(conditionTypes);
@@ -29,6 +31,9 @@ export const settingsSchema = z.object({
   maxPlayers: z.number().int().min(2).max(16),
   bonusInitials: z.array(z.string().regex(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])$/)).max(23),
   bonusEnabled: z.boolean().optional(),
+  bonusType: z.enum(['auto', 'initial', 'final', 'radical']).optional(),
+  bonusFinals: z.array(z.string().refine(value => bonusFinalCandidates.includes(value))).max(bonusFinalCandidates.length).optional(),
+  bonusRadicals: z.array(z.string().refine(value => bonusRadicalCandidates.includes(value))).max(bonusRadicalCandidates.length).optional(),
 }).strict().superRefine((value, context) => {
   const invalid = (message: string) => context.addIssue({code: z.ZodIssueCode.custom, message});
   if (value.minLength > value.maxLength) invalid('最短答案长度超过最长答案长度');
@@ -47,7 +52,8 @@ export const settingsSchema = z.object({
     pairs.add(key);
   }
   if (new Set(value.bonusInitials).size !== value.bonusInitials.length) invalid('奖励声母不能重复');
-  if (value.bonusEnabled !== false && value.bonusInitials.length === 0) invalid('启用奖励声母时至少选择一个候选');
+  for (const values of [value.bonusFinals, value.bonusRadicals]) if (values && new Set(values).size !== values.length) invalid('奖励候选不能重复');
+  if (resolveBonusType(value) && bonusCandidates(value).length === 0) invalid('启用奖励时至少选择一个候选');
   if (value.promptSlots) {
     if (value.mode !== 'custom') invalid('逐格条件用于自定义模式');
     if (value.promptSlots.length !== value.promptLength) invalid('提示格数量与规则不一致');

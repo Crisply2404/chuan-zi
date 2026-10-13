@@ -44,9 +44,13 @@ docker run --name chuan-zi -p 8787:8787 -e ALLOWED_ORIGINS=https://crisply2404.g
 
 ## 发布状态
 
+main 的每次更新触发私有仓库的 `.github/workflows/publish-personal-site.yml`。类型、规则与真实联机测试以及发布产物检查通过后，workflow 使用 `PERSONAL_SITE_TOKEN` 调用个人网站已有的 `deploy.yml`，将本次 commit 作为 `chuan_zi_ref`。个人网站在 GitHub Actions 中读取私有项目并构建，仅将 dist 复制到网页的 chuan-zi 子目录。CHUAN_ZI_REF 设置为 main，个人网站常规发布同样读取当前主分支。
+
+`scripts/check-pages-artifact.ts` 在每次构建结束时检查全部产物与字形 ZIP，允许网页 JS/CSS、音频、字形资料与许可文本。项目源目录、TypeScript、source map、配置与文档均禁止进入产物。字形资料下载包保存完整原始 JSON Lines、可编辑的派生 JSON 和完整许可。
+
 2026-10-13：Cloudflare 免费服务已发布。健康地址为 `https://chuan-zi-online.tcoinsm.workers.dev/health`，WebSocket 地址为 `wss://chuan-zi-online.tcoinsm.workers.dev/ws`。`npm run build:pages` 生成自动连接这个服务的 `dist/`；普通 `npm run build` 继续供本地 `/ws` 验证使用。大陆访问条件见 [本轮托管研究](multiplayer-hosting-research-2026-10-13.md)。
 
-公开 `/health` 与真实双人 WebSocket 已通过创建、密码加入、草稿同步、答案提交、回合传递和身份重连验证。Cloudflare 部署版本为 `b7d1e8b5-d375-4edb-841a-1cc2158ae0da`，使用 2026-10-12 CC-CEDICT 快照，完整词库 89,431 条；逐格规则、电脑额外席位、个人随机奖励与两秒自动提交已通过公网验证。本机网络验证已经完成，中国大陆多运营商网络测量尚未完成。
+公开 `/health` 与真实双人 WebSocket 已通过创建、密码加入、草稿同步、答案提交、回合传递和身份重连验证。Cloudflare 部署版本为 `bdd043e4-e2fb-4aef-8a42-b5b8a0488bf8`，使用 2026-10-12 CC-CEDICT 快照，完整词库 89,431 条；逐格规则、电脑额外席位、个人随机奖励、默认奖励韵母与两秒自动提交已通过公网验证。本机网络验证已经完成，中国大陆多运营商网络测量尚未完成。
 
 ## 托管配置
 

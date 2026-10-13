@@ -5,7 +5,8 @@ import { settingsSchema } from '../shared/settings';
 import { getModeSettings, modeColors, modeDescriptions, modeLabels } from '../shared/presets';
 import { PromptView } from './PromptView';
 import {emptyPromptSlot, slotsFromSettings, slotHasCondition, withPromptSlots} from '../shared/prompt-slots';
-import {bonusInitialCandidates} from '../shared/bonus-initials';
+import {availableBonusTypes, bonusCandidates, resolveBonusType} from '../shared/bonuses';
+import {bonusCandidateSets, bonusLabels} from '../shared/bonus-candidates';
 
 export const conditionLabels: Record<ConditionType, string> = {
   initial: '声母', final: '韵母', tone: '声调', radical: '部首', component: '字形部件', contains: '汉字',
@@ -41,6 +42,16 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   const slots = slotsFromSettings(value);
   const selectedIndex = Math.min(selectedSlot, slots.length - 1);
   const currentSlot = slots[selectedIndex];
+  const bonusTypes = availableBonusTypes(value);
+  const bonusType = resolveBonusType({...value, bonusEnabled: true});
+  const selectedBonusCandidates = bonusCandidates({...value, bonusEnabled: true});
+  const updateBonusCandidate = (candidate: string, selected: boolean) => {
+    if (!bonusType) throw new Error('当前规则没有奖励类型');
+    const next = selected ? [...selectedBonusCandidates, candidate] : selectedBonusCandidates.filter(item => item !== candidate);
+    if (bonusType === 'initial') update('bonusInitials', next);
+    else if (bonusType === 'final') update('bonusFinals', next);
+    else update('bonusRadicals', next);
+  };
   const updateSlot = <K extends keyof PromptSlot>(type: K, next: PromptSlot[K]) => {
     const nextSlots = slots.map((slot, index) => index === selectedIndex ? {...slot, [type]: next} : slot);
     onChange(withPromptSlots(value, nextSlots));
@@ -122,10 +133,13 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
             <NumberField label="初始生命" value={value.startingLives} min={1} max={10} onChange={next => update('startingLives', next)} />
             <NumberField label="生命上限" value={value.maxLives} min={1} max={10} onChange={next => update('maxLives', next)} />
           </div>
-          <div className="bonus-setting"><label className="checkbox-field"><input type="checkbox" checked={value.bonusEnabled !== false} onChange={event => update('bonusEnabled', event.target.checked)} />奖励声母</label>{value.bonusEnabled !== false && <><span className="settings-help">每人从候选中随机获得五个目标，集齐后增加一个生命。</span><div className="initial-grid">{bonusInitialCandidates.map(initial => <label key={initial} className="initial-choice">
-            <input type="checkbox" checked={value.bonusInitials.includes(initial)} onChange={event => update('bonusInitials', event.target.checked
-              ? [...value.bonusInitials, initial] : value.bonusInitials.filter(item => item !== initial))} /><span>{initial}</span>
-          </label>)}</div></>}</div>
+          <div className="bonus-setting"><label className="checkbox-field"><input type="checkbox" checked={value.bonusEnabled !== false && bonusType !== null} disabled={bonusType === null} onChange={event => update('bonusEnabled', event.target.checked)} />奖励生命</label>
+            {bonusType === null ? <p className="settings-help">所有奖励类型已用于提示，奖励已关闭。</p> : value.bonusEnabled !== false && <>
+              <div className="segments" role="group" aria-label="奖励类型">{bonusTypes.map(type => <button type="button" key={type} aria-pressed={bonusType === type} onClick={() => update('bonusType', type)}>奖励{bonusLabels[type]}</button>)}</div>
+              <span className="settings-help">每人随机获得五个目标，集齐后增加一个生命；候选不足五个时使用全部。</span><div className="initial-grid">{bonusCandidateSets[bonusType].map(candidate => <label key={candidate} className="initial-choice">
+                <input type="checkbox" checked={selectedBonusCandidates.includes(candidate)} onChange={event => updateBonusCandidate(candidate, event.target.checked)} /><span>{candidate}</span>
+              </label>)}</div></>}
+          </div>
         </section>
         <section className="settings-section">
           <h3>计时</h3><div className="segments timer-segments" role="group" aria-label="计时方式">

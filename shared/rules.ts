@@ -1,10 +1,12 @@
 import { conditionTypes, type ConditionType, type DictionaryData, type MatchResult, type Prompt, type PromptSlot, type Reading, type Settings, type WordEntry } from './types';
 import { validateSettings } from './settings';
 import { correctionFor, correctionMessage } from './word-corrections';
+import {commonRadicalParts} from './bonuses';
+import {bonusRadicalCandidates} from './bonus-candidates';
 
 export class RuleError extends Error {}
 
-export const commonRadicals = new Set(['氵', '扌', '忄', '艹', '宀', '讠', '纟', '钅', '灬', '辶', '阝', '犭', '饣', '衤', '礻', '冫', '疒', '亻', '刂', '囗', '⺮']);
+export const commonRadicals = new Set(bonusRadicalCandidates);
 
 export class WordRules {
   private readonly entries: Map<string, WordEntry>;
@@ -92,11 +94,7 @@ export class WordRules {
   }
 
   private radicalsFor(letter: string): string[] {
-    const character = this.data.characters[letter];
-    return Object.keys(character?.strokeParts ?? {}).filter(radical => {
-      const length = character!.strokeParts![radical].length;
-      return commonRadicals.has(radical) && letter !== radical && length > 0 && length < character!.strokeCount!;
-    });
+    return commonRadicalParts(letter, this.data.characters[letter]);
   }
 
   private matchEntry(entry: WordEntry, prompt: Prompt): MatchResult | undefined {

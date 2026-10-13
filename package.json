@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "server": "tsx server/index.ts",
-    "build": "tsc --noEmit && tsx scripts/prepare-glyphs.ts && tsx scripts/prepare-public.ts && vite build",
+    "build": "tsc --noEmit && tsx scripts/prepare-glyphs.ts && tsx scripts/prepare-public.ts && vite build && tsx scripts/check-pages-artifact.ts",
     "build:pages": "VITE_WS_URL=wss://chuan-zi-online.tcoinsm.workers.dev/ws npm run build",
+    "check:pages": "tsx scripts/check-pages-artifact.ts",
     "preview": "vite preview --host 0.0.0.0",
     "data:build": "tsx scripts/build-data.ts",
     "test": "npm run cloudflare:build && tsx --test tests/*.test.ts",

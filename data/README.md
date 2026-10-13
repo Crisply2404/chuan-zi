@@ -30,7 +30,7 @@ jieba 原始默认词典与词频使用 MIT，版权为 `Copyright (c) 2013 Sun 
 
 Make Me a Hanzi 字形部件和常用部首形式使用 LGPL-3.0-or-later，保留完整原始 dictionary、固定版本、来源说明、修改说明与 LGPL/GPL 全文。文件见 `sources/makemeahanzi-dictionary.jsonl`、`../licenses/MakeMeAHanzi-*`、`../licenses/GPL-3.0.txt`。这些资料允许免费商业使用；发布派生资料时继续遵守各部分的许可。
 
-逐笔 SVG 路径来自同一固定版本 graphics，采用 Arphic Public License，允许免费商业使用。`strokeParts` 从 dictionary 的 IDS 与 matches 生成；嵌套部件只有在完整笔画数量一致时转移索引。部首判定要求具有对应索引，绘制使用真实笔画。构建生成按汉字请求的 JSON 与 `glyphs-source.zip`，包含原始资料、修改资料、生成源文件和完整许可；许可页提供下载。
+逐笔 SVG 路径来自同一固定版本 graphics，采用 Arphic Public License，允许免费商业使用。`strokeParts` 从 dictionary 的 IDS 与 matches 生成；嵌套部件只有在完整笔画数量一致时转移索引。部首判定要求具有对应索引，绘制使用真实笔画。构建生成按汉字请求的 JSON 与 `glyphs-source.zip`，包含原始资料、可编辑的修改 JSON 和完整许可；许可页提供下载。
 
 `strokeCount` 记录完整笔画数量；部首的提示笔画数量必须小于完整数量，保证汉字包含其它补全笔画。初始化检查笔画总数与索引范围，提示生成、草稿和最终提交使用相同规则。
 

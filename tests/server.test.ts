@@ -175,7 +175,7 @@ test('人类人数上限之外可增加一名电脑，并保留人类加入名�
   assert.equal((await host.request({type: 'settings', data: {settings}})).ok, true);
 });
 
-test('奖励声母给每名玩家五个独立目标', async t => {
+test('默认奖励韵母给每名玩家五个独立目标', async t => {
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
   t.after(() => server.close());
   const host = await Client.connect(server.address, '奖励玩家甲');
@@ -210,6 +210,31 @@ test('关闭奖励声母时不分配目标、不奖励生命', async t => {
   assert.deepEqual(host.room!.players[0].collected, []);
 });
 
+test('部首奖励使用答案中的完整笔画归属，单候选集齐增加生命', async t => {
+  const {WordRules} = await import('../shared/rules');
+  const dictionary = JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData;
+  const rules = new WordRules(dictionary);
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '部首奖励甲');
+  const guest = await Client.connect(server.address, '部首奖励乙');
+  t.after(() => host.close()); t.after(() => guest.close());
+  const settings = {...defaultSettings, bonusType: 'radical' as const, bonusRadicals: ['氵'], promptLength: 1, minAnswers: 100, maxAnswers: 100000,
+    appearance: {initial: 'off' as const, final: 'off' as const, tone: 'required' as const, radical: 'off' as const, component: 'off' as const, contains: 'off' as const}};
+  await host.request({type: 'create', data: {name: '', password: '', settings}});
+  await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
+  await host.request({type: 'ready', data: {ready: true}}); await guest.request({type: 'ready', data: {ready: true}});
+  await host.request({type: 'start', data: {}});
+  assert.deepEqual(host.room!.players[0].bonusTargets, ['氵']);
+  const question = host.room!.prompt!;
+  const answer = rules.examples(question, settings, new Set(), Infinity).find(entry => [...entry.word].some(letter => dictionary.characters[letter]?.strokeParts?.['氵']?.length));
+  assert.ok(answer);
+  assert.equal((await host.request({type: 'submit', data: {word: answer.word, promptId: question.id}})).ok, true);
+  assert.equal(host.room!.players[0].lives, settings.startingLives + 1);
+  assert.deepEqual(host.room!.players[0].bonusTargets, ['氵']);
+  assert.deepEqual(host.room!.players[0].collected, []);
+});
+
 test('五个奖励目标集齐增加生命并重新选择，优先减少上一组重复', async t => {
   const {WordRules} = await import('../shared/rules');
   const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
@@ -218,8 +243,8 @@ test('五个奖励目标集齐增加生命并重新选择，优先减少上一�
   const host = await Client.connect(server.address, '重新抽取甲');
   const guest = await Client.connect(server.address, '重新抽取乙');
   t.after(() => host.close()); t.after(() => guest.close());
-  const candidates = ['b', 'p', 'm', 'f', 'd', 't'];
-  const settings = {...defaultSettings, initialSeconds: 120, promptLength: 1, minAnswers: 1, bonusInitials: candidates,
+  const candidates = ['a', 'i', 'u', 'an', 'ing', 'ao'];
+  const settings = {...defaultSettings, initialSeconds: 120, promptLength: 1, minAnswers: 1, bonusFinals: candidates,
     appearance: {initial: 'required' as const, final: 'off' as const, tone: 'off' as const, radical: 'off' as const, component: 'off' as const, contains: 'off' as const}};
   await host.request({type: 'create', data: {name: '', password: '', settings}});
   await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
@@ -234,7 +259,7 @@ test('五个奖励目标集齐增加生命并重新选择，优先减少上一�
     const answers = rules.examples(room.prompt!, settings, new Set(room.history.map(item => item.word)), Infinity);
     const score = (word: string) => {
       const result = rules.match(word, room.prompt!, settings);
-      return new Set(result.reading!.initials.filter(initial => missing.includes(initial))).size;
+      return new Set(result.reading!.finals.filter(final => missing.includes(final))).size;
     };
     const answer = answers.sort((first, second) => score(second.word) - score(first.word))[0];
     assert.ok(answer);
@@ -365,7 +390,7 @@ test('服务器验证真实词语、独立回合计时、规则锁定、声母�
     ...structuredClone(defaultSettings), dictionary: 'all', minLength: 2, maxLength: 9,
     promptLength: 1, minAnswers: 1, maxAnswers: 100000, initialSeconds: 15,
     appearance: {initial: 'off', final: 'off', tone: 'required', radical: 'off', component: 'off', contains: 'off'},
-    bonusInitials: ['b'],
+    bonusType: 'initial', bonusInitials: ['b'],
   };
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
   t.after(() => server.close());
@@ -546,7 +571,7 @@ test('真实答案全部使用后中止本局，接受最终答案并允许修�
   assert.equal(idioms.length, 9);
   const settings: Settings = {
     ...structuredClone(defaultSettings), dictionary: 'idioms', minLength: 9, maxLength: 9, promptLength: 1, minAnswers: 1,
-    initialSeconds: 20, bonusInitials: ['b'],
+    initialSeconds: 20, bonusType: 'initial', bonusInitials: ['b'],
     appearance: {initial: 'off', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'required'},
   };
   const server = await createGameServer({port: 0, host: '127.0.0.1'});

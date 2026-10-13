@@ -11,6 +11,8 @@ import { DrumTransfer } from './DrumTransfer';
 import { modeColors, modeLabels } from '../shared/presets';
 import { correctionMessage } from '../shared/word-corrections';
 import { useAnswerVisibility } from './useAnswerVisibility';
+import {resolveBonusType} from '../shared/bonuses';
+import {bonusLabels} from '../shared/bonus-candidates';
 
 const phaseLabels: Record<RoomView['phase'], string> = { waiting: '准备中', playing: '正在游戏', between: '本局结束', finished: '比赛结束' };
 const connectionLabels = { idle: '未连接', connecting: '正在连接', connected: '已连接', reconnecting: '正在重连' };
@@ -505,7 +507,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
           <div className="answer-message" role="status" aria-live="polite">{duplicateWord ? '这个词之前输入过了' : wordCorrection ?? answerMessage}</div>
           {room.settings.minLength !== shownPrompt.cells.length && <div className="answer-length-hint">答案最短为 {room.settings.minLength} 个字</div>}
         </form></div>
-        {self && room.settings.bonusEnabled !== false && <div className="bonus-progress"><div><span>奖励生命</span><Heart size={13} /></div><div className="bonus-letters">{self.bonusTargets.map(initial =>
+        {self && resolveBonusType(room.settings) && <div className="bonus-progress"><div><span>奖励{bonusLabels[resolveBonusType(room.settings)!]}</span><Heart size={13} /></div><div className="bonus-letters">{self.bonusTargets.map(initial =>
           <span className={self.collected.includes(initial) ? 'bonus-collected' : ''} key={initial}>{initial}</span>)}</div></div>}
       </> : <div className="waiting-stage">
         {room.phase === 'finished' ? <h2>{winners.length ? `${winners.map(player => player.nickname).join('、')} 获胜` : '比赛平局'}</h2>

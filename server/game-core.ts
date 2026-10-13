@@ -5,6 +5,7 @@ import { conditionTypes, type LobbyRoom, type PlayerView, type Request, type Roo
 import { RuleError, WordRules } from '../shared/rules';
 import { normalizePinyin } from '../shared/pinyin';
 import { playerColors } from '../shared/player-layout';
+import {bonusCandidates, collectBonusValues, resolveBonusType} from '../shared/bonuses';
 
 const empty = z.object({}).strict();
 const nickname = z.string().trim().min(1).max(20);
@@ -350,9 +351,10 @@ export function createGameCore(options: GameCoreOptions) {
     room.used.add(word);
     room.history.push({playerId: player.id, nickname: player.nickname, word, at: Date.now()});
     player.draft = '';
-    if (result.reading && room.settings.bonusEnabled !== false && player.bonusTargets.length) {
+    const bonusType = resolveBonusType(room.settings);
+    if (result.reading && bonusType && player.bonusTargets.length) {
       const collected = new Set(player.collected);
-      for (const initial of result.reading.initials) if (player.bonusTargets.includes(initial)) collected.add(initial);
+      for (const value of collectBonusValues(word, result.reading, rules.data.characters, bonusType)) if (player.bonusTargets.includes(value)) collected.add(value);
       if (player.bonusTargets.every(initial => collected.has(initial))) {
         player.lives = Math.min(room.settings.maxLives, player.lives + 1);
         player.collected = [];
@@ -376,7 +378,7 @@ export function createGameCore(options: GameCoreOptions) {
   }
 
   function drawBonusTargets(room: Room, player: Session): string[] {
-    if (room.settings.bonusEnabled === false) return [];
+    if (!resolveBonusType(room.settings)) return [];
     const previous = new Set(player.bonusTargets);
     const shuffle = (values: string[]) => {
       for (let index = values.length - 1; index > 0; index--) {
@@ -385,7 +387,7 @@ export function createGameCore(options: GameCoreOptions) {
       }
       return values;
     };
-    const candidates = room.settings.bonusInitials;
+    const candidates = bonusCandidates(room.settings);
     const targets = [...shuffle(candidates.filter(value => !previous.has(value))), ...shuffle(candidates.filter(value => previous.has(value)))].slice(0, Math.min(5, candidates.length));
     const occupied = new Set(room.players.filter(item => item.id !== player.id).map(item => [...item.bonusTargets].sort().join(':')));
     if (candidates.length > targets.length && occupied.has([...targets].sort().join(':'))) {
@@ -904,8 +906,13 @@ export function createGameCore(options: GameCoreOptions) {
       used: new Set(room.used), failedPromptPlayers: new Set(room.failedPromptPlayers), matchPlayerIds: new Set(room.matchPlayerIds), contenderIds: new Set(room.contenderIds),
     });
     for (const event of options.state.events) events.set(event.key, event);
-    for (const room of rooms.values()) for (const player of room.players) {
-      if (room.phase === 'playing' && room.settings.bonusEnabled !== false && !player.bonusTargets.length) player.bonusTargets = drawBonusTargets(room, player);
+    for (const room of rooms.values()) {
+      const legacyBonus = room.settings.bonusType === undefined;
+      room.settings.bonusType ??= 'auto';
+      for (const player of room.players) {
+        if (legacyBonus || !resolveBonusType(room.settings)) {player.bonusTargets = []; player.collected = [];}
+        if (room.phase === 'playing' && resolveBonusType(room.settings) && !player.bonusTargets.length) player.bonusTargets = drawBonusTargets(room, player);
+      }
     }
   }
 

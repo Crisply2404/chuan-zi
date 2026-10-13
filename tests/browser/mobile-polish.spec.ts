@@ -188,10 +188,10 @@ test('奖励开关显示候选，个人目标为五个，并可在多人房间�
     await expect(page.getByRole('button', {name: '添加电脑', exact: true})).toBeVisible();
     await page.getByRole('tab', {name: '规则设置', exact: true}).click();
     await page.getByRole('button', {name: '自定义', exact: true}).click();
-    await page.getByLabel('奖励声母', {exact: true}).uncheck();
+    await page.getByLabel('奖励生命', {exact: true}).uncheck();
     await expect(page.locator('.initial-grid')).toHaveCount(0);
-    await page.getByLabel('奖励声母', {exact: true}).check();
-    await expect(page.locator('.initial-grid input')).toHaveCount(23);
+    await page.getByLabel('奖励生命', {exact: true}).check();
+    await expect(page.locator('.initial-grid input')).toHaveCount(34);
     await page.getByRole('button', {name: '保存规则', exact: true}).click();
     await page.getByRole('tab', {name: '游戏', exact: true}).click();
     await page.getByRole('button', {name: '添加电脑', exact: true}).click();
@@ -203,4 +203,29 @@ test('奖励开关显示候选，个人目标为五个，并可在多人房间�
     expect(new Set(state.room!.players[0].bonusTargets).size).toBe(5);
     expect(state.errors).toEqual([]);
   } finally { await context.close(); await other.close(); }
+});
+
+test('自定义奖励只显示未使用类型，全部使用时关闭奖励', async ({browser}) => {
+  const context = await browser.newContext();
+  try {
+    const page = await context.newPage();
+    await page.goto('./');
+    await page.locator('.page-heading').getByRole('button', {name: '创建房间', exact: true}).click();
+    await page.getByRole('tab', {name: '规则设置', exact: true}).click();
+    await page.getByRole('button', {name: '自定义', exact: true}).click();
+    await expect(page.getByRole('button', {name: '奖励韵母', exact: true})).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', {name: '奖励声母', exact: true})).toHaveCount(0);
+    await page.getByRole('group', {name: '韵母', exact: true}).getByRole('button', {name: '提示', exact: true}).click();
+    await expect(page.getByRole('button', {name: '奖励部首', exact: true})).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', {name: '奖励韵母', exact: true})).toHaveCount(0);
+    await page.getByLabel('第 1 格条件', {exact: true}).getByLabel('部首', {exact: true}).check();
+    await expect(page.getByLabel('奖励生命', {exact: true})).toBeDisabled();
+    await expect(page.getByLabel('奖励生命', {exact: true})).not.toBeChecked();
+    await expect(page.getByText('所有奖励类型已用于提示，奖励已关闭。', {exact: true})).toBeVisible();
+    await page.getByRole('group', {name: '声母', exact: true}).getByRole('button', {name: '不限', exact: true}).click();
+    await page.getByRole('button', {name: '提示格 2', exact: true}).click();
+    await page.getByRole('group', {name: '声母', exact: true}).getByRole('button', {name: '不限', exact: true}).click();
+    await expect(page.getByRole('button', {name: '奖励声母', exact: true})).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('group', {name: '奖励类型', exact: true}).getByRole('button')).toHaveCount(1);
+  } finally {await context.close();}
 });
