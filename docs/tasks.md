@@ -42,7 +42,7 @@
 | 50：逐笔画字体选择 | resolved | research | 两套逐笔字形及许可已核查，交互样本通过十八个汉字与四种宽度检查，等待用户选择 |
 | 51：奖励条件选择 | resolved | grilling、tdd、code-review | 韵母、部首、声母优先级，字形部件与部首分别判断；候选与生命奖励通过真实联机及浏览器检查 |
 | 52：寻路收录核查 | resolved | diagnosing-bugs | CC-CEDICT 无此词，jieba 有词频记录；已核查匹配失败原因 |
-| 53：main 开发与网页自动发布 | in-progress | research、tdd | 切换 main，配置私有源码仓库触发个人网站构建与 Pages 发布 |
+| 53：main 开发与网页自动发布 | resolved | research、tdd、code-review | main 自动触发成功，个人网站仅发布产物；公开网页创建、加入、奖励与资料包检查通过 |
 | 54：聊天记录格式 | resolved | writing-for-agents | 81 条用户消息保持顺序，assistant 记录仅保留最终回复，skill 仅保留名称 |
 
 ## 用户已经确定的要求
@@ -59,4 +59,4 @@
 
 ## 后续步骤
 
-Cloudflare 服务已经发布，网页产物通过 `npm run build:pages` 连接公开 WSS。main 更新触发已验证产物的个人网站构建与 Pages 发布，当前等待 GitHub Actions 完整运行。字体选择等待用户决定，中国大陆多运营商网络测量尚未完成。
+Cloudflare 服务与个人网站网页已经更新，main 自动发布完整流程和公开网页验证通过。字体选择等待用户决定，中国大陆多运营商网络测量尚未完成。

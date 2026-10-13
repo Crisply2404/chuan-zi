@@ -198,3 +198,5 @@ Render 与日常词语研究已经保存，`render.yaml` 的免费 Blueprint 配
 - 字形 ZIP 的 TypeScript 文件可以被发布检查拒绝；最终 5,778 个网页文件与资料包检查通过，资料仅含 JSON Lines、可编辑 JSON 和许可文本。
 - 字体样本十八个汉字的路径与原始资料一致，逐笔颜色切换、全部颜色操作及缩略图同步通过。320px、390px、700px、1100px 没有横向溢出或页面 JavaScript 错误。
 - Cloudflare 版本 bdd043e4-e2fb-4aef-8a42-b5b8a0488bf8 的真实公网双人流程通过默认奖励韵母、个人目标、自动提交、同题确认与重连。
+- Cloudflare 最终版本 d55e5ea0-7d5b-438e-8eb8-4a07f6a8b063 保持奖励部首与字形部件分别计算。
+- main 自动触发私有仓库的 GitHub Actions，65 项检查与 Pages 产物检查通过，随后个人网站完成构建和 Pages 发布。公开网页最新资源、创建房间、分享加入、默认奖励韵母和字形 ZIP 数据范围通过。
