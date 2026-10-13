@@ -84,7 +84,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   };
   return <div className="settings-editor">
     <div className="settings-heading"><h2>{custom ? '自定义规则' : '房间规则'}</h2>{custom && <button type="button" className="back-button" onClick={() => setEditingCustom(false)}><ArrowLeft size={15} />游戏模式</button>}{disabled && <span className="muted">本局规则已确定</span>}</div>
-    <fieldset disabled={disabled || busy}>
+    <fieldset disabled={disabled || busy}><div className="settings-sections">
       <section className="settings-section dictionary-choice">
         <h3>答案词库</h3><div className="segments" role="group" aria-label="答案词库">
           {([['all', '全部词语'], ['words', '普通词语'], ['idioms', '成语']] as const).map(([id, label]) => <button type="button" aria-pressed={value.dictionary === id} key={id} onClick={() => updateDictionary(id)}>{label}</button>)}
@@ -153,7 +153,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
           </div>
         </section>
       </>}
-    </fieldset>
+    </div></fieldset>
     {problems.length > 0 && <div className="field-errors" role="alert">{problems.map(problem => <p key={problem}>{problem}</p>)}</div>}
     {custom && <><div className="settings-actions"><button type="button" className="secondary-button" disabled={!validate.success || busy} onClick={onPreview}><Eye size={16} />预览提示</button>
         <button type="button" className="secondary-button" disabled={!validate.success || busy} onClick={exportRules}><Download size={16} />导出规则</button>

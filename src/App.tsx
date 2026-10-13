@@ -251,7 +251,7 @@ function PlayerTopology({ room, self, isHost, busy, connected, act, seconds }: {
     return () => observer.disconnect();
   }, [count]);
   const radius = count === 2 ? Math.max(35, layout.width * .36) : count >= 8
-    ? Math.min(layout.width / 2 - 18, 92)
+    ? Math.min(layout.width / 2 - 18, Math.max(92, layout.height / 2 - 65))
     : Math.max(45, Math.min(layout.width / 2 - 32, layout.height / 2 - 55));
   const [accepted, setAccepted] = useState<AcceptedAnswer | null>(null);
   const lastAccepted = useRef(room.acceptedAnswer?.id);
@@ -465,7 +465,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const inputColor = combiningAnswer?.color ?? currentPlayer?.color ?? self?.color ?? '#47738A';
   const activity = <aside className="activity-area"><div className="activity-tabs" role="tablist"><button role="tab" type="button" aria-selected={sideTab === 'history'} onClick={() => setSideTab('history')}>答案记录<span>{room.history.length}</span></button>
     <button role="tab" type="button" aria-selected={sideTab === 'chat'} onClick={() => setSideTab('chat')}><MessageCircle size={16} />聊天</button>
-    <IconButton label="关闭记录与聊天" onClick={closeActivity}><X size={18} /></IconButton></div>
+    {narrowViewport && <IconButton label="关闭记录与聊天" onClick={closeActivity}><X size={18} /></IconButton>}</div>
     {sideTab === 'history' ? <div className="history-list" ref={historyList}>{room.history.length ? room.history.map((item, index) => <div className="history-row" key={`${item.at}:${index}`}>
       <span>{item.word}</span><small>{item.nickname}</small></div>) : <p className="activity-empty">暂无答案</p>}</div>
       : <><div className="chat-list" ref={chatList}>{room.chat.length ? room.chat.map(message => <div className="chat-message" key={message.id}>
@@ -484,7 +484,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
     <section className="game-area"><div className="game-summary"><span aria-label="比赛局数">第 {room.round || 1} 局 / {room.settings.bestOf} 局</span>
       <div className="game-summary-tools">
         <IconButton label={audioEnabled ? '静音' : '打开音效'} onClick={() => { const enabled = !audioEnabled; setAudioEnabled(enabled); audio.setEnabled(enabled); if (enabled) audio.play('turn'); }}>{audioEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}</IconButton>
-        <IconButton label={`${narrowViewport ? '查看' : '打开'}答案记录与聊天`} onClick={() => setActivityOpen(true)}><MessageCircle size={19} /></IconButton>
+        {narrowViewport && <IconButton label="查看答案记录与聊天" onClick={() => setActivityOpen(true)}><MessageCircle size={19} /></IconButton>}
       </div></div>
       <PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} seconds={seconds} />
       {(room.phase === 'playing' || activeCompletion) && shownPrompt ? <>
@@ -518,6 +518,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
             onClick={() => act({ type: 'start', data: {} })}><ArrowRight size={17} />{room.phase === 'between' ? '开始下一局' : room.phase === 'finished' ? '开始新比赛' : '开始比赛'}</button>}</div>
       </div>}
     </section>
-    {activityOpen && <Modal title="答案记录与聊天" onClose={closeActivity} showHeading={false} drawer allowInteraction>{activity}</Modal>}
+    {!narrowViewport && activity}
+    {narrowViewport && activityOpen && <Modal title="答案记录与聊天" onClose={closeActivity} showHeading={false} drawer allowInteraction>{activity}</Modal>}
   </div>;
 }

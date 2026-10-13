@@ -803,13 +803,10 @@ test('窄窗口活动面板默认收起，房间设置与局数在各宽度可�
   await expect(page.getByRole('checkbox', { name: '在大厅展示', exact: true })).toBeVisible();
   await expect(page.locator('.settings-room-info')).toHaveCount(0);
   await page.getByRole('tab', { name: '游戏', exact: true }).click();
-  await expect(page.locator('.history-list')).toBeHidden();
-  await page.getByRole('button', { name: '打开答案记录与聊天', exact: true }).click();
-  await expect(page.locator('.history-list')).toBeVisible();
-  await expect.poll(async () => {
-    const drawer = await page.locator('.modal-drawer').boundingBox();
-    return drawer !== null && drawer.x + drawer.width <= 1441;
-  }).toBe(true);
+  await page.getByRole('tab', {name: '答案记录', exact: false}).click();
+  await expect(page.locator('.room-layout > .activity-area .history-list')).toBeVisible();
+  await expect(page.locator('.modal-drawer')).toHaveCount(0);
+  await expect(page.getByRole('button', {name: '打开答案记录与聊天', exact: true})).toHaveCount(0);
   const height = await page.getByRole('tab', { name: '聊天', exact: true }).evaluate(element => element.getBoundingClientRect().height);
   expect(height).toBeGreaterThanOrEqual(44);
   await assertLayout(page);

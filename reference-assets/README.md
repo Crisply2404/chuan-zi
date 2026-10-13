@@ -6,6 +6,8 @@
 
 ## BombParty
 
+- `bombparty/2026-10-13-full-page.png`：宽窗口游戏与右侧常驻聊天的布局参考，对应用户消息 82 图二。两张收到的图片尺寸为 2048×1155，保存收到的附件版本。
+
 - `bombparty/bombparty-2p-correct.gif`：用户提供的正确答案反馈参考动画。
 - `bombparty/06.png` 与 `bombparty/07.png`：用户提供的玩家排列与中央传递物参考图片，对应原始附件顺序 6、7。
 - `bombparty/2026-10-12-player-arrow.png`：用户本轮图三，箭头与中央炸弹层次参考。
