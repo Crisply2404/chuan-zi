@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { formatPinyin } from '../shared/pinyin';
-import type { DraftMatch, Prompt, PromptCell, Reading } from '../shared/types';
+import type { AcceptedAnswer, DraftMatch, Prompt, PromptCell, Reading } from '../shared/types';
 
 type Glyph = { character: string; strokes: string[]; parts: Record<string, number[]> };
 const glyphCache = new Map<string, Promise<Glyph>>();
@@ -211,9 +211,9 @@ function layoutValue(element: HTMLElement, includeSize: boolean): LayoutFrame {
   };
 }
 
-function animateFlip(element: HTMLElement, previous: LayoutFrame | undefined, includeSize = false): LayoutFrame {
+function animateFlip(element: HTMLElement, previous: LayoutFrame | undefined, includeSize = false, origin?: LayoutFrame): LayoutFrame {
   const active = flipAnimations.get(element);
-  const from = active ? layoutValue(element, includeSize) : previous;
+  const from = origin ?? (active ? layoutValue(element, includeSize) : previous);
   active?.cancel();
   flipAnimations.delete(element);
   const current = layoutValue(element, includeSize);
@@ -246,10 +246,10 @@ function animateOpacity(element: HTMLElement | SVGElement, target: number) {
   };
 }
 
-export function PromptView({ prompt, compact = false, draft = '', draftMatch, feedback = false, maxLength, cursor = 0, focused = false, answerInput, onSelectCharacter, supplementColor = '#ffad32', settled = false, submitting = false, onCombined }: {
+export function PromptView({ prompt, compact = false, draft = '', draftMatch, feedback = false, maxLength, cursor = 0, focused = false, answerInput, onSelectCharacter, supplementColor = '#ffad32', settled = false, submitting = false, onCombined, returnFrom }: {
   prompt: Prompt; compact?: boolean; draft?: string; draftMatch?: DraftMatch; feedback?: boolean;
   maxLength?: number; cursor?: number; focused?: boolean; answerInput?: ReactNode; onSelectCharacter?: (index: number) => void;
-  supplementColor?: string; settled?: boolean; submitting?: boolean; onCombined?: () => void;
+  supplementColor?: string; settled?: boolean; submitting?: boolean; onCombined?: () => void; returnFrom?: AcceptedAnswer;
 }) {
   const characters = [...draft];
   const match = draftMatch && draftMatch.promptId === prompt.id && draftMatch.word === draft && draftMatch.offset !== null && draftMatch.reading
@@ -284,19 +284,38 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
   } as CSSProperties;
   const flipRoot = useRef<HTMLDivElement>(null);
   const flipTransforms = useRef(new Map<string, LayoutFrame>());
+  const lastReturn = useRef(returnFrom?.id);
   useLayoutEffect(() => {
     const root = flipRoot.current;
     if (!root) return;
     const nodes = [
       ...Array.from(root.querySelectorAll<HTMLElement>('.prompt-layer, .answer-editor')),
     ];
+    const returning = returnFrom && returnFrom.id !== lastReturn.current ? returnFrom : undefined;
+    lastReturn.current = returnFrom?.id ?? lastReturn.current;
+    const rootStyle = getComputedStyle(root);
+    const gap = parseFloat(rootStyle.getPropertyValue('--cell-gap'));
+    const rowGap = parseFloat(rootStyle.getPropertyValue('--row-gap'));
+    const previousCount = returning ? Math.min([...returning.word].length + 1, maxLength ?? [...returning.word].length) : 0;
+    const previousSlots = returning ? Math.max(returning.prompt.cells.length, previousCount) : 0;
+    const previousSize = returning ? Math.min(62, (root.clientWidth - (previousSlots - 1) * gap) / previousSlots) : 0;
+    const distance = (previousSize + rowGap) / 2;
+    const previousWidth = previousSlots ? previousSlots * previousSize + (previousSlots - 1) * gap : 0;
     const next = new Map<string, LayoutFrame>();
     nodes.forEach(node => {
       const key = node.classList.contains('prompt-layer') ? 'prompt-layer' : 'answer-editor';
-      next.set(key, animateFlip(node, flipTransforms.current.get(key)));
+      let origin: LayoutFrame | undefined;
+      if (returning) {
+        if (returning.match.offset === null) throw new Error('已接受答案缺少匹配位置');
+        const shift = returning.match.offset + returning.prompt.cells.length / 2 - previousCount / 2;
+        origin = {transform: key === 'prompt-layer'
+          ? `matrix(1, 0, 0, 1, ${-previousWidth / 2 + shift * (previousSize + gap)}, ${distance})`
+          : `matrix(1, 0, 0, 1, 0, ${-distance})`};
+      }
+      next.set(key, animateFlip(node, flipTransforms.current.get(key), false, origin));
     });
     flipTransforms.current = next;
-  }, [draft, visualAttached, prompt.id, completion?.offset, answerCount]);
+  }, [draft, visualAttached, prompt.id, completion?.offset, answerCount, returnFrom?.id, maxLength]);
   useLayoutEffect(() => {
     if (!submitting || !attached || !visualAttached) return;
     const root = flipRoot.current!;

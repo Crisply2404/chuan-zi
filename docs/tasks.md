@@ -52,7 +52,7 @@
 | 60：寻路补充词库核查 | resolved | research | RIME-LMDG 固定基础词库有寻路 xún lù，CC BY 4.0；建议优先使用审核词条，产品数据保持当前内容 |
 | 61：成语预设提示分布 | resolved | grilling、tdd、code-review | 两种分布各半，连续无人失去生命逐步增加最多10%的两星号，68 项规则检查通过 |
 | 62：词库入口与立即提交 | resolved | diagnosing-bugs、tdd、code-review | 入口仅全部词语/成语，IME 确认后立即提交，动画继续补全；68 项规则测试、47 项浏览器测试通过 |
-| 63：结合态直接分开 | resolved | diagnosing-bugs、tdd、code-review | 提交成功后从结合态直接播放分开，保留新回合输入与最新提示；48 项浏览器检查通过 |
+| 63：结合态直接分开 | resolved | diagnosing-bugs、tdd、code-review | 提交成功后提交者与下一位玩家页面都从结合态播放分开，保留新回合输入与最新提示；专项浏览器检查通过 |
 | 64：领域术语与 Agent 资料 | resolved | domain-modeling | 已增加方格状态、输入、比赛、奖励、词库术语与代码验证入口 |
 | 65：全模式 Make Me a Hanzi 楷体 | resolved | tdd、code-review | 同一路径生成字体与逐笔颜色，排除 334 个未覆盖字形答案；统一字体与路径检查通过 |
 | 66：万象补充词库接入 | resolved | research、tdd、code-review | 保存固定来源、许可和审核补充文件，接入寻路完整读音；71 项规则与联机测试通过 |

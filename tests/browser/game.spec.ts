@@ -478,6 +478,57 @@ test('已经结合的真实答案提交后立即使用新提示并连续返回',
   } finally { await desktop.close(); await mobile.close(); }
 });
 
+test('立即提交后下一位玩家从结合位置返回并立即编辑最新题目', async ({browser}) => {
+  const first = await browser.newContext({baseURL: 'http://localhost:4173/chuan-zi/'});
+  const second = await browser.newContext({baseURL: 'http://localhost:4173/chuan-zi/'});
+  try {
+    const host = await first.newPage(); const guest = await second.newPage();
+    const state = observe(host);
+    await connect(host, '即时提交');
+    await host.locator('.page-heading').getByRole('button', {name: '创建房间', exact: true}).click();
+    await expect(host.locator('.room-heading h1')).toBeVisible();
+    await guest.goto(host.url());
+    await expect(guest.locator('.room-heading h1')).toBeVisible();
+    await Promise.all([host, guest].map(page => page.evaluate(async () => { await document.fonts.load('25px "Chuan Zi Kai"', '知识'); })));
+    await host.getByRole('button', {name: '准备', exact: true}).click();
+    await guest.getByRole('button', {name: '准备', exact: true}).click();
+    await host.getByRole('button', {name: '开始比赛', exact: true}).click();
+    await expect(host.getByLabel('当前提示')).toBeVisible();
+    await guest.evaluate(() => {
+      const frames: {editable: boolean; sourceY: number | null; hints: string[]}[] = [];
+      Reflect.set(window, 'nextTurnFrames', frames);
+      const start = performance.now();
+      const sample = () => {
+        const layer = document.querySelector('.answer-form .prompt-layer')!;
+        const animation = layer.getAnimations()[0];
+        const transform = animation?.effect instanceof KeyframeEffect ? animation.effect.getKeyframes()[0].transform : undefined;
+        frames.push({editable: !(document.querySelector('input[aria-label="输入答案"]') as HTMLInputElement).disabled,
+          sourceY: typeof transform === 'string' ? new DOMMatrix(transform).m42 : null,
+          hints: [...layer.querySelectorAll('.prompt-hint-layout')].map(element => element.textContent!)});
+        if (performance.now() - start < 1400) requestAnimationFrame(sample);
+        else Reflect.set(window, 'nextTurnComplete', true);
+      };
+      requestAnimationFrame(sample);
+    });
+    const answer = rules.cpuAnswer(state.room!.prompt!, state.room!.settings)!.word;
+    await host.getByLabel('输入答案').fill(answer);
+    const distance = await host.locator('.answer-form .prompt-cell').first().evaluate(element =>
+      (element.getBoundingClientRect().width + parseFloat(getComputedStyle(element.closest('.prompt')!).getPropertyValue('--row-gap'))) / 2
+    );
+    await host.getByRole('button', {name: '提交答案', exact: true}).click();
+    await expect(guest.getByLabel('输入答案')).toBeFocused({timeout: 300});
+    await guest.waitForFunction(() => Reflect.get(window, 'nextTurnComplete'));
+    const frames = await guest.evaluate(() => Reflect.get(window, 'nextTurnFrames') as {editable: boolean; sourceY: number | null; hints: string[]}[]);
+    const returning = frames.filter(frame => frame.editable && frame.sourceY !== null);
+    expect(returning.length).toBeGreaterThan(3);
+    expect(returning[0].sourceY).toBeCloseTo(distance, 1);
+    const hints = state.room!.prompt!.cells.map(cell => [cell.radical, cell.component, cell.contains, cell.initial === '' || cell.final === '' ? '∅' : '', cell.initial, cell.final].filter(value => value !== undefined).join(''));
+    expect(returning[0].hints).toEqual(hints);
+    await guest.keyboard.insertText('知识');
+    await expect(guest.getByLabel('输入答案')).toHaveValue('知识');
+  } finally {await first.close(); await second.close();}
+});
+
 test('大厅房间卡片、电脑草稿、箭头方向和单行生命', async ({ browser }) => {
   const creator = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
   const observer = await browser.newContext({ baseURL: 'http://localhost:4173/chuan-zi/' });
