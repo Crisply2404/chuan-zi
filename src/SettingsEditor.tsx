@@ -32,7 +32,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   const updateDictionary = (next: Settings['dictionary']) => {
     const length = next === 'idioms' ? 4 : Math.min(value.promptLength, 2);
     const settings = { ...value, dictionary: next, minLength: next === 'idioms' ? 4 : 2, maxLength: Math.max(value.maxLength, next === 'idioms' ? 4 : 2), promptLength: length,
-      hiddenCount: Math.max(0, Math.min(length - 1, value.hiddenCount + length - value.promptLength)) };
+      hiddenCount: next === 'idioms' && value.mode !== 'custom' ? 1 : Math.max(0, Math.min(length - 1, value.hiddenCount + length - value.promptLength)) };
     const nextSettings = settings.promptSlots ? withPromptSlots(settings, [...settings.promptSlots.slice(0, length), ...Array.from({length: Math.max(0, length - settings.promptSlots.length)}, emptyPromptSlot)]) : settings;
     onChange(nextSettings);
     if (!editingCustom) onSave?.(nextSettings);
@@ -70,7 +70,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     const settings = next === 'custom' ? withPromptSlots(value, slotsFromSettings(value)) : {
       ...getModeSettings(next), dictionary: value.dictionary, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers,
     };
-    if (next !== 'custom' && value.dictionary === 'idioms') {settings.hiddenCount += 4 - settings.promptLength; settings.promptLength = 4;}
+    if (next !== 'custom' && value.dictionary === 'idioms') {settings.hiddenCount = 1; settings.promptLength = 4;}
     onChange(settings);
     if (next !== 'custom') onSave?.(settings);
   };
@@ -87,7 +87,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     <fieldset disabled={disabled || busy}><div className="settings-sections">
       <section className="settings-section dictionary-choice">
         <h3>答案词库</h3><div className="segments" role="group" aria-label="答案词库">
-          {([['all', '全部词语'], ['words', '普通词语'], ['idioms', '成语']] as const).map(([id, label]) => <button type="button" aria-pressed={value.dictionary === id} key={id} onClick={() => updateDictionary(id)}>{label}</button>)}
+          {([['all', '全部词语'], ['idioms', '成语']] as const).map(([id, label]) => <button type="button" aria-pressed={value.dictionary === id} key={id} onClick={() => updateDictionary(id)}>{label}</button>)}
         </div>
       </section>
       <section className="settings-section">

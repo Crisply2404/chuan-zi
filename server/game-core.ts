@@ -6,6 +6,7 @@ import { RuleError, WordRules } from '../shared/rules';
 import { normalizePinyin } from '../shared/pinyin';
 import { playerColors } from '../shared/player-layout';
 import {bonusCandidates, collectBonusValues, resolveBonusType} from '../shared/bonuses';
+import {stalemateScore} from '../shared/idiom-prompts';
 
 const empty = z.object({}).strict();
 const nickname = z.string().trim().min(1).max(20);
@@ -56,6 +57,7 @@ interface Room extends Omit<RoomView, 'players' | 'protected' | 'serverTime'> {
   matchBestOf: number;
   matchDuel: boolean;
   creationOrder: number;
+  answersWithoutLifeLoss: number;
 }
 
 export interface GameSocket {
@@ -271,7 +273,7 @@ export function createGameCore(options: GameCoreOptions) {
   function preparePrompt(room: Room, rules: WordRules): boolean {
     cancel('answer', room.id);
     try {
-      room.prompt = rules.generate(room.settings, room.used);
+      room.prompt = rules.generate(room.settings, room.used, {stalemateScore: stalemateScore(room.answersWithoutLifeLoss)});
       room.draftMatch = null;
       room.failedPromptPlayers.clear();
       return true;
@@ -309,6 +311,7 @@ export function createGameCore(options: GameCoreOptions) {
       return;
     }
     player.lives--;
+    room.answersWithoutLifeLoss = 0;
     player.draft = '';
     room.failedPromptPlayers.add(player.id);
     const remaining = remainingPlayers(room);
@@ -349,6 +352,7 @@ export function createGameCore(options: GameCoreOptions) {
     room.acceptedAnswer = { id: randomUUID(), playerId: player.id, word, prompt: structuredClone(room.prompt!), color: player.color, at: Date.now(),
       match: { word, promptId: room.prompt!.id, offset, reading: { syllables: reading.syllables.slice(offset, offset + room.prompt!.cells.length), initials: reading.initials.slice(offset, offset + room.prompt!.cells.length), finals: reading.finals.slice(offset, offset + room.prompt!.cells.length), tones: reading.tones.slice(offset, offset + room.prompt!.cells.length) } } };
     room.used.add(word);
+    room.answersWithoutLifeLoss++;
     room.history.push({playerId: player.id, nickname: player.nickname, word, at: Date.now()});
     player.draft = '';
     const bonusType = resolveBonusType(room.settings);
@@ -543,7 +547,7 @@ export function createGameCore(options: GameCoreOptions) {
       players: [session], round: 0, suddenDeath: false, currentPlayerId: null,
       prompt: null, deadline: null, history: [], chat: [], lastWinnerId: null, winnerIds: [], previousPlayerId: null, draftMatch: null, acceptedAnswer: null,
       passwordSalt: salt, passwordHash: salt ? scryptSync(passwordValue, salt, 64) : null,
-      lastActivity: now, used: new Set(), failedPromptPlayers: new Set(), playOrder: [], matchPlayerIds: new Set(),
+      lastActivity: now, used: new Set(), failedPromptPlayers: new Set(), playOrder: [], matchPlayerIds: new Set(), answersWithoutLifeLoss: 0,
       contenderIds: new Set(), matchBestOf: settings.bestOf, matchDuel: false,
       creationOrder: ++creationOrder,
     };
@@ -682,6 +686,7 @@ export function createGameCore(options: GameCoreOptions) {
         room.used.clear();
         room.failedPromptPlayers.clear();
         room.history = [];
+        room.answersWithoutLifeLoss = 0;
         room.acceptedAnswer = null;
         room.draftMatch = null;
         room.prompt = prompt;
@@ -897,7 +902,7 @@ export function createGameCore(options: GameCoreOptions) {
     }));
     for (const session of allSessions.values()) if (!session.cpu) sessions.set(session.token, session);
     for (const room of options.state.rooms) rooms.set(room.id, {
-      ...room, players: room.players.map(token => {
+      ...room, answersWithoutLifeLoss: room.answersWithoutLifeLoss ?? 0, players: room.players.map(token => {
         const player = allSessions.get(token);
         if (!player) throw new Error('持久房间中的玩家身份不存在');
         return player;

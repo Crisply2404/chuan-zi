@@ -315,7 +315,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const [chat, setChat] = useState('');
   const [now, setNow] = useState(Date.now());
   const composing = useRef(false);
-  const composedAt = useRef(0);
+  const confirmingEnter = useRef(false);
   const chatComposing = useRef(false);
   const chatComposedAt = useRef(0);
   const input = useRef<HTMLInputElement>(null);
@@ -435,8 +435,9 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   useEffect(() => { historyList.current?.scrollTo({ top: historyList.current.scrollHeight }); }, [room.history.length]);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (composing.current || Date.now() - composedAt.current < 120 || !room.prompt || !isTurn || !word.trim()) return;
-    act({ type: 'submit', data: { word: word.trim(), promptId: room.prompt.id } }, () => { setWord(''); setInputValue(''); }, failure => {
+    const confirmed = confirmedAnswer(input.current?.value ?? word, room.settings.maxLength);
+    if (composing.current || !room.prompt || !isTurn || !confirmed.trim()) return;
+    act({ type: 'submit', data: { word: confirmed.trim(), promptId: room.prompt.id } }, () => { setWord(''); setInputValue(''); }, failure => {
       if (/答案|词库|提示|重复|长度|当前回合|时间|写作/.test(failure.message)) {
         if (failure.message === '本局已经使用这个答案') {
           clearAnswerMessage();
@@ -500,15 +501,18 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
             updateAnswer(event.target);
           }} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={event => {
             composing.current = false;
-            updateAnswer(event.currentTarget); composedAt.current = Date.now();
+            updateAnswer(event.currentTarget);
           }}
-          onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || composing.current || event.keyCode === 229 || Date.now() - composedAt.current < 120)) event.preventDefault(); }} />} />
+          onKeyDown={event => {
+            if (event.key !== 'Enter') return;
+            if (event.nativeEvent.isComposing || composing.current || event.keyCode === 229 || confirmingEnter.current) {confirmingEnter.current = true; event.preventDefault();}
+          }} onKeyUp={event => {if (event.key === 'Enter' || event.keyCode === 229) confirmingEnter.current = false;}} />} />
           <button type="submit" className="submit-button" title="提交答案" aria-label="提交答案" disabled={!isTurn || !connected || busy || !word.trim()}><ArrowRight size={23} /></button>
           <div className="answer-message" role="status" aria-live="polite">{duplicateWord ? '这个词之前输入过了' : wordCorrection ?? answerMessage}</div>
           {room.settings.minLength !== shownPrompt.cells.length && <div className="answer-length-hint">答案最短为 {room.settings.minLength} 个字</div>}
-        </form></div>
+        </form>
         {self && resolveBonusType(room.settings) && <div className="bonus-progress"><div><span>奖励{bonusLabels[resolveBonusType(room.settings)!]}</span><Heart size={13} /></div><div className="bonus-letters">{self.bonusTargets.map(initial =>
-          <span className={self.collected.includes(initial) ? 'bonus-collected' : ''} key={initial}>{initial}</span>)}</div></div>}
+          <span className={self.collected.includes(initial) ? 'bonus-collected' : ''} key={initial}>{initial}</span>)}</div></div>}</div>
       </> : <div className="waiting-stage">
         {room.phase === 'finished' ? <h2>{winners.length ? `${winners.map(player => player.nickname).join('、')} 获胜` : '比赛平局'}</h2>
           : room.phase === 'between' ? <h2>{lastWinner ? `${lastWinner.nickname} 获胜` : room.players.filter(player => player.role === 'player').every(player => player.lives === 0) ? '本局平局' : '本局中止'}</h2> : null}

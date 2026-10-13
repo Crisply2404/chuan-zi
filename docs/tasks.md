@@ -1,6 +1,6 @@
 # 当前任务
 
-日期：2026-10-13，Asia/Shanghai。
+日期：2026-10-14，Asia/Shanghai。
 
 本文件持续保存任务、当前状态、验证结果与使用的 Matt skill。详细记录位于 `.scratch/chuan-zi/issues/`。中断后从本文件与对应任务继续。
 
@@ -47,6 +47,11 @@
 | 55：页面空间与宽窗口侧栏 | resolved | diagnosing-bugs、tdd、code-review | 43 项浏览器检查和大屏专项通过，main 自动发布成功，公开页面宽度与常驻侧栏通过 |
 | 56：jieba 补充词库评估 | resolved | research | 建议采用审核后的候选，许可与完整差集统计已核查，词库内容保持当前状态 |
 | 57：个人网站源码检查 | resolved | research | 公开 main 文件列表没有项目源目录；workflow 仅发布 dist，5,778 个产物与 ZIP 检查通过 |
+| 58：手机奖励区域可见 | resolved | diagnosing-bugs、tdd、code-review | Android 原生键盘可见高度 498px，奖励底部 498.1px，答案与奖励保持可见 |
+| 59：印刷风格逐笔字体 | resolved | research | 宋体/黑体风格六个字形样本通过，GlyphWiki 字形数据商业许可已核查，等待字体选择 |
+| 60：寻路补充词库核查 | resolved | research | RIME-LMDG 固定基础词库有寻路 xún lù，CC BY 4.0；建议优先使用审核词条，产品数据保持当前内容 |
+| 61：成语预设提示分布 | resolved | grilling、tdd、code-review | 两种分布各半，连续无人失去生命逐步增加最多10%的两星号，68 项规则检查通过 |
+| 62：词库入口与立即提交 | resolved | diagnosing-bugs、tdd、code-review | 入口仅全部词语/成语，IME 确认后立即提交，动画继续补全；68 项规则测试、47 项浏览器测试通过 |
 
 ## 用户已经确定的要求
 

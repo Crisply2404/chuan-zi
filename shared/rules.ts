@@ -3,6 +3,7 @@ import { validateSettings } from './settings';
 import { correctionFor, correctionMessage } from './word-corrections';
 import {commonRadicalParts} from './bonuses';
 import {bonusRadicalCandidates} from './bonus-candidates';
+import {idiomVisiblePositions} from './idiom-prompts';
 
 export class RuleError extends Error {}
 
@@ -149,11 +150,13 @@ export class WordRules {
     })));
   }
 
-  generate(settings: Settings, used = new Set<string>()): Prompt {
+  generate(settings: Settings, used = new Set<string>(), context: {stalemateScore?: number} = {}): Prompt {
     validateSettings(settings);
-    if (settings.mode === 'radical') {
+    const idiomPositions = settings.dictionary === 'idioms' && settings.mode !== 'custom' ? idiomVisiblePositions(context.stalemateScore ?? 0) : null;
+    if (idiomPositions) settings = {...settings, promptLength: 4, hiddenCount: 4 - idiomPositions.length};
+    else if (settings.mode === 'radical') {
       const count = Math.random() < .5 ? 1 : 2;
-      settings = {...settings, promptLength: settings.dictionary === 'idioms' ? 4 : count, hiddenCount: settings.dictionary === 'idioms' ? 4 - count : 0};
+      settings = {...settings, promptLength: count, hiddenCount: 0};
     }
     const candidates = this.data.words.filter(entry => this.allowed(entry, settings) && !used.has(entry.word));
     if (!candidates.length) throw new RuleError('当前词库没有符合设置的答案');
@@ -178,7 +181,7 @@ export class WordRules {
       const offset = window?.offset ?? Math.floor(Math.random() * (length - span + 1));
       const cells = Array.from({ length: span }, () => ({} as Prompt['cells'][number]));
       const selected = possibleSelections[Math.floor(Math.random() * possibleSelections.length)];
-      const positions = this.shuffle(Array.from({ length: span }, (_, index) => index)).slice(0, visibleCount);
+      const positions = idiomPositions ?? this.shuffle(Array.from({ length: span }, (_, index) => index)).slice(0, visibleCount);
       const assignments = settings.promptSlots ? new Map(conditionTypes.map(type => [type, settings.promptSlots!.flatMap((slot, index) =>
         (type === 'initial' || type === 'final' ? slot[type] !== 'off' : slot[type]) ? [index] : [])])) : this.assignMasks(selected, positions, settings);
       if (!assignments) continue;
