@@ -171,14 +171,22 @@ export class WordRules {
     const possibleSelections = Array.from({ length: (1 << active.length) - 1 }, (_, index) => active.filter((_, bit) => (index + 1) & (1 << bit)))
       .filter(selected => required.every(type => selected.includes(type)) && this.assignMasks(selected, Array.from({ length: visibleCount }, (_, index) => index), settings));
     if (!settings.promptSlots && !possibleSelections.length) throw new RuleError('提示位置数量无法满足当前条件关系与声调范围');
-    for (let attempt = 0; attempt < 500; attempt++) {
+    const idiomCandidates = idiomPositions ? this.shuffle(candidates.flatMap(entry => entry.readings.flatMap(reading =>
+      Array.from({length: [...entry.word].length - 3}, (_, offset) => ({entry, reading, offset}))))).filter(item => idiomPositions.every(position => {
+        const letter = [...item.entry.word][item.offset + position];
+        return (settings.appearance.radical === 'off' || this.radicalsFor(letter).length > 0)
+          && (settings.appearance.tone === 'off' || item.reading.tones[item.offset + position] !== 5);
+      })) : null;
+    const attempts = idiomCandidates ? idiomCandidates.length : 500;
+    for (let attempt = 0; attempt < attempts; attempt++) {
       const slotCandidate = slotCandidates?.[Math.floor(Math.random() * slotCandidates.length)];
-      const candidate = slotCandidate?.entry ?? candidates[Math.floor(Math.random() * candidates.length)];
+      const idiomCandidate = idiomCandidates?.[attempt];
+      const candidate = idiomCandidate?.entry ?? slotCandidate?.entry ?? candidates[Math.floor(Math.random() * candidates.length)];
       const window = slotCandidate?.windows[Math.floor(Math.random() * slotCandidate.windows.length)];
-      const reading = window?.reading ?? candidate.readings[Math.floor(Math.random() * candidate.readings.length)];
+      const reading = idiomCandidate?.reading ?? window?.reading ?? candidate.readings[Math.floor(Math.random() * candidate.readings.length)];
       const length = [...candidate.word].length;
       const span = settings.promptLength;
-      const offset = window?.offset ?? Math.floor(Math.random() * (length - span + 1));
+      const offset = idiomCandidate?.offset ?? window?.offset ?? Math.floor(Math.random() * (length - span + 1));
       const cells = Array.from({ length: span }, () => ({} as Prompt['cells'][number]));
       const selected = possibleSelections[Math.floor(Math.random() * possibleSelections.length)];
       const positions = idiomPositions ?? this.shuffle(Array.from({ length: span }, (_, index) => index)).slice(0, visibleCount);
