@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import type { RoomView } from '../shared/types';
+import { playerAngle } from '../shared/player-layout';
 
 type Hand = { angle: number; length: number; playerId: string };
 type Hands = { x: number; y: number; current: Hand; previous: Hand | null };
@@ -69,7 +70,8 @@ export function DrumTransfer({ topology, room }: { topology: RefObject<HTMLDivEl
         const rect = avatar.getBoundingClientRect();
         const dx = rect.x + rect.width / 2 - bounds.x - x;
         const dy = rect.y + rect.height / 2 - bounds.y - y;
-        return { angle: Math.atan2(dy, dx), length: Math.max(35, Math.hypot(dx, dy) - rect.width / 2 - 12), playerId };
+        const index = room.players.findIndex(player => player.id === playerId);
+        return { angle: playerAngle(index, Math.max(2, room.players.length)), length: Math.max(35, Math.hypot(dx, dy) - rect.width / 2 - 12), playerId };
       };
       const previous = room.previousPlayerId && room.previousPlayerId !== room.currentPlayerId && room.players.some(player => player.id === room.previousPlayerId)
         ? readHand(room.previousPlayerId) : null;

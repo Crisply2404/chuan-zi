@@ -1,8 +1,19 @@
+import {bonusInitialCandidates} from './bonus-initials';
+
 export const conditionTypes = ['initial', 'final', 'tone', 'radical', 'component', 'contains'] as const;
 export type ConditionType = typeof conditionTypes[number];
 export type Appearance = 'off' | 'random' | 'required';
 export type RelationMode = 'free' | 'same' | 'different';
 export type ToneScope = 'one' | 'some' | 'all';
+export type PhoneticChoice = 'off' | 'required' | 'absent';
+export interface PromptSlot {
+  initial: PhoneticChoice;
+  final: PhoneticChoice;
+  tone: boolean;
+  radical: boolean;
+  component: boolean;
+  contains: boolean;
+}
 export const modeIds = ['initial-tone', 'radical', 'character', 'tone-only', 'custom'] as const;
 export type ModeId = typeof modeIds[number];
 export type RulePresetId = 'simple' | 'hard' | 'featured' | 'custom';
@@ -23,6 +34,7 @@ export interface Settings {
   appearance: Record<ConditionType, Appearance>;
   relations: Relation[];
   toneScope: ToneScope;
+  promptSlots?: PromptSlot[];
   minAnswers: number;
   maxAnswers: number;
   startingLives: number;
@@ -34,6 +46,7 @@ export interface Settings {
   bestOf: number;
   maxPlayers: number;
   bonusInitials: string[];
+  bonusEnabled?: boolean;
 }
 
 export const defaultSettings: Settings = {
@@ -43,7 +56,7 @@ export const defaultSettings: Settings = {
   relations: [], toneScope: 'one', minAnswers: 2, maxAnswers: 20000,
   startingLives: 3, maxLives: 5, timerMode: 'fixed', initialSeconds: 10,
   randomMinSeconds: 10, randomMaxSeconds: 30,
-  bestOf: 3, maxPlayers: 8, bonusInitials: ['b', 'p', 'm', 'f', 'd', 't', 'n', 'l'],
+  bestOf: 3, maxPlayers: 8, bonusEnabled: true, bonusInitials: [...bonusInitialCandidates],
 };
 
 export interface CharacterData { radicals: string[]; components: string[]; strokeCount?: number; strokeParts?: Record<string, number[]> }
@@ -71,6 +84,7 @@ export interface PlayerView {
   id: string; nickname: string; online: boolean; ready: boolean; color: string;
   role: 'player' | 'spectator'; lives: number; wins: number;
   collected: string[]; draft: string; cpu: boolean;
+  bonusTargets: string[];
 }
 export interface HistoryItem { playerId: string; nickname: string; word: string; at: number }
 export interface ChatMessage { id: string; nickname: string; text: string; at: number }

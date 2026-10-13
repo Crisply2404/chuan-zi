@@ -88,6 +88,44 @@ test('易误写草稿同步正确词形，提交拒绝并减少一秒', async t 
   assert.equal(player.room!.history.length, 0);
 });
 
+test('合法草稿两秒自动提交，重复广播保持时间，失去匹配后重新计时', async t => {
+  const {WordRules} = await import('../shared/rules');
+  const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '自动提交');
+  const guest = await Client.connect(server.address, '观看提交');
+  t.after(() => host.close()); t.after(() => guest.close());
+  await host.request({type: 'create', data: {name: '', password: '', settings: {...defaultSettings, initialSeconds: 20}}});
+  await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
+  await host.request({type: 'ready', data: {ready: true}}); await guest.request({type: 'ready', data: {ready: true}});
+  await host.request({type: 'start', data: {}});
+  const question = host.room!.prompt!;
+  const [firstAnswer, secondAnswer] = rules.examples(question, host.room!.settings, new Set(), 2);
+  const word = secondAnswer.word;
+  const start = guest.messages.length;
+  const matchedAt = Date.now();
+  await host.request({type: 'draft', data: {word: firstAnswer.word, promptId: question.id}});
+  await delay(1000);
+  await host.request({type: 'draft', data: {word, promptId: question.id}});
+  await host.request({type: 'draft', data: {word, promptId: question.id}});
+  assert.equal(host.room!.history.length, 0);
+  await guest.wait(message => message.type === 'state' && message.room?.history.length === 1, start, 2400);
+  assert.ok(Date.now() - matchedAt >= 1800 && Date.now() - matchedAt < 2900);
+  assert.equal(guest.room!.history[0].word, word);
+  const next = guest.room!.prompt!;
+  const answer = rules.examples(next, guest.room!.settings, new Set(guest.room!.history.map(item => item.word)), 1)[0].word;
+  await guest.request({type: 'draft', data: {word: answer, promptId: next.id}});
+  await delay(700);
+  await guest.request({type: 'draft', data: {word: '不存在的测试答案', promptId: next.id}});
+  await delay(1500);
+  assert.equal(guest.room!.history.length, 1);
+  const restart = Date.now();
+  await guest.request({type: 'draft', data: {word: answer, promptId: next.id}});
+  await host.wait(message => message.type === 'state' && message.room?.history.length === 2, host.messages.length, 3000);
+  assert.ok(Date.now() - restart >= 1800);
+});
+
 test('大厅提供创建顺序、密码、房主转移和空房删除', async t => {
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
   t.after(() => server.close());
@@ -117,6 +155,96 @@ test('大厅提供创建顺序、密码、房主转移和空房删除', async t 
   const start = second.messages.length;
   await second.request({type: 'leave', data: {}});
   await second.wait(message => message.type === 'lobby' && message.rooms.length === 0, start);
+});
+
+test('人类人数上限之外可增加一名电脑，并保留人类加入名额', async t => {
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '房主');
+  const guest = await Client.connect(server.address, '玩家');
+  t.after(() => host.close()); t.after(() => guest.close());
+  const settings = {...defaultSettings, maxPlayers: 2};
+  await host.request({type: 'create', data: {name: '', password: '', settings}});
+  assert.equal((await host.request({type: 'addCpu', data: {}})).ok, true);
+  assert.equal((await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}})).ok, true);
+  assert.equal(guest.room!.players.length, 3);
+  assert.equal(guest.room!.players.filter(player => player.cpu).length, 1);
+  await host.request({type: 'removeCpu', data: {}});
+  assert.equal((await host.request({type: 'addCpu', data: {}})).ok, true);
+  assert.equal((await host.request({type: 'addCpu', data: {}})).ok, false);
+  assert.equal((await host.request({type: 'settings', data: {settings}})).ok, true);
+});
+
+test('奖励声母给每名玩家五个独立目标', async t => {
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '奖励玩家甲');
+  const guest = await Client.connect(server.address, '奖励玩家乙');
+  t.after(() => host.close()); t.after(() => guest.close());
+  await host.request({type: 'create', data: {name: '', password: '', settings: defaultSettings}});
+  await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
+  await host.request({type: 'ready', data: {ready: true}}); await guest.request({type: 'ready', data: {ready: true}});
+  await host.request({type: 'start', data: {}});
+  const targets = host.room!.players.map(player => player.bonusTargets);
+  assert.ok(targets.every(group => group?.length === 5 && new Set(group).size === 5));
+  assert.notDeepEqual([...targets[0]].sort(), [...targets[1]].sort());
+});
+
+test('关闭奖励声母时不分配目标、不奖励生命', async t => {
+  const {WordRules} = await import('../shared/rules');
+  const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '关闭奖励甲');
+  const guest = await Client.connect(server.address, '关闭奖励乙');
+  t.after(() => host.close()); t.after(() => guest.close());
+  await host.request({type: 'create', data: {name: '', password: '', settings: {...defaultSettings, bonusEnabled: false}}});
+  await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
+  await host.request({type: 'ready', data: {ready: true}}); await guest.request({type: 'ready', data: {ready: true}});
+  await host.request({type: 'start', data: {}});
+  assert.ok(host.room!.players.every(player => player.bonusTargets.length === 0));
+  const question = host.room!.prompt!;
+  const answer = rules.examples(question, host.room!.settings, new Set(), 1)[0];
+  await host.request({type: 'submit', data: {word: answer.word, promptId: question.id}});
+  assert.equal(host.room!.players[0].lives, defaultSettings.startingLives);
+  assert.deepEqual(host.room!.players[0].collected, []);
+});
+
+test('五个奖励目标集齐增加生命并重新选择，优先减少上一组重复', async t => {
+  const {WordRules} = await import('../shared/rules');
+  const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
+  const server = await createGameServer({port: 0, host: '127.0.0.1'});
+  t.after(() => server.close());
+  const host = await Client.connect(server.address, '重新抽取甲');
+  const guest = await Client.connect(server.address, '重新抽取乙');
+  t.after(() => host.close()); t.after(() => guest.close());
+  const candidates = ['b', 'p', 'm', 'f', 'd', 't'];
+  const settings = {...defaultSettings, initialSeconds: 120, promptLength: 1, minAnswers: 1, bonusInitials: candidates,
+    appearance: {initial: 'required' as const, final: 'off' as const, tone: 'off' as const, radical: 'off' as const, component: 'off' as const, contains: 'off' as const}};
+  await host.request({type: 'create', data: {name: '', password: '', settings}});
+  await guest.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
+  await host.request({type: 'ready', data: {ready: true}}); await guest.request({type: 'ready', data: {ready: true}});
+  await host.request({type: 'start', data: {}});
+  const previous = [...host.room!.players[0].bonusTargets];
+  for (let turn = 0; turn < 80 && host.room!.players[0].lives === settings.startingLives; turn++) {
+    const room = host.room!;
+    const player = room.currentPlayerId === host.playerId ? host : guest;
+    const active = room.players.find(item => item.id === player.playerId)!;
+    const missing = active.bonusTargets.filter(value => !active.collected.includes(value));
+    const answers = rules.examples(room.prompt!, settings, new Set(room.history.map(item => item.word)), Infinity);
+    const score = (word: string) => {
+      const result = rules.match(word, room.prompt!, settings);
+      return new Set(result.reading!.initials.filter(initial => missing.includes(initial))).size;
+    };
+    const answer = answers.sort((first, second) => score(second.word) - score(first.word))[0];
+    assert.ok(answer);
+    assert.equal((await player.request({type: 'submit', data: {word: answer.word, promptId: room.prompt!.id}})).ok, true);
+  }
+  const rewarded = host.room!.players[0];
+  assert.equal(rewarded.lives, settings.startingLives + 1);
+  assert.equal(rewarded.bonusTargets.length, 5);
+  assert.equal(rewarded.bonusTargets.filter(value => previous.includes(value)).length, 4);
+  assert.deepEqual(rewarded.collected, []);
 });
 
 test('拼音分享链接加入隐藏房间并支持房主修改元数据', async t => {
@@ -235,7 +363,7 @@ test('服务器验证真实词语、独立回合计时、规则锁定、声母�
   const rules = new WordRules(dictionary);
   const settings: Settings = {
     ...structuredClone(defaultSettings), dictionary: 'all', minLength: 2, maxLength: 9,
-    promptLength: 1, minAnswers: 1, initialSeconds: 15,
+    promptLength: 1, minAnswers: 1, maxAnswers: 100000, initialSeconds: 15,
     appearance: {initial: 'off', final: 'off', tone: 'required', radical: 'off', component: 'off', contains: 'off'},
     bonusInitials: ['b'],
   };
@@ -274,6 +402,7 @@ test('服务器验证真实词语、独立回合计时、规则锁定、声母�
   assert.equal(host.room!.history[0].word, answer.word);
   assert.equal(host.room!.players.find(player => player.id === host.playerId)!.lives, lives + 1);
   assert.deepEqual(host.room!.players.find(player => player.id === host.playerId)!.collected, []);
+  assert.deepEqual(host.room!.players.find(player => player.id === host.playerId)!.bonusTargets, ['b']);
   assert.equal((await host.request({type: 'submit', data: {word: answer.word, promptId: host.room!.prompt!.id}})).ok, false);
   assert.equal((await guest.request({type: 'submit', data: {word: answer.word, promptId: host.room!.prompt!.id}})).ok, false);
   await spectator.request({type: 'join', data: {roomId: host.room!.id, password: ''}});
@@ -413,11 +542,11 @@ test('真实答案全部使用后中止本局，接受最终答案并允许修�
   const {WordRules} = await import('../shared/rules');
   const dictionary: DictionaryData = JSON.parse(await readFile(new URL('../data/dictionary.json', import.meta.url), 'utf8'));
   const rules = new WordRules(dictionary);
-  const idioms = dictionary.words.filter(entry => entry.idiom && [...entry.word].length === 2);
-  assert.equal(idioms.length, 5);
+  const idioms = dictionary.words.filter(entry => entry.idiom && [...entry.word].length === 9);
+  assert.equal(idioms.length, 9);
   const settings: Settings = {
-    ...structuredClone(defaultSettings), dictionary: 'idioms', minLength: 2, maxLength: 2, promptLength: 2,
-    minAnswers: 1, initialSeconds: 20, bonusInitials: ['b'],
+    ...structuredClone(defaultSettings), dictionary: 'idioms', minLength: 9, maxLength: 9, promptLength: 1, minAnswers: 1,
+    initialSeconds: 20, bonusInitials: ['b'],
     appearance: {initial: 'off', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'required'},
   };
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
@@ -449,7 +578,7 @@ test('真实答案全部使用后中止本局，接受最终答案并允许修�
   assert.equal(host.room!.prompt, null);
   assert.equal(host.room!.currentPlayerId, null);
   assert.equal(host.room!.lastWinnerId, null);
-  assert.equal(host.room!.history.length, 5);
+  assert.equal(host.room!.history.length, 9);
   assert.ok(host.room!.players.every(player => !player.ready && player.wins === 0 && player.collected.length === 0 && player.draft === ''));
   const revised = {...settings, minLength: 4, maxLength: 8};
   assert.equal((await host.request({type: 'settings', data: {settings: revised}})).ok, true);
@@ -544,8 +673,10 @@ test('多人比赛并列加赛限定领先者，并允许完成后重新比赛',
     assert.equal((await players[0].request({type: 'start', data: {}})).ok, true);
     const winner = players[(round + 1) % players.length];
     await players[0].wait(message => message.type === 'state' && message.room?.currentPlayerId === winner.playerId && message.room.players.filter(player => player.lives > 0).length === 1, start, 5000);
-    const answer = rules.cpuAnswer(players[0].room!.prompt!, settings, new Set(players[0].room!.history.map(item => item.word)))!;
-    await winner.request({type: 'submit', data: {word: answer.word, promptId: players[0].room!.prompt!.id}});
+    const answer = rules.examples(players[0].room!.prompt!, settings, new Set(players[0].room!.history.map(item => item.word)), 1)[0];
+    assert.ok(answer);
+    const result = await winner.request({type: 'submit', data: {word: answer.word, promptId: players[0].room!.prompt!.id}});
+    assert.equal(result.ok, true, JSON.stringify(result));
     await players[0].wait(message => message.type === 'state' && message.room?.round === round && message.room.phase !== 'playing', start, 5000);
     if (round === 3) {
       assert.equal(players[0].room!.phase, 'between');

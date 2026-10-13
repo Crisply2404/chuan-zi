@@ -14,7 +14,7 @@ Worker 入口位于 `cloudflare/worker.ts`，使用单个 `GameHub` SQLite Durab
 
 使用 `npm run test:cloudflare` 通过七项真实 workerd/Miniflare 测试：健康检查与 Origin 拒绝、大厅密码和 Hibernation 后身份恢复、真实词库草稿截止自动提交、alarm 电脑逐字输入、15 分钟隐藏与重连期限、身份切换连接后的 Hibernation 授权、runtime 重启后的 SQLite 房间恢复。测试使用 `.scratch/cloudflare/` 持久目录和当前 `data/dictionary.json`。
 
-`npm test` 通过全部 50 项，包含规则、Node WebSocket 与七项 Cloudflare 真实 workerd 检查。完整浏览器流程通过 31 项。
+`npm test` 通过全部 61 项，包含规则、Node WebSocket 与八项 Cloudflare 真实 workerd 检查。完整浏览器流程通过 39 项，新增奖励开关与多人电脑专项通过。
 
 `npm run check` 通过，包括普通 Node TypeScript 与 Cloudflare Worker TypeScript。`npx wrangler deploy --dry-run --outdir .scratch/cloudflare-upload-final` 通过，确认 `GAME_HUB` SQLite Durable Object、`ALLOWED_ORIGINS` 与紧凑词库附加资源均进入构建。发布 bundle 独立存放在 `.scratch/cloudflare/bundle/`，验证输出与 SQLite 目录位于其它位置。
 
@@ -24,7 +24,7 @@ Miniflare workerd Inspector 在完成词库加载、创建房间和真实提示�
 
 ## 公开服务
 
-用户已经完成 Wrangler 登录授权。服务于 2026-10-13 发布到 `https://chuan-zi-online.tcoinsm.workers.dev`，当前版本为 `e9e685c1-bc81-4e5b-8297-bda199ff17f3`。公开 `/health` 返回正常，完整词库为 89,431 条。部首提示要求笔画数量严格小于完整汉字数量，生成、草稿与提交共用此规则。易误写词形只按用户明确提供的表达添加，当前为不可置否→不置可否，草稿和提交均拒绝对应表达。
+用户已经完成 Wrangler 登录授权。服务于 2026-10-13 发布到 `https://chuan-zi-online.tcoinsm.workers.dev`，当前版本为 `b7d1e8b5-d375-4edb-841a-1cc2158ae0da`。公开 `/health` 返回正常，完整词库为 89,431 条。部首提示要求笔画数量严格小于完整汉字数量，生成、草稿与提交共用此规则。易误写词形只按用户明确提供的表达添加，当前为不可置否→不置可否，草稿和提交均拒绝对应表达。逐格规则、额外一名电脑、个人随机奖励声母与两秒自动提交均已通过真实公网操作。
 
 公网 WSS 地址为 `wss://chuan-zi-online.tcoinsm.workers.dev/ws`。真实两个 WebSocket 连接验证了创建隐藏房间、密码加入、草稿同步、答案提交、下一回合与身份重连；确认只有一条答案历史。验证启用 TLS 证书检查。本机完成这些步骤总耗时约 31.5 秒，这个数字包含多次请求与重连，中国大陆运营商网络质量仍需测量。
 

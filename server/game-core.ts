@@ -66,7 +66,7 @@ export interface GameSocket {
 interface ScheduledEvent {
   key: string;
   at: number;
-  type: 'idle' | 'turn' | 'cpu' | 'reconnect';
+  type: 'idle' | 'turn' | 'cpu' | 'reconnect' | 'answer';
   target: string;
   promptId?: string;
   playerId?: string;
@@ -125,7 +125,7 @@ export function createGameCore(options: GameCoreOptions) {
       settings: structuredClone(room.settings), players: room.players.map(player => ({
         id: player.id, nickname: player.nickname, online: player.online, ready: player.ready,
         role: player.role, lives: player.lives, wins: player.wins,
-        collected: [...player.collected], draft: player.draft, cpu: player.cpu, color: player.color,
+        collected: [...player.collected], bonusTargets: [...player.bonusTargets], draft: player.draft, cpu: player.cpu, color: player.color,
       })), round: room.round, suddenDeath: room.suddenDeath,
       currentPlayerId: room.currentPlayerId, prompt: room.prompt,
       deadline: room.deadline, serverTime: Date.now(), history: room.history, previousPlayerId: room.previousPlayerId,
@@ -139,7 +139,7 @@ export function createGameCore(options: GameCoreOptions) {
       .sort((first, second) => second.createdAt - first.createdAt || second.creationOrder - first.creationOrder)
       .map(room => ({
         id: room.id, roomKey: room.roomKey, roomPinyin: room.roomPinyin, name: room.name, createdAt: room.createdAt, creator: room.creator,
-        playerCount: room.players.length, maxPlayers: room.settings.maxPlayers,
+        playerCount: room.players.filter(player => !player.cpu).length, maxPlayers: room.settings.maxPlayers,
         protected: room.passwordHash !== null, listed: room.listed, phase: room.phase,
         mode: room.settings.mode,
         dictionary: room.settings.dictionary,
@@ -193,6 +193,7 @@ export function createGameCore(options: GameCoreOptions) {
   }
 
   function resetDeadline(room: Room) {
+    cancel('answer', room.id);
     const seconds = room.settings.timerMode === 'fixed' ? room.settings.initialSeconds
       : randomInt(room.settings.randomMinSeconds, room.settings.randomMaxSeconds + 1);
     room.deadline = Date.now() + seconds * 1000;
@@ -212,6 +213,7 @@ export function createGameCore(options: GameCoreOptions) {
   }
 
   function finishRound(room: Room, winnerId: string | null) {
+    cancel('answer', room.id);
     cancel('turn', room.id);
     cancel('cpu', room.id);
     room.phase = 'between';
@@ -266,6 +268,7 @@ export function createGameCore(options: GameCoreOptions) {
   }
 
   function preparePrompt(room: Room, rules: WordRules): boolean {
+    cancel('answer', room.id);
     try {
       room.prompt = rules.generate(room.settings, room.used);
       room.draftMatch = null;
@@ -337,6 +340,7 @@ export function createGameCore(options: GameCoreOptions) {
   }
 
   function acceptWord(room: Room, player: Session, word: string, rules: WordRules) {
+    cancel('answer', room.id);
     const result = rules.match(word, room.prompt!, room.settings, room.used);
     if (!result.valid) throw new Error(`答案没有通过规则：${word}`);
     const offset = result.offset!;
@@ -346,12 +350,13 @@ export function createGameCore(options: GameCoreOptions) {
     room.used.add(word);
     room.history.push({playerId: player.id, nickname: player.nickname, word, at: Date.now()});
     player.draft = '';
-    if (result.reading) {
+    if (result.reading && room.settings.bonusEnabled !== false && player.bonusTargets.length) {
       const collected = new Set(player.collected);
-      for (const initial of result.reading.initials) if (room.settings.bonusInitials.includes(initial)) collected.add(initial);
-      if (room.settings.bonusInitials.every(initial => collected.has(initial))) {
+      for (const initial of result.reading.initials) if (player.bonusTargets.includes(initial)) collected.add(initial);
+      if (player.bonusTargets.every(initial => collected.has(initial))) {
         player.lives = Math.min(room.settings.maxLives, player.lives + 1);
         player.collected = [];
+        player.bonusTargets = drawBonusTargets(room, player);
       } else player.collected = [...collected];
     }
     room.previousPlayerId = player.id;
@@ -370,11 +375,52 @@ export function createGameCore(options: GameCoreOptions) {
     touch(room);
   }
 
+  function drawBonusTargets(room: Room, player: Session): string[] {
+    if (room.settings.bonusEnabled === false) return [];
+    const previous = new Set(player.bonusTargets);
+    const shuffle = (values: string[]) => {
+      for (let index = values.length - 1; index > 0; index--) {
+        const position = randomInt(index + 1);
+        [values[index], values[position]] = [values[position], values[index]];
+      }
+      return values;
+    };
+    const candidates = room.settings.bonusInitials;
+    const targets = [...shuffle(candidates.filter(value => !previous.has(value))), ...shuffle(candidates.filter(value => previous.has(value)))].slice(0, Math.min(5, candidates.length));
+    const occupied = new Set(room.players.filter(item => item.id !== player.id).map(item => [...item.bonusTargets].sort().join(':')));
+    if (candidates.length > targets.length && occupied.has([...targets].sort().join(':'))) {
+      for (const replacement of [...shuffle(candidates.filter(value => !targets.includes(value) && !previous.has(value))), ...shuffle(candidates.filter(value => !targets.includes(value) && previous.has(value)))]) {
+        let changed = false;
+        for (let index = targets.length - 1; index >= 0; index--) {
+          const next = targets.map((value, position) => position === index ? replacement : value);
+          if (!occupied.has([...next].sort().join(':'))) { targets.splice(0, targets.length, ...next); changed = true; break; }
+        }
+        if (changed) break;
+      }
+    }
+    return targets;
+  }
+
   function scheduleCpuTurn(room: Room) {
     cancel('cpu', room.id);
     const player = room.players.find(item => item.id === room.currentPlayerId);
     if (room.phase !== 'playing' || !player?.cpu) return;
     schedule('cpu', room.id, Date.now() + 700, {promptId: room.prompt!.id, playerId: player.id, length: 1});
+  }
+
+  function scheduleAnswer(room: Room, player: Session, valid: boolean) {
+    const key = `answer:${room.id}`;
+    const pending = events.get(key);
+    if (!valid) { cancel('answer', room.id); return; }
+    const at = pending?.promptId === room.prompt!.id && pending.playerId === player.id ? pending.at : Date.now() + 2000;
+    schedule('answer', room.id, at, {promptId: room.prompt!.id, playerId: player.id});
+  }
+
+  function automaticAnswer(room: Room, event: ScheduledEvent) {
+    const player = room.players.find(item => item.id === event.playerId);
+    if (!player || !room.prompt || room.phase !== 'playing' || room.currentPlayerId !== player.id || room.prompt.id !== event.promptId) return;
+    if (Date.now() >= room.deadline!) { timeoutTurn(room); return; }
+    if (loadedRules.match(player.draft, room.prompt, room.settings, room.used).valid) acceptWord(room, player, player.draft, loadedRules);
   }
 
   function cpuStep(room: Room, event: ScheduledEvent) {
@@ -419,6 +465,7 @@ export function createGameCore(options: GameCoreOptions) {
     room.matchPlayerIds.delete(session.id);
     room.contenderIds.delete(session.id);
     if (!room.players.some(player => !player.cpu)) {
+      cancel('answer', room.id);
       cancel('idle', room.id);
       cancel('turn', room.id);
       cancel('cpu', room.id);
@@ -467,11 +514,10 @@ export function createGameCore(options: GameCoreOptions) {
   function addCpu(room: Room) {
     if (room.phase === 'playing') throw new BusinessError('本局游戏期间不能加入电脑');
     if (room.players.some(player => player.cpu)) throw new BusinessError('房间已经有电脑玩家');
-    if (room.players.length >= room.settings.maxPlayers) throw new BusinessError('房间人数已满');
     const cpuId = randomUUID();
     room.players.push({
       id: cpuId, token: `cpu-${cpuId}`, nickname: '电脑', online: true, ready: true, role: 'player', lives: 0,
-      wins: 0, collected: [], draft: '', socket: null, roomId: room.id, cpu: true, color: nextColor(room),
+      wins: 0, collected: [], bonusTargets: [], draft: '', socket: null, roomId: room.id, cpu: true, color: nextColor(room),
     });
   }
 
@@ -510,7 +556,7 @@ export function createGameCore(options: GameCoreOptions) {
 
   function joinRoom(session: Session, room: Room | undefined, passwordValue: string) {
     if (!room) throw new BusinessError('房间不存在');
-    if (room.players.length >= room.settings.maxPlayers) throw new BusinessError('房间人数已满');
+    if (room.players.filter(player => !player.cpu).length >= room.settings.maxPlayers) throw new BusinessError('房间人数已满');
     if (room.passwordHash && !timingSafeEqual(scryptSync(passwordValue, room.passwordSalt!, 64), room.passwordHash)) {
       throw new BusinessError('房间密码不正确');
     }
@@ -568,7 +614,7 @@ export function createGameCore(options: GameCoreOptions) {
         requireHost(session, room);
         if (room.phase === 'playing') throw new BusinessError('本局游戏期间设置保持不变');
         if (room.phase === 'between' && request.data.settings.bestOf !== room.matchBestOf) throw new BusinessError('比赛局数在比赛开始前设置');
-        if (request.data.settings.maxPlayers < room.players.length) throw new BusinessError('人数上限少于当前人数');
+        if (request.data.settings.maxPlayers < room.players.filter(player => !player.cpu).length) throw new BusinessError('人数上限少于当前人数');
         room.settings = structuredClone(request.data.settings);
         for (const player of room.players) player.ready = player.cpu;
         touch(room);
@@ -640,6 +686,7 @@ export function createGameCore(options: GameCoreOptions) {
         for (const player of room.players) {
           player.lives = players.includes(player) ? room.settings.startingLives : 0;
           player.collected = [];
+          player.bonusTargets = players.includes(player) ? drawBonusTargets(room, player) : [];
           player.draft = '';
           player.role = players.includes(player) ? 'player' : 'spectator';
         }
@@ -688,6 +735,7 @@ export function createGameCore(options: GameCoreOptions) {
             tones: result.reading.tones.slice(offset, offset + room.prompt!.cells.length),
           } : undefined;
           room.draftMatch = {word: request.data.word, promptId: room.prompt!.id, offset, reading, reason: result.reason};
+          scheduleAnswer(room, session, result.valid);
           broadcastRoom(room);
           return room.draftMatch;
         }
@@ -755,7 +803,7 @@ export function createGameCore(options: GameCoreOptions) {
           session = {
             id: randomUUID(), token: randomBytes(32).toString('hex'), nickname: request.data.nickname,
             online: true, ready: false, role: 'player', lives: 0, wins: 0,
-            collected: [], draft: '', socket, roomId: null, cpu: false, color: playerColors[0],
+            collected: [], bonusTargets: [], draft: '', socket, roomId: null, cpu: false, color: playerColors[0],
           };
           sessions.set(session.token, session);
         }
@@ -820,6 +868,7 @@ export function createGameCore(options: GameCoreOptions) {
       if (event.type === 'idle') broadcastLobby();
       if (event.type === 'turn') timeoutTurn(room);
       if (event.type === 'cpu') cpuStep(room, event);
+      if (event.type === 'answer') automaticAnswer(room, event);
     }
   }
 
@@ -839,7 +888,11 @@ export function createGameCore(options: GameCoreOptions) {
   if (options.state) {
     if (options.state.version !== 1) throw new Error('持久状态版本不支持');
     creationOrder = options.state.creationOrder;
-    const allSessions = new Map(options.state.sessions.map(session => [session.token, {...session, socket: null}] as [string, Session]));
+    const allSessions = new Map(options.state.sessions.map(session => {
+      const restored = {...session, socket: null};
+      if (!Object.hasOwn(restored, 'bonusTargets')) Object.assign(restored, {bonusTargets: []});
+      return [session.token, restored] as [string, Session];
+    }));
     for (const session of allSessions.values()) if (!session.cpu) sessions.set(session.token, session);
     for (const room of options.state.rooms) rooms.set(room.id, {
       ...room, players: room.players.map(token => {
@@ -851,6 +904,9 @@ export function createGameCore(options: GameCoreOptions) {
       used: new Set(room.used), failedPromptPlayers: new Set(room.failedPromptPlayers), matchPlayerIds: new Set(room.matchPlayerIds), contenderIds: new Set(room.contenderIds),
     });
     for (const event of options.state.events) events.set(event.key, event);
+    for (const room of rooms.values()) for (const player of room.players) {
+      if (room.phase === 'playing' && room.settings.bonusEnabled !== false && !player.bonusTargets.length) player.bonusTargets = drawBonusTargets(room, player);
+    }
   }
 
   return {

@@ -176,8 +176,12 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
     const exported = JSON.parse(readFileSync((await ruleFile.path())!, 'utf8'));
     expect(Object.keys(exported)).toEqual(['version', 'settings']);
     expect(exported.version).toBe(1);
-    expect(settingsSchema.parse(exported.settings)).toEqual({ ...hostState.room!.settings, mode: 'custom' });
+    expect(settingsSchema.parse(exported.settings).promptSlots).toEqual([
+      {initial: 'required', final: 'off', tone: true, radical: false, component: false, contains: false},
+      {initial: 'required', final: 'off', tone: false, radical: false, component: false, contains: false},
+    ]);
     await host.getByRole('button', { name: '保存规则', exact: true }).click();
+    await expect.poll(() => hostState.room?.settings).toEqual(exported.settings);
     await expect(host.locator('.mode-card')).toHaveCount(5);
     await expect(host.getByRole('button', { name: '预览提示', exact: true })).toHaveCount(0);
     await expect(host.getByRole('group', { name: '声母', exact: true })).toHaveCount(0);
@@ -567,10 +571,14 @@ test('组合提示附着后保留部首与字形部件', async ({ browser }) => 
     await expect(guest.locator('.room-heading h1')).toBeVisible();
     await host.getByRole('tab', { name: '规则设置', exact: true }).click();
     await host.getByRole('button', { name: '自定义', exact: true }).click();
-    for (const label of ['声母', '声调']) await host.getByRole('group', { name: label, exact: true }).getByRole('button', { name: '关闭', exact: true }).click();
-    for (const label of ['部首', '字形部件']) await host.getByRole('group', { name: label, exact: true }).getByRole('button', { name: '必选', exact: true }).click();
-    await host.getByLabel('部首与字形部件关系', { exact: true }).selectOption('same');
-    await host.getByLabel('提示位置数量', { exact: true }).fill('1');
+    for (const position of [1, 2]) {
+      await host.getByRole('button', {name: `提示格 ${position}`, exact: true}).click();
+      await host.getByRole('group', {name: '声母', exact: true}).getByRole('button', {name: '不限', exact: true}).click();
+      await host.getByLabel('声调', {exact: true}).uncheck();
+    }
+    await host.getByRole('button', {name: '提示格 1', exact: true}).click();
+    await host.getByLabel('部首', {exact: true}).check();
+    await host.getByLabel('字形部件', {exact: true}).check();
     await host.getByLabel('可用答案下限', { exact: true }).fill('1');
     await host.getByRole('button', { name: '保存规则', exact: true }).click();
     await expect.poll(() => state.room?.settings.appearance.component).toBe('required');
@@ -649,8 +657,8 @@ test('五个模式入口和移动端页面保持可用', async ({ page }) => {
   const templates = page.locator('.custom-templates');
   await expect(templates.getByRole('button')).toHaveText(['声母+音调', '部首', '字', '只有音调']);
   await templates.getByRole('button', { name: '声母+音调', exact: true }).click();
-  await expect(page.getByRole('group', { name: '声母', exact: true }).getByRole('button', { name: '必选', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByRole('group', { name: '声调', exact: true }).getByRole('button', { name: '必选', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByRole('group', { name: '声母', exact: true }).getByRole('button', { name: '提示', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.getByLabel('声调', {exact: true})).toBeChecked();
   await expect(page.getByRole('heading', { name: '自定义规则', exact: true })).toBeVisible();
   await assertLayout(page);
 });

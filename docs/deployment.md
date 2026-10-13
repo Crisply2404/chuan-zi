@@ -46,7 +46,7 @@ docker run --name chuan-zi -p 8787:8787 -e ALLOWED_ORIGINS=https://crisply2404.g
 
 2026-10-13：Cloudflare 免费服务已发布。健康地址为 `https://chuan-zi-online.tcoinsm.workers.dev/health`，WebSocket 地址为 `wss://chuan-zi-online.tcoinsm.workers.dev/ws`。`npm run build:pages` 生成自动连接这个服务的 `dist/`；普通 `npm run build` 继续供本地 `/ws` 验证使用。大陆访问条件见 [本轮托管研究](multiplayer-hosting-research-2026-10-13.md)。
 
-公开 `/health` 与真实双人 WebSocket 已通过创建、密码加入、草稿同步、答案提交、回合传递和身份重连验证。Cloudflare 部署版本为 `e9e685c1-bc81-4e5b-8297-bda199ff17f3`，使用 2026-10-12 CC-CEDICT 快照，完整词库 89,431 条；易误写提醒只使用用户明确提供的词形。本机网络验证已经完成，中国大陆多运营商网络测量尚未完成。
+公开 `/health` 与真实双人 WebSocket 已通过创建、密码加入、草稿同步、答案提交、回合传递和身份重连验证。Cloudflare 部署版本为 `b7d1e8b5-d375-4edb-841a-1cc2158ae0da`，使用 2026-10-12 CC-CEDICT 快照，完整词库 89,431 条；逐格规则、电脑额外席位、个人随机奖励与两秒自动提交已通过公网验证。本机网络验证已经完成，中国大陆多运营商网络测量尚未完成。
 
 ## 托管配置
 

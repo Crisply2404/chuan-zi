@@ -24,3 +24,4 @@
 - `user-attachments/2026-10-12/1.png` 至 `3.png`：本轮用户消息的完整原始附件。
 - `user-attachments/2026-10-13/1.png` 与 `2.png`：重复答案、部首显示及题目顺延要求的原始附件。
 - `user-attachments/2026-10-13/word-hint-1.png` 与 `word-hint-2.png`：易误写词语和部件拼音组合提示要求的原始附件，完整保留。
+- `user-attachments/2026-10-13/mobile-layout-1.jpeg`、`mobile-layout-2.jpeg`、`mobile-layout-3.png`、`mobile-layout-4.jpeg` 至 `mobile-layout-7.jpeg`：圆周箭头、手机键盘、分隔线、轻声及全部条件布局要求的完整原图。

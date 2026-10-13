@@ -1,14 +1,15 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { ArrowLeft, Check, ChevronRight, Component, Download, Eye, Music2, Save, SlidersHorizontal, Speech, Type } from 'lucide-react';
-import { conditionTypes, modeIds, type Appearance, type ConditionType, type ModeId, type Prompt, type RelationMode, type Settings } from '../shared/types';
+import { ArrowLeft, Check, ChevronRight, Component, Download, Eye, Music2, Plus, Save, SlidersHorizontal, Speech, Type, X } from 'lucide-react';
+import { conditionTypes, modeIds, type ConditionType, type ModeId, type Prompt, type PromptSlot, type Settings } from '../shared/types';
 import { settingsSchema } from '../shared/settings';
 import { getModeSettings, modeColors, modeDescriptions, modeLabels } from '../shared/presets';
 import { PromptView } from './PromptView';
+import {emptyPromptSlot, slotsFromSettings, slotHasCondition, withPromptSlots} from '../shared/prompt-slots';
+import {bonusInitialCandidates} from '../shared/bonus-initials';
 
 export const conditionLabels: Record<ConditionType, string> = {
-  initial: '声母', final: '韵母', tone: '声调', radical: '部首', component: '字形部件', contains: '连续汉字',
+  initial: '声母', final: '韵母', tone: '声调', radical: '部首', component: '字形部件', contains: '汉字',
 };
-const initials = ['b', 'p', 'm', 'f', 'd', 't', 'n', 'l', 'g', 'k', 'h', 'j', 'q', 'x', 'zh', 'ch', 'sh', 'r', 'z', 'c', 's', 'y', 'w'];
 const modeIcons = { 'initial-tone': Speech, radical: Component, character: Type, 'tone-only': Music2, custom: SlidersHorizontal };
 
 function NumberField({ label, value, min, max, step = 1, onChange, disabled = false }: {
@@ -24,33 +25,41 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
 }) {
   const [mode, setMode] = useState<ModeId>(value.mode);
   const [editingCustom, setEditingCustom] = useState(false);
+  const [selectedSlot, setSelectedSlot] = useState(0);
   useEffect(() => setMode(value.mode), [value.mode]);
   const update = <K extends keyof Settings>(key: K, next: Settings[K]) => onChange({ ...value, [key]: next });
   const updateDictionary = (next: Settings['dictionary']) => {
-    const settings = { ...value, dictionary: next, minLength: next === 'idioms' ? 4 : 2, maxLength: Math.max(value.maxLength, next === 'idioms' ? 4 : 2), promptLength: Math.min(value.promptLength, next === 'idioms' ? 4 : 2) };
-    onChange(settings);
-    if (!editingCustom) onSave?.(settings);
+    const length = next === 'idioms' ? 4 : Math.min(value.promptLength, 2);
+    const settings = { ...value, dictionary: next, minLength: next === 'idioms' ? 4 : 2, maxLength: Math.max(value.maxLength, next === 'idioms' ? 4 : 2), promptLength: length,
+      hiddenCount: Math.max(0, Math.min(length - 1, value.hiddenCount + length - value.promptLength)) };
+    const nextSettings = settings.promptSlots ? withPromptSlots(settings, [...settings.promptSlots.slice(0, length), ...Array.from({length: Math.max(0, length - settings.promptSlots.length)}, emptyPromptSlot)]) : settings;
+    onChange(nextSettings);
+    if (!editingCustom) onSave?.(nextSettings);
   };
   const validate = settingsSchema.safeParse(value);
   const problems = validate.success ? [] : [...new Set(validate.error.issues.map(issue => issue.message))];
-  const relation = (first: ConditionType, second: ConditionType): RelationMode => value.relations.find(item =>
-    (item.first === first && item.second === second) || (item.first === second && item.second === first))?.mode || 'free';
-  const setRelation = (first: ConditionType, second: ConditionType, relationMode: RelationMode) => update('relations', [
-    ...value.relations.filter(item => !((item.first === first && item.second === second) || (item.first === second && item.second === first))),
-    ...(relationMode === 'free' ? [] : [{ first, second, mode: relationMode }]),
-  ]);
+  const slots = slotsFromSettings(value);
+  const selectedIndex = Math.min(selectedSlot, slots.length - 1);
+  const currentSlot = slots[selectedIndex];
+  const updateSlot = <K extends keyof PromptSlot>(type: K, next: PromptSlot[K]) => {
+    const nextSlots = slots.map((slot, index) => index === selectedIndex ? {...slot, [type]: next} : slot);
+    onChange(withPromptSlots(value, nextSlots));
+  };
   const applyTemplate = (template: Exclude<ModeId, 'custom'>) => {
     const next = getModeSettings(template);
-    onChange({ ...next, mode: 'custom', dictionary: value.dictionary, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers });
+    if (value.dictionary === 'idioms') {next.hiddenCount += 4 - next.promptLength; next.promptLength = 4;}
+    const configured = {...next, dictionary: value.dictionary, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers};
+    onChange(withPromptSlots(configured, slotsFromSettings(configured)));
+    setSelectedSlot(0);
   };
-  const active = conditionTypes.filter(type => value.appearance[type] !== 'off');
   const custom = editingCustom;
   const selectMode = (next: ModeId) => {
     setMode(next);
     setEditingCustom(next === 'custom');
-    const settings = next === 'custom' ? { ...value, mode: 'custom' as const } : {
+    const settings = next === 'custom' ? withPromptSlots(value, slotsFromSettings(value)) : {
       ...getModeSettings(next), dictionary: value.dictionary, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers,
     };
+    if (next !== 'custom' && value.dictionary === 'idioms') {settings.hiddenCount += 4 - settings.promptLength; settings.promptLength = 4;}
     onChange(settings);
     if (next !== 'custom') onSave?.(settings);
   };
@@ -81,31 +90,26 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
           </button>;
         })}</div>}
         {custom ? <><div className="custom-templates" aria-label="预设模板"><span>预设模板</span><div className="preset-row">{(['initial-tone', 'radical', 'character', 'tone-only'] as const).map(template => <button type="button" className="preset-button" key={template}
-          onClick={() => applyTemplate(template)}>{modeLabels[template]}</button>)}</div></div><div className="condition-controls">{conditionTypes.map(type => <div className="condition-row" key={type}>
-          <span>{conditionLabels[type]}</span><div className="segments" role="group" aria-label={conditionLabels[type]}>{([
-            ['off', '关闭'], ['random', '随机'], ['required', '必选'],
-          ] as [Appearance, string][]).map(([appearance, label]) => <button type="button" key={appearance} aria-pressed={value.appearance[type] === appearance}
-            onClick={() => update('appearance', { ...value.appearance, [type]: appearance })}>{label}</button>)}</div>
-        </div>)}</div>{value.appearance.tone !== 'off' && <label className="select-field"><span>声调位置</span><select value={value.toneScope} onChange={event => update('toneScope', event.target.value as Settings['toneScope'])}>
-          <option value="one">一个汉字</option><option value="some">部分汉字</option><option value="all">全部汉字</option>
-        </select></label>}</> : null}
+          onClick={() => applyTemplate(template)}>{modeLabels[template]}</button>)}</div></div>
+          <div className="slot-grid" aria-label="提示格设置">{slots.map((slot, index) => <div className="slot-choice" key={index}>
+            <button type="button" className="slot-card" aria-label={`提示格 ${index + 1}`} aria-pressed={index === selectedIndex} onClick={() => setSelectedSlot(index)}>
+              <span className="slot-number">第 {index + 1} 格</span><span className="slot-content">{slotHasCondition(slot) ? conditionTypes.filter(type => type === 'initial' || type === 'final' ? slot[type] !== 'off' : slot[type]).map(type => <span key={type}>{(type === 'initial' || type === 'final') && slot[type] === 'absent' ? `无${conditionLabels[type]} ∅` : conditionLabels[type]}</span>) : <span className="slot-wildcard">*</span>}</span>
+            </button><button type="button" className="slot-remove" aria-label={`删除提示格 ${index + 1}`} disabled={slots.length === 1} onClick={() => {onChange(withPromptSlots(value, slots.filter((_, position) => position !== index))); setSelectedSlot(Math.max(0, index - 1));}}><X size={12} /></button>
+          </div>)}<button type="button" className="slot-add" aria-label="添加提示格" disabled={slots.length >= 9} onClick={() => {onChange(withPromptSlots(value, [...slots, emptyPromptSlot()])); setSelectedSlot(slots.length);}}><Plus size={22} /></button></div>
+          <div className="slot-editor" aria-label={`第 ${selectedIndex + 1} 格条件`}>
+            {(['initial', 'final'] as const).map(type => <div className="condition-row" key={type}><span>{conditionLabels[type]}</span><div className="segments" role="group" aria-label={conditionLabels[type]}>
+              {([['off', '不限'], ['required', '提示'], ['absent', `无${conditionLabels[type]}`]] as const).map(([choice, label]) => <button type="button" key={choice} aria-pressed={currentSlot[type] === choice} onClick={() => updateSlot(type, choice)}>{label}</button>)}
+            </div></div>)}
+            <div className="slot-checks">{(['tone', 'radical', 'component', 'contains'] as const).map(type => <label className="checkbox-field" key={type}><input type="checkbox" checked={currentSlot[type]} onChange={event => updateSlot(type, event.target.checked)} />{conditionLabels[type]}</label>)}</div>
+            <p className="settings-help">同格条件共同限制一个汉字。* 代表不限条件，∅ 代表对应发音部分为空。</p>
+          </div></> : null}
       </section>
       {custom && <>
-        <section className="settings-section">
-          <h3>条件关系</h3>
-          <div className="relation-list">{active.length < 2 ? <span className="muted">独立条件</span> : active.flatMap((first, index) => active.slice(index + 1).map(second =>
-            <label className="relation-row" key={`${first}:${second}`}><span>{conditionLabels[first]} <span className="relation-plus">＋</span> {conditionLabels[second]}</span>
-              <select aria-label={`${conditionLabels[first]}与${conditionLabels[second]}关系`} value={relation(first, second)} onChange={event => setRelation(first, second, event.target.value as RelationMode)}>
-                <option value="free">自由位置</option><option value="same">同一汉字</option><option value="different">不同汉字</option>
-              </select></label>))}</div>
-        </section>
         <section className="settings-section">
           <h3>词库与难度</h3>
           <div className="number-grid">
             <NumberField label="答案最短字数" value={value.minLength} min={2} max={9} onChange={next => update('minLength', next)} />
             <NumberField label="答案最长字数" value={value.maxLength} min={2} max={9} onChange={next => update('maxLength', next)} />
-            <NumberField label="提示位置数量" value={value.promptLength} min={1} max={8} onChange={next => update('promptLength', next)} />
-            <NumberField label="隐藏位置数量" value={value.hiddenCount} min={0} max={7} onChange={next => update('hiddenCount', next)} />
             <NumberField label="可用答案下限" value={value.minAnswers} min={1} max={100000} onChange={next => update('minAnswers', next)} />
             <NumberField label="可用答案上限" value={value.maxAnswers} min={1} max={100000} onChange={next => update('maxAnswers', next)} />
           </div>
@@ -118,10 +122,10 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
             <NumberField label="初始生命" value={value.startingLives} min={1} max={10} onChange={next => update('startingLives', next)} />
             <NumberField label="生命上限" value={value.maxLives} min={1} max={10} onChange={next => update('maxLives', next)} />
           </div>
-          <div className="bonus-setting"><span>奖励声母</span><div className="initial-grid">{initials.map(initial => <label key={initial} className="initial-choice">
+          <div className="bonus-setting"><label className="checkbox-field"><input type="checkbox" checked={value.bonusEnabled !== false} onChange={event => update('bonusEnabled', event.target.checked)} />奖励声母</label>{value.bonusEnabled !== false && <><span className="settings-help">每人从候选中随机获得五个目标，集齐后增加一个生命。</span><div className="initial-grid">{bonusInitialCandidates.map(initial => <label key={initial} className="initial-choice">
             <input type="checkbox" checked={value.bonusInitials.includes(initial)} onChange={event => update('bonusInitials', event.target.checked
               ? [...value.bonusInitials, initial] : value.bonusInitials.filter(item => item !== initial))} /><span>{initial}</span>
-          </label>)}</div></div>
+          </label>)}</div></>}</div>
         </section>
         <section className="settings-section">
           <h3>计时</h3><div className="segments timer-segments" role="group" aria-label="计时方式">

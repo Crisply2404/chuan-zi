@@ -10,6 +10,7 @@ import { GameAudio } from './audio';
 import { DrumTransfer } from './DrumTransfer';
 import { modeColors, modeLabels } from '../shared/presets';
 import { correctionMessage } from '../shared/word-corrections';
+import { useAnswerVisibility } from './useAnswerVisibility';
 
 const phaseLabels: Record<RoomView['phase'], string> = { waiting: '准备中', playing: '正在游戏', between: '本局结束', finished: '比赛结束' };
 const connectionLabels = { idle: '未连接', connecting: '正在连接', connected: '已连接', reconnecting: '正在重连' };
@@ -233,7 +234,8 @@ function PlayerTopology({ room, self, isHost, busy, connected, act, seconds }: {
   const topology = useRef<HTMLDivElement>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [layout, setLayout] = useState({ width: 500, height: 160, avatarSize: 48 });
-  const count = Math.max(2, room.players.length);
+  const canAddCpu = isHost && room.phase !== 'playing' && !room.players.some(player => player.cpu);
+  const count = Math.max(2, room.players.length + (canAddCpu ? 1 : 0));
   const dense = count > 8;
   useLayoutEffect(() => {
     const root = topology.current!;
@@ -284,7 +286,7 @@ function PlayerTopology({ room, self, isHost, busy, connected, act, seconds }: {
             </div>}
           </div>;
         })}
-        {isHost && room.players.length === 1 && room.phase !== 'playing' && <button type="button" className="topology-add" style={{left: `${layout.width / 2 + radius}px`, top: `${layout.height / 2 - layout.avatarSize / 2}px`}} aria-label="添加电脑" disabled={busy || !connected} onClick={() => act({ type: 'addCpu', data: {} })}>
+        {canAddCpu && <button type="button" className="topology-add" style={{left: `${layout.width / 2 + Math.cos(playerAngle(room.players.length, count)) * radius}px`, top: `${layout.height / 2 + Math.sin(playerAngle(room.players.length, count)) * radius - layout.avatarSize / 2}px`}} aria-label="添加电脑" disabled={busy || !connected} onClick={() => act({ type: 'addCpu', data: {} })}>
           <span className="topology-avatar"><Plus size={24} /></span><span>添加电脑</span>
         </button>}
         <div className="topology-center"><span className={room.phase === 'playing' ? 'drum-beat' : ''} style={{ '--beat-duration': `${seconds <= 3 ? .3 : seconds <= 5 ? .5 : seconds <= 10 ? .85 : 1.4}s` } as CSSProperties}><DrumMark size={46} /></span></div>
@@ -315,6 +317,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const chatComposing = useRef(false);
   const chatComposedAt = useRef(0);
   const input = useRef<HTMLInputElement>(null);
+  const answerRegion = useRef<HTMLDivElement>(null);
   const pendingSelection = useRef<number | null>(null);
   const [cursor, setCursor] = useState(0);
   const [inputFocused, setInputFocused] = useState(false);
@@ -366,6 +369,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
     input.current?.focus({ preventScroll: true });
     input.current?.setSelectionRange(position, position);
     setCursor(index);
+    revealAnswer();
   };
   const chatList = useRef<HTMLDivElement>(null);
   const historyList = useRef<HTMLDivElement>(null);
@@ -381,6 +385,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   }, []);
   const isTurn = room.phase === 'playing' && self?.id === room.currentPlayerId && self.role === 'player';
   const canEdit = isTurn && connected;
+  const revealAnswer = useAnswerVisibility(answerRegion, input, canEdit);
   const deadlineOffset = room.serverTime - Date.now();
   const serverOffset = useRef(deadlineOffset);
   useEffect(() => { serverOffset.current = room.serverTime - Date.now(); }, [room.serverTime]);
@@ -481,7 +486,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
       </div></div>
       <PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} seconds={seconds} />
       {(room.phase === 'playing' || activeCompletion) && shownPrompt ? <>
-        <div className="timer-area"><div className={`timer ${seconds <= 5 ? 'timer-urgent' : ''}`} aria-label="剩余时间"><span>{seconds.toFixed(1)}</span><small>秒</small></div>
+        <div className="answer-region" ref={answerRegion}><div className="timer-area"><div className={`timer ${seconds <= 5 ? 'timer-urgent' : ''}`} aria-label="剩余时间"><span>{seconds.toFixed(1)}</span><small>秒</small></div>
           <div className="timer-track"><span style={{ width: `${Math.min(100, seconds / initial * 100)}%` }} /></div></div>
         <form className={`answer-form ${isTurn ? 'answer-active' : 'answer-watching'}`} style={{ '--player-color': inputColor } as CSSProperties} onSubmit={submit}>
           <PromptView prompt={shownPrompt} draft={shownWord} draftMatch={shownMatch} supplementColor={inputColor} submitting={Boolean(activeCompletion && !activeCompletion.returning)} onCombined={finishCombined} feedback={feedback} maxLength={room.settings.maxLength} cursor={cursor} focused={isTurn && inputFocused} onSelectCharacter={selectCharacter} answerInput={<input ref={input} aria-label="输入答案" value={isTurn ? inputValue : shownWord} autoComplete="off" autoCorrect="off" spellCheck={false}
@@ -498,8 +503,9 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
           onKeyDown={event => { if (event.key === 'Enter' && (event.nativeEvent.isComposing || composing.current || event.keyCode === 229 || Date.now() - composedAt.current < 120)) event.preventDefault(); }} />} />
           <button type="submit" className="submit-button" title="提交答案" aria-label="提交答案" disabled={!isTurn || !connected || busy || !word.trim()}><ArrowRight size={23} /></button>
           <div className="answer-message" role="status" aria-live="polite">{duplicateWord ? '这个词之前输入过了' : wordCorrection ?? answerMessage}</div>
-        </form>
-        {self && <div className="bonus-progress"><div><span>奖励生命</span><Heart size={13} /></div><div className="bonus-letters">{room.settings.bonusInitials.map(initial =>
+          {room.settings.minLength !== shownPrompt.cells.length && <div className="answer-length-hint">答案最短为 {room.settings.minLength} 个字</div>}
+        </form></div>
+        {self && room.settings.bonusEnabled !== false && <div className="bonus-progress"><div><span>奖励生命</span><Heart size={13} /></div><div className="bonus-letters">{self.bonusTargets.map(initial =>
           <span className={self.collected.includes(initial) ? 'bonus-collected' : ''} key={initial}>{initial}</span>)}</div></div>}
       </> : <div className="waiting-stage">
         {room.phase === 'finished' ? <h2>{winners.length ? `${winners.map(player => player.nickname).join('、')} 获胜` : '比赛平局'}</h2>

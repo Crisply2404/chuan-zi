@@ -6,6 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import { defaultSettings, type ClientCommand, type DictionaryData, type RoomView, type ServerMessage } from '../shared/types';
 import { WordRules } from '../shared/rules';
+import {emptyPromptSlot, withPromptSlots} from '../shared/prompt-slots';
 
 function createWorker(bindings: Record<string, string> = {}, persistPath = `.scratch/cloudflare/test-storage-${randomUUID()}`) {
   return new Miniflare(convertV4MiniflareOptions({
@@ -59,6 +60,31 @@ class Client {
   }
   close() { if (this.socket.readyState === 1) this.socket.close(1000); }
 }
+
+test('Cloudflare 合法草稿两秒提交在 Hibernation 后保留计时', async t => {
+  const worker = createWorker();
+  t.after(() => worker.dispose());
+  const first = await Client.connect(worker, '甲玩家');
+  const second = await Client.connect(worker, '乙玩家');
+  t.after(() => first.close()); t.after(() => second.close());
+  const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
+  const settings = withPromptSlots({...defaultSettings, initialSeconds: 20}, [{...emptyPromptSlot(), initial: 'required'}, {...emptyPromptSlot(), initial: 'required'}]);
+  await first.request({type: 'create', data: {name: '', password: '', settings}});
+  await second.request({type: 'join', data: {roomId: first.room!.id, password: ''}});
+  await first.request({type: 'ready', data: {ready: true}}); await second.request({type: 'ready', data: {ready: true}});
+  await first.request({type: 'start', data: {}});
+  const question = first.room!.prompt!;
+  const word = rules.examples(question, first.room!.settings, new Set(), 1)[0].word;
+  const started = Date.now();
+  const from = second.messages.length;
+  await first.request({type: 'draft', data: {word, promptId: question.id}});
+  await worker.unsafeEvictDurableObject('chuan-zi-online', 'GameHub', {name: 'chuan-zi', webSockets: 'hibernate'});
+  await second.wait(message => message.type === 'state' && message.room?.history.length === 1, from, 5000);
+  assert.ok(Date.now() - started >= 1800 && Date.now() - started < 4500);
+  assert.equal(second.room!.history[0].word, word);
+  assert.equal((await first.request({type: 'submit', data: {word, promptId: question.id}})).ok, true);
+  assert.equal(second.room!.history.length, 1);
+});
 
 test('Cloudflare 公开入口提供健康检查并限制 WebSocket 来源', async t => {
   const worker = createWorker();

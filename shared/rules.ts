@@ -1,4 +1,4 @@
-import { conditionTypes, type ConditionType, type DictionaryData, type MatchResult, type Prompt, type Settings, type WordEntry } from './types';
+import { conditionTypes, type ConditionType, type DictionaryData, type MatchResult, type Prompt, type PromptSlot, type Reading, type Settings, type WordEntry } from './types';
 import { validateSettings } from './settings';
 import { correctionFor, correctionMessage } from './word-corrections';
 
@@ -138,30 +138,51 @@ export class WordRules {
     });
   }
 
+  private slotWindows(entry: WordEntry, slots: PromptSlot[]): {reading: Reading; offset: number}[] {
+    const characters = [...entry.word];
+    return entry.readings.flatMap(reading => Array.from({length: Math.max(0, characters.length - slots.length + 1)}, (_, offset) => ({reading, offset})).filter(({offset}) => slots.every((slot, index) => {
+      const position = offset + index;
+      const character = this.data.characters[characters[position]];
+      return (slot.initial !== 'absent' || reading.initials[position] === '')
+        && (slot.final !== 'absent' || reading.finals[position] === '')
+        && (!slot.tone || reading.tones[position] >= 1 && reading.tones[position] <= 4)
+        && (!slot.radical || this.radicalsFor(characters[position]).length > 0)
+        && (!slot.component || Object.keys(character?.strokeParts ?? {}).length > 0);
+    })));
+  }
+
   generate(settings: Settings, used = new Set<string>()): Prompt {
     validateSettings(settings);
-    if (settings.mode === 'radical') settings = {...settings, promptLength: Math.random() < .5 ? 1 : 2, hiddenCount: 0};
+    if (settings.mode === 'radical') {
+      const count = Math.random() < .5 ? 1 : 2;
+      settings = {...settings, promptLength: settings.dictionary === 'idioms' ? 4 : count, hiddenCount: settings.dictionary === 'idioms' ? 4 - count : 0};
+    }
     const candidates = this.data.words.filter(entry => this.allowed(entry, settings) && !used.has(entry.word));
     if (!candidates.length) throw new RuleError('当前词库没有符合设置的答案');
+    const slotCandidates = settings.promptSlots ? candidates.map(entry => ({entry, windows: this.slotWindows(entry, settings.promptSlots!)})).filter(item => item.windows.length) : null;
+    if (slotCandidates && !slotCandidates.length) throw new RuleError('当前词库没有符合逐格条件的答案');
     const visibleCount = settings.promptLength - settings.hiddenCount;
     const required = conditionTypes.filter(type => settings.appearance[type] === 'required');
-    if (!this.assignMasks(required, Array.from({ length: visibleCount }, (_, index) => index), settings, false)) {
+    if (!settings.promptSlots && !this.assignMasks(required, Array.from({ length: visibleCount }, (_, index) => index), settings, false)) {
       throw new RuleError('提示位置数量无法满足当前条件关系与声调范围');
     }
     const active = conditionTypes.filter(type => settings.appearance[type] !== 'off');
     const possibleSelections = Array.from({ length: (1 << active.length) - 1 }, (_, index) => active.filter((_, bit) => (index + 1) & (1 << bit)))
       .filter(selected => required.every(type => selected.includes(type)) && this.assignMasks(selected, Array.from({ length: visibleCount }, (_, index) => index), settings));
-    if (!possibleSelections.length) throw new RuleError('提示位置数量无法满足当前条件关系与声调范围');
+    if (!settings.promptSlots && !possibleSelections.length) throw new RuleError('提示位置数量无法满足当前条件关系与声调范围');
     for (let attempt = 0; attempt < 500; attempt++) {
-      const candidate = candidates[Math.floor(Math.random() * candidates.length)];
-      const reading = candidate.readings[Math.floor(Math.random() * candidate.readings.length)];
+      const slotCandidate = slotCandidates?.[Math.floor(Math.random() * slotCandidates.length)];
+      const candidate = slotCandidate?.entry ?? candidates[Math.floor(Math.random() * candidates.length)];
+      const window = slotCandidate?.windows[Math.floor(Math.random() * slotCandidate.windows.length)];
+      const reading = window?.reading ?? candidate.readings[Math.floor(Math.random() * candidate.readings.length)];
       const length = [...candidate.word].length;
       const span = settings.promptLength;
-      const offset = Math.floor(Math.random() * (length - span + 1));
+      const offset = window?.offset ?? Math.floor(Math.random() * (length - span + 1));
       const cells = Array.from({ length: span }, () => ({} as Prompt['cells'][number]));
       const selected = possibleSelections[Math.floor(Math.random() * possibleSelections.length)];
       const positions = this.shuffle(Array.from({ length: span }, (_, index) => index)).slice(0, visibleCount);
-      const assignments = this.assignMasks(selected, positions, settings);
+      const assignments = settings.promptSlots ? new Map(conditionTypes.map(type => [type, settings.promptSlots!.flatMap((slot, index) =>
+        (type === 'initial' || type === 'final' ? slot[type] !== 'off' : slot[type]) ? [index] : [])])) : this.assignMasks(selected, positions, settings);
       if (!assignments) continue;
       let complete = true;
       for (const [type, mask] of assignments) {
@@ -169,9 +190,18 @@ export class WordRules {
           const absolute = offset + position;
           const cell = cells[position];
           const character = this.data.characters[[...candidate.word][absolute]];
-          if (type === 'initial') cell.initial = reading.initials[absolute];
-          if (type === 'final') cell.final = reading.finals[absolute];
-          if (type === 'tone') cell.tone = reading.tones[absolute];
+          if (type === 'initial') {
+            if (settings.promptSlots?.[position].initial === 'absent' && reading.initials[absolute] !== '') complete = false;
+            cell.initial = reading.initials[absolute];
+          }
+          if (type === 'final') {
+            if (settings.promptSlots?.[position].final === 'absent' && reading.finals[absolute] !== '') complete = false;
+            cell.final = reading.finals[absolute];
+          }
+          if (type === 'tone') {
+            if (reading.tones[absolute] === 5) complete = false;
+            else cell.tone = reading.tones[absolute];
+          }
           if (type === 'radical') {
             const radicals = this.radicalsFor([...candidate.word][absolute]);
             if (!radicals.length) complete = false;

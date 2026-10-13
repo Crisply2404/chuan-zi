@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { conditionTypes, modeIds } from './types';
+import {slotHasCondition} from './prompt-slots';
 
 const appearance = z.enum(['off', 'random', 'required']);
 const conditionType = z.enum(conditionTypes);
@@ -9,11 +10,13 @@ export const settingsSchema = z.object({
   dictionary: z.enum(['idioms', 'words', 'all']),
   minLength: z.number().int().min(2).max(9),
   maxLength: z.number().int().min(2).max(9),
-  promptLength: z.number().int().min(1).max(8),
-  hiddenCount: z.number().int().min(0).max(7),
+  promptLength: z.number().int().min(1).max(9),
+  hiddenCount: z.number().int().min(0).max(8),
   appearance: z.object({initial: appearance, final: appearance, tone: appearance, radical: appearance, component: appearance, contains: appearance}).strict(),
   relations: z.array(z.object({ first: conditionType, second: conditionType, mode: z.enum(['free', 'same', 'different']) }).strict()).max(15),
   toneScope: z.enum(['one', 'some', 'all']),
+  promptSlots: z.array(z.object({initial: z.enum(['off', 'required', 'absent']), final: z.enum(['off', 'required', 'absent']),
+    tone: z.boolean(), radical: z.boolean(), component: z.boolean(), contains: z.boolean()}).strict()).min(1).max(9).optional(),
   minAnswers: z.number().int().min(1).max(100000),
   maxAnswers: z.number().int().min(1).max(100000),
   startingLives: z.number().int().min(1).max(10),
@@ -24,10 +27,12 @@ export const settingsSchema = z.object({
   randomMaxSeconds: z.number().int().min(1).max(120),
   bestOf: z.number().int().min(1).max(21),
   maxPlayers: z.number().int().min(2).max(16),
-  bonusInitials: z.array(z.string().regex(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])$/)).min(1).max(23),
+  bonusInitials: z.array(z.string().regex(/^(zh|ch|sh|[bpmfdtnlgkhjqxrzcsyw])$/)).max(23),
+  bonusEnabled: z.boolean().optional(),
 }).strict().superRefine((value, context) => {
   const invalid = (message: string) => context.addIssue({code: z.ZodIssueCode.custom, message});
   if (value.minLength > value.maxLength) invalid('最短答案长度超过最长答案长度');
+  if (value.dictionary === 'idioms' && value.minLength < 4) invalid('成语答案至少四个汉字');
   if (value.promptLength > value.minLength) invalid('提示长度不能超过最短答案长度');
   if (value.hiddenCount >= value.promptLength) invalid('至少保留一个提示位置');
   if (value.minAnswers > value.maxAnswers) invalid('答案数量下限超过上限');
@@ -42,6 +47,13 @@ export const settingsSchema = z.object({
     pairs.add(key);
   }
   if (new Set(value.bonusInitials).size !== value.bonusInitials.length) invalid('奖励声母不能重复');
+  if (value.bonusEnabled !== false && value.bonusInitials.length === 0) invalid('启用奖励声母时至少选择一个候选');
+  if (value.promptSlots) {
+    if (value.mode !== 'custom') invalid('逐格条件用于自定义模式');
+    if (value.promptSlots.length !== value.promptLength) invalid('提示格数量与规则不一致');
+    if (value.promptSlots.filter(slot => !slotHasCondition(slot)).length !== value.hiddenCount) invalid('隐藏格数量与规则不一致');
+    if (value.promptSlots.every(slot => !slotHasCondition(slot))) invalid('至少给一个提示格选择条件');
+  }
 });
 
 export function validateSettings(input: unknown) {

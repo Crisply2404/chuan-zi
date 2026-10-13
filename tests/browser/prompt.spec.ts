@@ -126,13 +126,13 @@ test('附着答案中间的提示读取对应汉字的完整拼音', async ({ pa
   } finally { await page.close(); await server.close(); }
 });
 
-test('未提供条件的提示位置显示空集符号', async ({ page }) => {
+test('未提供条件的提示位置显示星号', async ({ page }) => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
   await server.listen();
   const address = server.httpServer!.address() as AddressInfo;
   try {
     await page.goto(`http://127.0.0.1:${address.port}/tests/browser/prompt-harness.html?case=hidden`);
-    await expect(page.locator('.prompt-cell').nth(1)).toHaveText('∅');
+    await expect(page.locator('.prompt-cell').nth(1)).toHaveText('*');
     await expect(page.locator('.prompt-cell').nth(1)).toHaveAttribute('aria-label', '不限条件');
   } finally { await page.close(); await server.close(); }
 });

@@ -30,6 +30,15 @@
 | 38：返回过程中更新提示 | resolved | diagnosing-bugs、tdd、code-review | 返回开始显示新提示，连续位置与即时输入通过 |
 | 39：部件与拼音组合布局 | resolved | diagnosing-bugs、tdd、code-review | 电脑和手机的部件在上、拼音在下，结合与声调检查通过 |
 | 40：用户维护易误写提醒 | resolved | tdd、writing-for-agents | 用户指定词形与两项字段，规则、联机、浏览器、workerd 与构建通过 |
+| 41：圆周箭头目标方向 | resolved | diagnosing-bugs、tdd、code-review | 人数等分方向，电脑和手机布局变化通过 |
+| 42：手机键盘与答案可见 | resolved | research、diagnosing-bugs、tdd、code-review | Android 原生键盘和输入可见通过；iOS 尚未实测 |
+| 43：分隔线与轻声显示 | resolved | tdd、code-review | 大厅单条分隔线，完整轻声直接显示字母通过 |
+| 44：全部条件方格布局 | resolved | diagnosing-bugs、tdd、code-review | 320px、390px 与电脑组合条件边界通过 |
+| 45：声调范围与两秒自动提交 | resolved | tdd、code-review | 第一至第四声，连续合法草稿与 Hibernation 调度通过 |
+| 46：多人房间电脑与设置名称 | resolved | tdd、code-review | 人类上限额外一名电脑，汉字名称通过 |
+| 47：自定义逐格规则 | resolved | grilling、tdd、code-review | 格子条件、无发音字段、星号、模板、预览、保存导出通过 |
+| 48：个人随机奖励声母 | resolved | grilling、tdd、code-review | 五个目标、集齐重新抽取、最少重复、开关和单候选通过 |
+| 49：提示窗口与最短长度 | resolved | grilling、tdd、code-review | 片段自由匹配、不同长度提示、成语默认四格通过 |
 
 ## 用户已经确定的要求
 

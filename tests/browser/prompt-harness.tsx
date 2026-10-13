@@ -19,6 +19,8 @@ const cases: Record<string, { cells: PromptCell[]; word: string }> = {
   zeroInitial: { cells: [{ initial: '' }], word: '安心' },
   radical: { cells: [{ radical: '冫' }], word: '冰凉' },
   combined: { cells: [{ radical: '冫', initial: 'b' }], word: '冰凉' },
+  neutral: { cells: [{initial: 'd'}], word: '使得' },
+  all: {cells: [{initial: 'zh', final: 'ua', tone: 1, radical: '扌', component: '爪', contains: '抓'}, {initial: 'b', final: 'ing', tone: 3, radical: '饣', component: '并', contains: '饼'}], word: '抓饼'},
 };
 const name = new URLSearchParams(location.search).get('case') || 'sliding';
 const selected = cases[name];

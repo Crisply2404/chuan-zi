@@ -6,6 +6,7 @@ import { formatPinyin } from '../shared/pinyin';
 import { getModeSettings, getPresetSettings } from '../shared/presets';
 import { defaultSettings, type DictionaryData, type Prompt } from '../shared/types';
 import corrections from '../data/common-mistakes.json' with {type: 'json'};
+import {emptyPromptSlot, withPromptSlots} from '../shared/prompt-slots';
 
 const data = JSON.parse(readFileSync('data/dictionary.json', 'utf8')) as DictionaryData;
 const rules = new WordRules(data);
@@ -32,6 +33,36 @@ test('默认设置使用全部词语并允许两个汉字答案', () => {
     assert.equal(settings.dictionary, 'all');
     assert.equal(settings.minLength, 2);
   }
+});
+
+test('声调条件只生成第一至第四声，完整答案轻声正常显示', () => {
+  const settings = {...defaultSettings, promptLength: 1, minAnswers: 1, maxAnswers: 100000, appearance: {initial: 'off' as const, final: 'off' as const, tone: 'required' as const, radical: 'off' as const, component: 'off' as const, contains: 'off' as const}};
+  for (let index = 0; index < 80; index++) assert.ok(rules.generate(settings).cells.filter(cell => cell.tone !== undefined).every(cell => cell.tone! >= 1 && cell.tone! <= 4));
+  assert.equal(formatPinyin('d', 'e', 5), 'de');
+  assert.equal(rules.match('使得', prompt([{contains: '得'}]), defaultSettings).valid, true);
+});
+
+test('逐格条件固定同字条件和隐藏位置，并接受无声母或无韵母', () => {
+  const settings = withPromptSlots({...defaultSettings, minLength: 3, maxAnswers: 100000, minAnswers: 1}, [
+    {...emptyPromptSlot(), initial: 'absent', tone: true}, emptyPromptSlot(), {...emptyPromptSlot(), contains: true},
+  ]);
+  const result = rules.generate(settings);
+  assert.equal(result.cells[0].initial, '');
+  assert.ok(result.cells[0].tone! >= 1 && result.cells[0].tone! <= 4);
+  assert.deepEqual(result.cells[1], {});
+  assert.equal([...result.cells[2].contains!].length, 1);
+  assert.ok(rules.examples(result, settings).length > 0);
+  const consonant = withPromptSlots({...defaultSettings, minAnswers: 1, maxAnswers: 100000}, [{...emptyPromptSlot(), final: 'absent'}]);
+  assert.equal(rules.generate(consonant).cells[0].final, '');
+  assert.equal(rules.match('姆妈', prompt([{final: ''}]), consonant).valid, true);
+});
+
+test('两格提示在三个汉字答案前后均能匹配，星号占用一个汉字位置', () => {
+  const settings = {...defaultSettings, minLength: 3};
+  assert.equal(rules.match('白开水', prompt([{contains: '白'}, {contains: '开'}]), settings).offset, 0);
+  assert.equal(rules.match('白开水', prompt([{contains: '开'}, {contains: '水'}]), settings).offset, 1);
+  assert.equal(rules.match('白开水', prompt([{contains: '开'}, {contains: '水'}, {}]), settings).valid, false);
+  assert.equal(rules.match('白开水', prompt([{}, {contains: '开'}, {contains: '水'}]), settings).valid, true);
 });
 
 test('草稿只在完整合法词语匹配提示后返回附着位置', () => {
@@ -78,7 +109,8 @@ test('部首预设按相等概率生成一个或两个提示位置', () => {
   const counts = new Map<number, number>();
   for (let index = 0; index < 80; index++) {
     const result = rules.generate(settings);
-    counts.set(result.cells.length, (counts.get(result.cells.length) ?? 0) + 1);
+    const count = result.cells.filter(cell => cell.radical !== undefined).length;
+    counts.set(count, (counts.get(count) ?? 0) + 1);
     assert.ok(rules.examples(result, settings).every(entry => rules.match(entry.word, result, settings).valid));
   }
   assert.deepEqual([...counts.keys()].sort(), [1, 2]);

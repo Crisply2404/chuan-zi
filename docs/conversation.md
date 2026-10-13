@@ -3761,3 +3761,330 @@ Cloudflare 已更新，Pages 产物已生成。本地提交尚未 push，个人�
 已调整：每条记录只保存 `incorrect` 和 `correct`，目前仅有“不可置否→不置可否”。以后只添加你亲自发现并明确告诉我的词语，维护规则已记录。
 
 验证通过，线上服务已同步，修改已提交并推送。
+
+## 用户消息 65
+
+````text
+[$ask-matt](/Users/hco/.agents/skills/ask-matt/SKILL.md) 1.如图1，我希望箭头永远是平分拓扑图的360度角的，并不是要刻意指向玩家的某一处。也就是两个人的时候箭头必须是水平的，因为两个人在拓扑图的关系就是水平的，三个人的时候必须是差120°的，因为三个人在拓扑图的关系就是差120度的，明白我什么意思？你不清晰的话可以接着问。
+2.如图2，在手机端当我点输入格的时候，我的输入法弹出来了，但是我的输入格没紧接着浮现在我眼前，这不行，我要求点点击输入格弹出输入法的时候输入法必须在输入格之下，这样玩家才能在想输入的时候时刻看到自己在输什么。
+3.如图3，我认为应该把我红框框住的线去掉，这是重复ui，和下面那条一样的线重复了。
+4.如图4，轻声的时候不需要把"·“这一个代表轻声的点符号写在拼音的右边，比如图4直接写“de“就好了，图5提交后冒出来的答案也同理
+5.图6的设置过后出现了图7的把格子撑出去的问题，我觉得可以想想怎么处理，还有所谓的“字形部件“和“部首“有什么区别
+````
+
+附件原图：[图一](../reference-assets/user-attachments/2026-10-13/mobile-layout-1.jpeg)、[图二](../reference-assets/user-attachments/2026-10-13/mobile-layout-2.jpeg)、[图三](../reference-assets/user-attachments/2026-10-13/mobile-layout-3.png)、[图四](../reference-assets/user-attachments/2026-10-13/mobile-layout-4.jpeg)、[图五](../reference-assets/user-attachments/2026-10-13/mobile-layout-5.jpeg)、[图六](../reference-assets/user-attachments/2026-10-13/mobile-layout-6.jpeg)、[图七](../reference-assets/user-attachments/2026-10-13/mobile-layout-7.jpeg)。
+
+## 用户消息 66
+
+````text
+<skill>
+<name>ask-matt</name>
+<path>/Users/hco/.agents/skills/ask-matt/SKILL.md</path>
+---
+name: ask-matt
+description: Ask which skill or flow fits your situation. A router over the skills in this repo.
+disable-model-invocation: true
+---
+
+# Ask Matt
+
+You don't remember every skill, so ask.
+
+A **flow** is a path through the skills. Most paths run along one **main flow**, and two **on-ramps** merge onto it. Everything else is standalone, or a vocabulary layer that runs underneath.
+
+## The main flow: idea → ship
+
+The route most work travels. You have an idea and want it built.
+
+1. **`/grill-with-docs`** sharpens the idea by interview. Start here whenever you are **working in a working directory**: it's stateful, retaining what it learns in `GLOSSARY.md` and ADRs. (No working directory? Use `/grill-me` instead, covered under Standalone. Both run the same `/grilling` primitive; `grill-with-docs` is the one that leaves a paper trail, which makes it the better of the two whenever a repo is there to leave it in.)
+2. **Branch: can you settle every question in conversation?** If a question needs a runnable answer (state, business logic, a UI you have to see), detour through a prototype, bridged by **`/handoff`** in both directions (a prototype lives in its own directory, which is exactly what `/handoff` is for; see Phase boundaries):
+   - **`/handoff`** out, then open a fresh session against that file,
+   - **`/prototype`** to answer the question with throwaway code,
+   - **`/handoff`** back what you learned, and reference it from the original idea thread.
+3. **Branch: is this a multi-session build?**
+   - **Yes** → **`/to-spec`** (turn the thread into a spec), then **`/to-tickets`** to split it into tracer-bullet tickets, each declaring its **blocking edges**. Then work the tickets one of two ways:
+     - **`/implement`** per ticket, **`/clear`ing context between each one**. On a local tracker that's one file per ticket under `.scratch/<feature>/issues/`, worked blockers-first by hand; on a real tracker the edges become native blocking links, so any ticket whose blockers are done can be grabbed. Each ticket is self-contained, so the last one's context is disposable.
+     - **`/implement-spec`** for the whole spec in one run. It reads the tickets as a **task graph**, runs implementer subagents across the ready **frontier** in parallel, and lands everything on one **integration branch**. Reach for it when you'd rather orchestrate the build than drive each ticket yourself.
+   - **No** → **`/implement`** right here, in the same context window.
+
+   Either way, the code gets built by driving **`/tdd`** (one red-green slice at a time) and closes out with **`/code-review`**, a two-axis review (Standards + Spec) of the diff. `/implement` runs both per ticket; `/implement-spec`'s implementers each drive `/tdd`, and it runs one `/code-review` over the integration branch. Reach for **`/tdd`** on its own when you just want to build a concrete behaviour test-first without a full spec, and **`/code-review`** on its own whenever you want to review a branch or PR against a fixed point.
+
+   When the work goes up as a pull request, **`/pr`** shapes the body: the smallest visual that shows the change, before/after evidence that it works, and a one-way or two-way door call. It's model-invoked, so the agent reaches for it whenever it writes a PR.
+
+4. **`/retro`** closes the loop. After a build, and especially one that went sideways, it looks back over the session and suggests changes to the agent's **environment**, not the code: navigation pointers, automated checks, the coding standards `/code-review` enforces, steering files, tooling. Mechanical mistakes become deterministic checks; judgement calls become coding standards. The next build then starts from a better environment.
+
+### Context hygiene
+
+Keep steps 1–3 in **one unbroken context window** (don't compact or clear until after `/to-tickets`) so the grilling, spec, and tickets all build on the same thinking. Each `/implement` then starts fresh, working from the ticket. Run `/retro` in the session it's looking back on, before you clear; after clearing, point it at that session's log instead.
+
+The limit on this is the **[smart zone](https://www.aihero.dev/ai-coding-dictionary/smart-zone)**: the window (~150k tokens on state-of-the-art models) within which the model still reasons sharply. If a session approaches it before `/to-tickets`, don't push on degraded; `/compact` at the nearest phase boundary and carry on (see Phase boundaries).
+
+## On-ramps
+
+A starting situation that generates work, then merges onto the main flow.
+
+- **Bugs and requests piling up** → **`/triage`**. It moves issues through triage roles and produces agent-ready issues, which **`/implement`** later picks up.
+
+  Triage is only for issues **you didn't create**: bug reports, incoming feature requests, anything that arrives raw. Tickets that `/to-tickets` produced are already agent-ready, so **don't triage them**.
+
+- **Something's broken** → **`/diagnosing-bugs`**. For the hard ones: the bug that resists a first glance, the intermittent flake, the regression that crept in between two known-good states. It refuses to theorise until it has a **tight feedback loop** (one command that already goes red on *this* bug), then fixes with a regression test. Once the fix is in, run **`/retro`** in the same session to ask what would have prevented the bug; where the real finding is that there's no good seam to lock it down, that's a job for **`/improve-codebase-architecture`**.
+
+- **A huge, foggy effort: a greenfield project or a huge feature build, too big for one session** → **`/wayfinder`**, the most cognitively demanding flow here. When the way from here to the destination isn't visible yet, it charts a **shared map** of **decision tickets** on the issue tracker and resolves them one at a time, producing **decisions, not deliverables**, until the fog is pushed back and the way is clear. Where **`/grill-with-docs`** sharpens an idea you can hold in one session, wayfinder is for the idea you can't, and it's slower and denser, so save it for exactly that, never a well-scoped feature.
+
+  When the map clears, **it hands off, it doesn't build**: merge onto the main flow at **`/to-spec`**, which collapses the map's linked decisions into a buildable plan, then `/to-tickets` and `/implement` as usual. Looping the map straight into `/implement` skips that collapse and throws the linked detail away, so go straight to `/implement` only when the effort turned out genuinely small.
+
+## Codebase health
+
+Not feature work, just upkeep.
+
+- **`/improve-codebase-architecture`** runs whenever you have a spare moment to keep the codebase good for agents to operate in. It surfaces **deepening opportunities**; picking one _generates an idea_ you can take into the main flow at `/grill-with-docs`. It's the survey that finds the candidates; **`/codebase-design`** (below) is the bench you design the chosen one on.
+
+## Vocabulary underneath
+
+Two model-invoked references that run *beneath* the other skills, each the single source of truth for its vocabulary. Reach for them directly when the **words**, not the process, are the problem; or let the skills above pull them in.
+
+- **`/domain-modeling`**: sharpen the project's *domain* language: challenge a fuzzy term, resolve an overloaded word ("account" doing three jobs), record a hard-to-reverse decision as an ADR. It's the active discipline `/grill-with-docs` drives to keep `GLOSSARY.md` a clean glossary.
+- **`/codebase-design`** is the deep-module vocabulary (module, interface, depth, seam, adapter, leverage, locality) for designing a module's *shape*: a lot of behaviour behind a small interface at a clean seam. `/tdd` and `/improve-codebase-architecture` both speak it.
+
+## Phase boundaries
+
+A **phase** is a chunk of work inside a session: the grilling, the implementation, the QA. At the **boundary** between two of them you have five options, and picking between them is the fuzziest decision in this whole map:
+
+- **Continue**: stay put. Costs nothing, loses nothing.
+- **`/clear`**: empty the window, when nothing here matters to what's next.
+- **`/handoff`** writes a portable markdown file. Narrow: only for a **new harness**, a **new directory**, a **colleague**, or forking a side task **mid-phase**. What it buys is portability.
+- **Subagent**: send a tightly-scoped task to its own window and get a report back.
+- **`/compact`** compresses this context and seeds a fresh session with it. The **default**, at the bottom of the tree rather than the first reach.
+
+Read [PHASE-BOUNDARIES.md](PHASE-BOUNDARIES.md) for the ordered tree: the five questions, the reasoning behind each branch, and why the primary-source cost makes **Continue** the one to rule out first. Make the decision **at** a boundary; mid-phase, continue or split the rest into subagents.
+
+## Standalone
+
+Off the main flow entirely.
+
+- **`/grill-me`**: the same relentless interview as `/grill-with-docs`, but **stateless**: it saves nothing locally and builds no `GLOSSARY.md`. Reach for it when you are **not working in a working directory** (sharpening a plan, a design, a piece of writing, anything with no repo under it). If you are in a working directory, use `/grill-with-docs` instead: it runs the same interview and leaves a paper trail, so it is strictly the better one.
+- **`/grilling`** is the interview primitive itself: rounds, the frontier, facts are the agent's job and decisions are yours. `/grill-me` and `/grill-with-docs` are the two named ways in, and `/triage`, `/wayfinder` and `/improve-codebase-architecture` all run it internally. Reach for it directly only when you want the interview with no wrapper around it.
+- **`/prototype`** is a small, throwaway program that answers one design question: does this state model feel right, or what should this UI look like. Throwaway is a constraint on how the code is written, not a promise to destroy it: the answer folds into the real code, and the prototype itself is kept as a **primary source** on a `prototype/<name>` branch out of main, pointed at from the implementation issue. It's the detour in step 2 of the main flow, but reach for it any time a design question is hard to settle on paper.
+- **`/research`**: delegate reading legwork to a **background agent**: it investigates a question against **primary sources**, then leaves a cited Markdown file in the repo. Keep working while it reads. The file it produces is something to take *into* the main flow at `/grill-with-docs`, since research feeds the thinking rather than replacing it.
+- **`/to-questionnaire`** comes in when the thing blocking you isn't in your head or the codebase but in **someone else's**, and it writes them a questionnaire to fill in. It's the inverse of `/grill-me`: instead of interviewing you about the subject, it interviews you about the **send** (who it's going to, what you need back) and aims the questions at the gap. What comes back is material for `/grill-with-docs` or `/to-spec`.
+- **`/wizard`** is for the steps only a **human** can take: provisioning infrastructure, setting up credentials or CI secrets, clicking through an unfamiliar third-party dashboard, running a one-off migration or cutover. It generates an interactive bash script that opens each URL, captures each value, and writes it into `.env` and GitHub secrets, so the procedure stops being something you re-explain to an agent every time. Model-invoked, so the agent reaches for it the moment it hits a wall only you can pass. If the agent could just do it itself, it should; this is for where a human is genuinely in the loop.
+- **`/wait-what`** is the corrective for a message that didn't land. Use it mid-conversation, inside any other skill, and the agent re-pitches what it just said with the context you were missing, in plain English, using the `GLOSSARY.md` vocabulary. It works after the fact; `/grill-with-docs` is the upfront cure, because a shared language agreed early is what stops the jargon arriving at all.
+- **`/teach`**: learn a concept over multiple sessions, using the current directory as a stateful workspace.
+- **`/writing-for-agents`** is the reference for writing documents agents consume: skills, AGENTS.md, pointed-at docs.
+
+## Precondition
+
+**`/setup-matt-pocock-skills`**: run before your first engineering flow to configure the issue tracker, triage labels, and doc layout the other skills assume. Custom issue trackers also work.
+
+</skill>
+````
+
+## assistant 进度消息 332
+
+箭头的目标方向按玩家人数等分圆周确定，两人水平、三人相差 120°。这轮使用 `diagnosing-bugs`、`tdd` 和 `code-review` 处理方向、手机键盘和提示布局，并保存消息原文与附件。
+
+## assistant 进度消息 333
+
+游戏里的“部首”只选择氵、扌、冫等常见形式；“字形部件”的范围更广，可以包含“晴”里的“青”、“饼”里的“并”、“抓”里的“爪”。
+
+手机键盘遮住输入格的问题会结合浏览器可见区域处理，并用 `research` 核查移动浏览器的键盘行为。
+
+## assistant 进度消息 334
+
+轻声符号、组合提示越界和大厅分隔线都已复现。正在核查三个原因：箭头角度是否来自头像坐标、多个汉字条件是否共用过宽的一行、键盘是否只缩小了浏览器可见区域。Android emulator 已启动，将直接验证原生键盘打开后的输入位置。
+
+## assistant 进度消息 335
+
+箭头方向、轻声显示和全部条件组合的专项检查已通过。键盘处理采用浏览器真实可见高度和滚动位置；Android Chrome 已进入首次运行页面，正在完成初始化以验证原生键盘。
+
+## assistant 进度消息 336
+
+52 项规则与联机检查已通过，新增五项界面检查也已通过。完整浏览器检查正在完成；Android Chrome 的远程调试连接还在核查，原生键盘结果会单独记录。
+
+## assistant 进度消息 337
+
+Android Chrome 的原生键盘验证通过：键盘展开后，可见高度从约 763px 变为 450px，答案格底部保持在约 413px；输入汉字后仍然可见。完整 38 项浏览器检查也已通过。
+
+## 用户消息 67
+
+````text
+5.我认为提示格提示声调不应该提示（限定）轻声，而是限定一二三四声
+6.只要成功匹配了提示，两秒后自动提交，防止有人做完之后故意不提交答案休息
+7.无论房间有多少个人，都可以加一个电脑。
+8.我觉得自定义的规则设置太繁琐，等下我们可以详细进行修改并且你可以向我提问。还有“连续汉字“这个设置选项是不是就是提示字的意思，那还不如直接改成“汉字“。
+````
+
+## 用户消息 68
+
+````text
+（刚刚那条消息的序号其实是6、7、8、9，我不小心打了已经存在的序号5了）
+````
+
+## assistant 进度消息 338
+
+已记录为补充第 6—9 项：声调提示只生成第一至第四声，合法答案匹配持续两秒后自动提交，房间可以添加一名电脑，“连续汉字”改名为“汉字”。这些会与正在处理的五项界面修改一起完成。自定义规则的设置方式需要进一步讨论。
+
+## assistant 问题 339
+
+自定义规则最想先简化哪部分？现有“汉字”条件就是提示指定汉字，答案中相应位置需要包含这些汉字。
+
+- 条件关系：用直观的提示格来安排条件
+- 设置数量：把常用设置集中展示
+- 两部分都调整，围绕提示格设置
+
+## assistant 问题 340
+
+房间达到人数上限时，电脑是否可以作为额外一席加入？
+
+- 电脑额外一席，人类人数上限保持原设置
+- 电脑占用房间人数上限中的一席
+
+## 用户消息 69
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_I1lPVPYyG0vRB87fnLLlH39Y\",0]","question":"自定义规则最想先简化哪部分？现有“汉字”条件就是提示指定汉字，答案中相应位置需要包含这些汉字。","answer":"条件关系：用直观的提示格来安排条件"},{"questionItemId":"[\"request_user_input_async\",\"call_f517ff32d887400c8442d0f16f53b215\",0]","question":"房间达到人数上限时，电脑是否可以作为额外一席加入？","answer":"电脑额外一席，人类人数上限保持原设置"}]
+</send_user_message_question_reply>
+````
+
+## 用户消息 70
+
+````text
+继续
+````
+
+## assistant 进度消息 341
+
+按你的确认，电脑作为额外一席加入，人类人数上限保持原设置。自定义规则会围绕提示格安排条件：同一格中的声母、部首等条件共同限制一个汉字。两秒自动提交和其余修改继续完成。
+
+## assistant 问题 342
+
+自定义规则中，是否直接增加或删除提示格，并在每格勾选声母、韵母、声调、部首、字形部件或汉字？系统随机生成具体提示，同格条件共同限制一个汉字。
+
+- 采用这个方式
+- 每格还需要设置条件随机出现
+
+某个提示格没有选择任何条件时，是否作为“∅”隐藏格保留，允许该位置任意汉字？
+
+- 保留为隐藏格
+- 自动移除没有条件的格子
+
+## assistant 进度消息 343
+
+两秒自动提交已通过真实联机检查，并验证了 Cloudflare 休眠恢复后仍保留计时。合法输入之间切换不会延长这两秒，失去匹配会取消计时。电脑入口和人数计算正在核对。自定义规则讨论使用 `grilling`，等待你确认逐格条件和空白格的方式。
+
+## 用户消息 71
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_657055c1a5f14b71909237cc0454ca08\",0]","question":"自定义规则中，是否直接增加或删除提示格，并在每格勾选声母、韵母、声调、部首、字形部件或汉字？系统随机生成具体提示，同格条件共同限制一个汉字。","answer":"采用这个方式"},{"questionItemId":"[\"request_user_input_async\",\"call_657055c1a5f14b71909237cc0454ca08\",1]","question":"某个提示格没有选择任何条件时，是否作为“∅”隐藏格保留，允许该位置任意汉字？","answer":"我想知道∅代表着可以任意还是说是“不准有“，我记得之前声母+音调模式的空集是代表不能有声母。你觉得怎么样更好，我觉得“不准有“这个设定也是需要的"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 344
+
+目前 `∅` 有两种含义：整格为空时表示任意汉字；声母位置显示 `∅` 时表示没有声母。两种用法容易混淆。
+
+我建议整格不限条件改用星号 `*`，声母或韵母位置的 `∅` 保留“该部分为空”的含义。自定义提示格可以明确选择“无声母”或“无韵母”，这样就能表达你需要的“不准有”条件。
+
+## assistant 问题 345
+
+自定义提示格是否采用这套区分：整格“*”表示任意汉字；单个发音字段“∅”表示无声母或无韵母，并提供明确的选择项？
+
+- 采用这个方式
+- 整格继续使用 ∅，通过文字区分
+
+“不准有”还需要禁止指定内容吗，例如禁止某个汉字或部首出现在答案里？
+
+- 目前只需要无声母、无韵母
+- 也需要禁止指定汉字或部首
+
+## 用户消息 72
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_baf6cc61a9f043038eb35877065ee8c5\",0]","question":"自定义提示格是否采用这套区分：整格“*”表示任意汉字；单个发音字段“∅”表示无声母或无韵母，并提供明确的选择项？","answer":"采用这个方式"},{"questionItemId":"[\"request_user_input_async\",\"call_baf6cc61a9f043038eb35877065ee8c5\",1]","question":"“不准有”还需要禁止指定内容吗，例如禁止某个汉字或部首出现在答案里？","answer":"目前只需要无声母、无韵母"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 346
+
+已确认：整格 `*` 表示任意汉字，发音字段 `∅` 表示无声母或无韵母。自定义规则将改为直接增加、删除提示格，并为每格选择条件；同格条件共同限制一个汉字。这些决定会写入规格并按此实现。
+
+## 用户消息 73
+
+````text
+还有，我认为游戏时提示格的个数应该代表最少字数的答案的字数，比如选了成语词库的话提示格就应该是四格，但是并不代表每格都一定需要出现限定类的提示，但不要每格都是*
+````
+
+## assistant 进度消息 347
+
+提示格数量会按房间允许的最短答案长度显示：成语词库默认四格，其中可以有 `*`，但至少一格必须给出条件。自定义页面也会展示这些位置，方便直接安排每格的提示。
+
+## assistant 进度消息 348
+
+逐格规则已通过真实词库检查：无声母、无韵母和 `*` 隐藏位置都能生成合法题目。现在核对成语四格、保存与导出，以及两秒自动提交加入后完整游戏流程的表现。
+
+## 用户消息 74
+
+````text
+1.我觉得默认的奖励声母要求有点苛刻了，其实每次奖励声母应该随机在合法的声母里面选五个，五个都弄上了奖励一条命然后再随机下5个，最好和上5个不同，不同玩家的奖励声母不同。然后自定义的规则里要先开了奖励声母这个规则的开关（默认为开）才能在里面选哪些声母可以作为奖励声母的候选，注意候选个数<5的情况。
+2.我们的提示格未必是答案的最前的子串的话，用提示格的格数去代表最少字数的答案的字数真的好吗？那比如给了两格的提示，但最小答案是三格，那这两格既可以在某一个答案的后两格，也可以在某一个答案的前两格，那我第三格的提示是*不就是限定了只能作为最前的子串了吗。请认真分析我这个需求，然后问我问题，看看这种情况怎么处理。
+````
+
+## assistant 进度消息 349
+
+你指出的情况确实存在：把两格条件补成 `[条件、条件、*]`，再按三格窗口匹配，会限制它们位于三个字答案的前两格。提示片段的位置和答案最短长度需要分别处理。
+
+我的建议是保留两格可移动的提示片段，在答案区域显示“至少三个字”；这样前两格、后两格都能匹配。奖励声母则按玩家分别随机分配，完成后重新抽取，并尽量减少与上一组重复。
+
+## assistant 问题 350
+
+提示片段与最短答案长度是否分开：提示继续显示实际限制的两格并可匹配任意连续位置，答案区域简短显示“至少三个字”？
+
+- 分开处理，采用这个方式
+- 继续显示三格，但多出的格子只表示长度
+
+奖励声母候选少于五个时，是否使用全部候选，集齐后增加一个生命？下一组先选择上一组没有出现的候选，数量不足再允许重复。
+
+- 采用这个方式
+- 至少五个候选才能启用奖励
+
+## assistant 进度消息 351
+
+个人奖励目标和奖励开关已通过真实联机检查。每名玩家默认获得五个不同的声母，完成后重新抽取；关闭奖励时不分配目标。提示片段与最短长度的显示方式仍等待你的选择，我会据此处理窗口位置问题。
+
+## 用户消息 75
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_41c3ad2a2f1745f1a8ecdf6ad98cbf14\",0]","question":"提示片段与最短答案长度是否分开：提示继续显示实际限制的两格并可匹配任意连续位置，答案区域简短显示“至少三个字”？","answer":"我觉得应该在答案最短字数和提示格格数不相等（应该100%是答案最短字数大于提示格格数吧，*格也代表了必须在这填一个字的意思）的时候显示“答案最短为x个字“。并且选择成语词库的时候默认4个提示格，而不是2个。"},{"questionItemId":"[\"request_user_input_async\",\"call_41c3ad2a2f1745f1a8ecdf6ad98cbf14\",1]","question":"奖励声母候选少于五个时，是否使用全部候选，集齐后增加一个生命？下一组先选择上一组没有出现的候选，数量不足再允许重复。","answer":"采用这个方式"}]
+</send_user_message_question_reply>
+````
+
+## assistant 进度消息 352
+
+按这个规则处理：`*` 也占一个汉字位置；提示片段可以短于最短答案，并继续匹配任意连续位置。只有两者数量不相等时显示“答案最短为 x 个字”。选择成语词库默认四个提示格。奖励候选少于五个时使用全部候选，下一组优先选择未在上一组出现的声母。
+
+## assistant 进度消息 353
+
+提示窗口已恢复任意连续位置匹配，长度说明只在需要时显示。60 项规则与联机测试通过；39 项完整浏览器检查通过，奖励开关和多人电脑的新增检查正在补充。接下来核对最终审查、Cloudflare 更新和构建产物。
+
+## assistant 进度消息 354
+
+公网验证已通过逐格规则、电脑额外席位、个人奖励目标和两秒自动提交，Cloudflare 已更新。正在完成文档与任务状态复核；随后会把这组修改提交并推送。
+
+## assistant 回复 355
+
+已按最后确认完成：
+
+- 提示片段独立于答案最短长度，可匹配任意连续位置；`*` 占一个汉字，`∅` 表示无声母或无韵母。
+- 长度不相等时显示“答案最短为 x 个字”；成语词库默认四个提示格。
+- 自定义改为逐格选择条件，支持模板、预览、保存和导出。
+- 每人随机获得五个奖励声母，完成后优先抽取不同目标；候选不足五个用全部，奖励可以关闭。
+- 合法匹配持续两秒自动提交；电脑作为额外一席加入。
+- 箭头按人数等分圆周，轻声直接显示拼音字母，组合提示越界和大厅重复分隔线已处理。
+
+61 项规则与联机测试、40 项浏览器检查通过。Android 原生键盘展开后答案保持可见；iOS 与横屏尚未实测。
+
+代码已提交并推送，Cloudflare 已更新，Pages 构建产物已生成。个人网站网页尚未发布本轮更新。
