@@ -152,7 +152,8 @@ export class WordRules {
 
   generate(settings: Settings, used = new Set<string>(), context: {stalemateScore?: number} = {}): Prompt {
     validateSettings(settings);
-    const idiomPositions = settings.dictionary === 'idioms' && settings.mode !== 'custom' ? idiomVisiblePositions(context.stalemateScore ?? 0) : null;
+    if (settings.mode === 'character') settings = {...settings, promptLength: 1, hiddenCount: 0};
+    const idiomPositions = settings.dictionary === 'idioms' && settings.mode !== 'custom' && settings.mode !== 'character' ? idiomVisiblePositions(context.stalemateScore ?? 0) : null;
     if (idiomPositions) settings = {...settings, promptLength: 4, hiddenCount: 4 - idiomPositions.length};
     else if (settings.mode === 'radical') {
       const count = Math.random() < .5 ? 1 : 2;

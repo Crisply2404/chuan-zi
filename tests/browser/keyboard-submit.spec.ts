@@ -35,7 +35,7 @@ test('手机可见高度缩小时答案和奖励目标都保持可见', async ({
       const viewport = visualViewport!;
       const bonus = element.getBoundingClientRect();
       const answer = document.querySelector('.answer-editor')!.getBoundingClientRect();
-      return bonus.bottom <= viewport.offsetTop + viewport.height && bonus.top >= viewport.offsetTop && answer.top >= viewport.offsetTop;
+      return bonus.bottom <= viewport.offsetTop + viewport.height - 23 && bonus.top >= viewport.offsetTop && answer.top >= viewport.offsetTop;
     })).toBe(true);
   } finally {await context.close();}
 });
@@ -78,9 +78,9 @@ test('词库入口只有全部词语与成语，四个成语预设遵守星号�
   await page.getByRole('button', {name: '成语', exact: true}).click();
   for (const mode of ['声母+音调', '部首', '字', '只有音调']) {
     await page.getByRole('button', {name: mode, exact: true}).click();
-    await expect.poll(() => state.room?.settings.promptLength).toBe(4);
+    await expect.poll(() => state.room?.settings.promptLength).toBe(mode === '字' ? 1 : 4);
     await page.getByRole('button', {name: '自定义', exact: true}).click();
-    await expect(page.locator('.slot-card')).toHaveCount(4);
+    await expect(page.locator('.slot-card')).toHaveCount(mode === '字' ? 1 : 4);
     await page.getByRole('button', {name: '游戏模式', exact: true}).click();
   }
 });

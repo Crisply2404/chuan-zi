@@ -30,9 +30,9 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   useEffect(() => setMode(value.mode), [value.mode]);
   const update = <K extends keyof Settings>(key: K, next: Settings[K]) => onChange({ ...value, [key]: next });
   const updateDictionary = (next: Settings['dictionary']) => {
-    const length = next === 'idioms' ? 4 : Math.min(value.promptLength, 2);
+    const length = value.mode === 'character' ? 1 : next === 'idioms' ? 4 : Math.min(value.promptLength, 2);
     const settings = { ...value, dictionary: next, minLength: next === 'idioms' ? 4 : 2, maxLength: Math.max(value.maxLength, next === 'idioms' ? 4 : 2), promptLength: length,
-      hiddenCount: next === 'idioms' && value.mode !== 'custom' ? 1 : Math.max(0, Math.min(length - 1, value.hiddenCount + length - value.promptLength)) };
+      hiddenCount: next === 'idioms' && value.mode !== 'custom' && value.mode !== 'character' ? 0 : Math.max(0, Math.min(length - 1, value.hiddenCount + length - value.promptLength)) };
     const nextSettings = settings.promptSlots ? withPromptSlots(settings, [...settings.promptSlots.slice(0, length), ...Array.from({length: Math.max(0, length - settings.promptSlots.length)}, emptyPromptSlot)]) : settings;
     onChange(nextSettings);
     if (!editingCustom) onSave?.(nextSettings);
@@ -58,7 +58,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   };
   const applyTemplate = (template: Exclude<ModeId, 'custom'>) => {
     const next = getModeSettings(template);
-    if (value.dictionary === 'idioms') {next.hiddenCount += 4 - next.promptLength; next.promptLength = 4;}
+    if (value.dictionary === 'idioms' && template !== 'character') {next.hiddenCount += 4 - next.promptLength; next.promptLength = 4;}
     const configured = {...next, dictionary: value.dictionary, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers};
     onChange(withPromptSlots(configured, slotsFromSettings(configured)));
     setSelectedSlot(0);
@@ -70,7 +70,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     const settings = next === 'custom' ? withPromptSlots(value, slotsFromSettings(value)) : {
       ...getModeSettings(next), dictionary: value.dictionary, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers,
     };
-    if (next !== 'custom' && value.dictionary === 'idioms') {settings.hiddenCount = 1; settings.promptLength = 4;}
+    if (next !== 'custom' && next !== 'character' && value.dictionary === 'idioms') {settings.hiddenCount = 0; settings.promptLength = 4;}
     onChange(settings);
     if (next !== 'custom') onSave?.(settings);
   };

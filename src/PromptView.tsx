@@ -19,17 +19,25 @@ function loadGlyph(character: string): Promise<Glyph> {
 }
 
 function GlyphPart({ glyph, indices, original, attached, hint }: { glyph: Glyph; indices: number[]; original: boolean; attached: boolean; hint?: string }) {
-  const vector = useRef<SVGSVGElement>(null);
-  const hintText = useRef<HTMLSpanElement>(null);
+  const strokes = useRef<SVGGElement>(null);
+  const transform = useRef<LayoutFrame | undefined>(undefined);
+  const [hintTransform, setHintTransform] = useState('matrix(1,0,0,1,0,0)');
   useLayoutEffect(() => {
     if (!original) return;
-    animateOpacity(vector.current!, attached ? 1 : 0);
-    animateOpacity(hintText.current!, attached ? 0 : 1);
-  }, [attached, original, indices.join(':')]);
+    const bounds = strokes.current!.getBBox();
+    if (!bounds.width || !bounds.height) throw new Error(`提示笔画范围无效：${glyph.character}`);
+    const scale = 850 / Math.max(bounds.width, bounds.height);
+    const source = `matrix(${scale},0,0,${scale},${(1024 - scale * bounds.width) / 2 - bounds.x * scale},${900 - (1024 - scale * bounds.height) / 2 - (bounds.y + bounds.height) * scale})`;
+    transform.current ??= {transform: source};
+    setHintTransform(source);
+  }, [glyph, original, indices.join(':')]);
+  useLayoutEffect(() => {
+    if (!original) return;
+    transform.current = animateFlip(strokes.current!, transform.current);
+  }, [attached, original, hintTransform]);
   return <span className={`stroke-glyph ${original ? 'prompt-glyph-origin' : 'prompt-glyph-supplement'}`} aria-hidden="true">
-    {original && <span ref={hintText} className="stroke-glyph-hint" style={{opacity: attached ? 0 : 1}}>{hint}</span>}
-    <svg ref={vector} className="stroke-glyph-vector" viewBox="0 0 1024 1024" style={{opacity: original && !attached ? 0 : 1}}>
-      <g transform="scale(1,-1) translate(0,-900)">{indices.map(index => <path key={index} data-stroke-index={index} d={glyph.strokes[index]} fill="currentColor" />)}</g>
+    <svg className="stroke-glyph-vector" viewBox="0 0 1024 1024" aria-label={hint}>
+      <g transform="scale(1,-1) translate(0,-900)"><g ref={strokes} style={{transform: original && !attached ? hintTransform : 'matrix(1,0,0,1,0,0)'}}>{indices.map(index => <path key={index} data-stroke-index={index} d={glyph.strokes[index]} fill="currentColor" />)}</g></g>
     </svg>
   </span>;
 }
@@ -116,7 +124,7 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
       for (const part of root.querySelectorAll<HTMLElement>('.prompt-part')) {
         const field = part.dataset.field!;
         const source = root.querySelector<HTMLElement>(`.prompt-hint-layout [data-field="${field}"]`);
-        const target = root.querySelector<HTMLElement>(`.prompt-complete-layout [data-field="${vector && ['radical', 'component'].includes(field) ? 'character' : field}"]`);
+        const target = root.querySelector<HTMLElement>(`.prompt-complete-layout [data-field="${['radical', 'component'].includes(field) ? 'character' : field}"]`);
         const sourceBounds = source?.getBoundingClientRect();
         const targetBounds = target?.getBoundingClientRect();
         const destination = targetBounds ?? sourceBounds;
@@ -178,11 +186,6 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
       </span>
     </div>
     {character && <div className="prompt-complete-layout" aria-hidden="true">
-      <span className="prompt-attached-hint">
-        {!vector && cell.radical !== undefined && <span data-field="radical">{cell.radical}</span>}
-        {!vector && cell.radical !== undefined && cell.component !== undefined && ' '}
-        {!vector && cell.component !== undefined && <span data-field="component">{cell.component}</span>}
-      </span>
       <span className="prompt-input-character" data-field="character">{character}</span>
       <span className={`prompt-pinyin ${fullPinyin.length > 6 ? 'prompt-pinyin-long' : ''}`}>
         {pinyinTargets(initial, 'initial', 0)}{pinyinTargets(final, 'final', initial.length)}
@@ -197,13 +200,13 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
   </div>;
 }
 
-const flipAnimations = new WeakMap<HTMLElement, Animation>();
+const flipAnimations = new WeakMap<HTMLElement | SVGGElement, Animation>();
 const opacityAnimations = new WeakMap<HTMLElement | SVGElement, Animation>();
 const easing = 'cubic-bezier(.16, 1, .3, 1)';
 
 type LayoutFrame = { transform: string; fontSize?: string; lineHeight?: string; width?: string; height?: string };
 
-function layoutValue(element: HTMLElement, includeSize: boolean): LayoutFrame {
+function layoutValue(element: HTMLElement | SVGGElement, includeSize: boolean): LayoutFrame {
   const style = getComputedStyle(element);
   return {
     transform: style.transform === 'none' ? 'matrix(1, 0, 0, 1, 0, 0)' : style.transform,
@@ -211,7 +214,7 @@ function layoutValue(element: HTMLElement, includeSize: boolean): LayoutFrame {
   };
 }
 
-function animateFlip(element: HTMLElement, previous: LayoutFrame | undefined, includeSize = false, origin?: LayoutFrame): LayoutFrame {
+function animateFlip(element: HTMLElement | SVGGElement, previous: LayoutFrame | undefined, includeSize = false, origin?: LayoutFrame): LayoutFrame {
   const active = flipAnimations.get(element);
   const from = origin ?? (active ? layoutValue(element, includeSize) : previous);
   active?.cancel();

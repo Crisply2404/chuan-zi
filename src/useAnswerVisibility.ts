@@ -2,6 +2,7 @@ import {useCallback, useLayoutEffect, useRef, type RefObject} from 'react';
 
 export function useAnswerVisibility(region: RefObject<HTMLElement | null>, input: RefObject<HTMLInputElement | null>, enabled: boolean) {
   const frame = useRef(0);
+  const expandedHeight = useRef(window.visualViewport?.height ?? window.innerHeight);
   const reveal = useCallback(() => {
     if (!enabled || !(matchMedia('(max-width: 700px)').matches || matchMedia('(pointer: coarse)').matches) || document.activeElement !== input.current) return;
     cancelAnimationFrame(frame.current);
@@ -12,7 +13,7 @@ export function useAnswerVisibility(region: RefObject<HTMLElement | null>, input
       if (!viewport) throw new Error('浏览器缺少 VisualViewport');
       const top = viewport.offsetTop;
       const height = viewport.height;
-      const bottom = top + height - 12;
+      const bottom = top + height - 24;
       const bounds = element.getBoundingClientRect();
       const delta = bounds.bottom > bottom ? bounds.bottom - bottom : bounds.top < top + 12 ? bounds.top - top - 12 : 0;
       if (Math.abs(delta) > 1) window.scrollBy({top: delta, behavior: 'instant'});
@@ -27,7 +28,11 @@ export function useAnswerVisibility(region: RefObject<HTMLElement | null>, input
     if (!viewport) throw new Error('浏览器缺少 VisualViewport');
     const update = () => {
       const shell = element.closest<HTMLElement>('.room-game-shell');
-      if (shell) shell.style.setProperty('--visible-height', `${viewport.height}px`);
+      expandedHeight.current = Math.max(expandedHeight.current, viewport.height);
+      if (shell) {
+        shell.style.setProperty('--visible-height', `${viewport.height}px`);
+        shell.dataset.keyboardVisible = String(document.activeElement === editor && expandedHeight.current - viewport.height > 100);
+      }
       reveal();
     };
     const observer = new ResizeObserver(update);
@@ -36,6 +41,7 @@ export function useAnswerVisibility(region: RefObject<HTMLElement | null>, input
     viewport.addEventListener('scroll', reveal);
     window.addEventListener('resize', update);
     editor.addEventListener('focus', update);
+    editor.addEventListener('blur', update);
     editor.addEventListener('pointerup', reveal);
     update();
     return () => {
@@ -45,8 +51,10 @@ export function useAnswerVisibility(region: RefObject<HTMLElement | null>, input
       viewport.removeEventListener('scroll', reveal);
       window.removeEventListener('resize', update);
       editor.removeEventListener('focus', update);
+      editor.removeEventListener('blur', update);
       editor.removeEventListener('pointerup', reveal);
       element.closest<HTMLElement>('.room-game-shell')?.style.removeProperty('--visible-height');
+      element.closest<HTMLElement>('.room-game-shell')?.removeAttribute('data-keyboard-visible');
     };
   }, [enabled, input, region, reveal]);
   return reveal;

@@ -19,7 +19,7 @@ function observe(page: Page) {
 
 async function connect(page: Page, nickname: string) {
   await page.goto('./');
-  await page.getByRole('button', { name: '连接与昵称', exact: true }).click();
+  await page.getByRole('button', { name: '修改昵称', exact: true }).click();
   await page.getByLabel('昵称', { exact: true }).fill(nickname);
   await page.getByRole('dialog').getByRole('button', { name: '保存昵称', exact: true }).click();
   await expect(page.locator('.page-heading').getByRole('button', { name: '创建房间', exact: true })).toBeEnabled();
@@ -231,7 +231,9 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
       if (cell.tone !== undefined) await expect(active.locator('.prompt-cell').nth(index).locator('.prompt-part-tone')).toHaveCSS('color', 'rgb(34, 34, 34)');
     }
     await expect.poll(() => active.locator('.prompt-cell').evaluateAll(elements => elements.every(element => {
-      const tone = element.querySelector('.prompt-part-tone')!.getBoundingClientRect();
+      const mark = element.querySelector('.prompt-part-tone');
+      if (!mark) return true;
+      const tone = mark.getBoundingClientRect();
       const target = element.querySelector('.prompt-complete-layout [data-field="tone"]')!.getBoundingClientRect();
       return Math.abs(tone.x - target.x) < 1 && Math.abs(tone.y - target.y) < 1;
     }))).toBe(true);

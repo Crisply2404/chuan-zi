@@ -74,7 +74,7 @@ test('完整轻声拼音显示字母且保持原声母提示', async ({page}) =>
     await expect(page.locator('.prompt-part-tone')).toHaveCount(0);
     await expect(page.locator('.prompt-part-initial')).toHaveText('d');
     await expect(page.locator('.prompt-part-final')).toHaveText('e');
-  } finally { await server.close(); }
+  } finally { await page.close(); await server.close(); }
 });
 
 test('全部提示条件组合保持每个格子内的字形与拼音', async ({page}) => {
@@ -99,7 +99,7 @@ test('全部提示条件组合保持每个格子内的字形与拼音', async ({
       await expect(page.locator('.prompt-layer-attached')).toBeVisible();
       await assertBounds();
     }
-  } finally { await server.close(); }
+  } finally { await page.close(); await server.close(); }
 });
 
 test('空大厅与底栏只保留底栏分隔线', async ({page}) => {
@@ -112,7 +112,7 @@ test('空大厅与底栏只保留底栏分隔线', async ({page}) => {
     await expect(page.locator('.empty-lobby')).toBeVisible();
     await expect(page.locator('.empty-lobby')).toHaveCSS('border-bottom-width', '0px');
     await expect(page.locator('.site-footer')).toHaveCSS('border-top-width', '1px');
-  } finally { await server.close(); await service.close(); }
+  } finally { await page.close(); await server.close(); await service.close(); }
 });
 
 test('手机可见高度缩小时仍能看见提示与全部答案格', async ({browser}) => {

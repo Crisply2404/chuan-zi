@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, Heart, LockKeyhole, LogOut, MessageCircle, Pencil, Plus, RefreshCw, Send, Settings2, UserRound, Users, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, Heart, LockKeyhole, LogOut, MessageCircle, Moon, Pencil, Plus, RefreshCw, Send, Sun, UserRound, Users, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react';
 import { defaultSettings, type AcceptedAnswer, type ClientCommand, type DraftMatch, type LobbyRoom, type PlayerView, type Prompt, type RoomView, type Settings } from '../shared/types';
 import { playerAngle } from '../shared/player-layout';
 import { ConnectionError, useGameConnection } from './network';
@@ -67,6 +67,8 @@ function DrumMark({ size = 34 }: { size?: number }) {
 export default function App() {
   const url = initialUrl;
   const [nickname, setNickname] = useState(initialNickname);
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => localStorage.getItem('chuan-zi:theme') === 'dark' ? 'dark' : 'light');
+  useLayoutEffect(() => {document.documentElement.dataset.theme = theme; localStorage.setItem('chuan-zi:theme', theme);}, [theme]);
   const connection = useGameConnection(url, nickname);
   const [modal, setModal] = useState<'connection' | 'join' | 'rename' | 'metadata' | 'licenses' | null>(null);
   const [error, setError] = useTimedMessage();
@@ -150,7 +152,7 @@ export default function App() {
     <header className="site-header"><a className="brand" href="#" onClick={event => { if (room) event.preventDefault(); }}><DrumMark /><span>击鼓传字</span></a>
       <div className="header-tools"><button type="button" className="connection-button" onClick={() => setModal('connection')}>
         {connected ? <Wifi size={16} /> : <WifiOff size={16} />}<span>{connectionLabels[connection.status]}</span>
-      </button><span className="header-nickname"><UserRound size={15} />{nickname}</span><IconButton label="连接与昵称" onClick={() => setModal('connection')}><Settings2 size={19} /></IconButton></div>
+      </button><button type="button" className="header-nickname" aria-label="修改昵称" onClick={() => setModal('connection')}><UserRound size={15} /><span>{nickname}</span><Pencil className="nickname-edit" size={11} /></button><IconButton label={theme === 'light' ? '切换暗色主题' : '切换亮色主题'} onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}>{theme === 'light' ? <Moon size={19} /> : <Sun size={19} />}</IconButton></div>
     </header>
     {((error && modal !== 'join' && modal !== 'metadata') || connection.notice) && <div className="notice-banner notice-error" role="alert">
       <span>{error || connection.notice}</span><IconButton label="关闭消息" onClick={() => { setError(''); connection.dismissNotice(); }}><X size={16} /></IconButton>

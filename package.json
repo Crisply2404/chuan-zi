@@ -12,7 +12,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "data:build": "tsx scripts/build-data.ts",
     "test": "npm run cloudflare:build && tsx scripts/prepare-glyphs.ts && tsx scripts/prepare-glyph-font.ts && tsx --test tests/*.test.ts",
-    "test:browser": "playwright test",
+    "test:browser": "VITE_WS_URL= npm run build && VITE_WS_URL= playwright test",
     "check": "tsc --noEmit && tsc -p tsconfig.cloudflare.json --noEmit",
     "cloudflare:build": "tsx scripts/prepare-cloudflare.ts",
     "cloudflare:dev": "wrangler dev --ip 0.0.0.0 --port 8788 --persist-to .scratch/cloudflare/wrangler-state",

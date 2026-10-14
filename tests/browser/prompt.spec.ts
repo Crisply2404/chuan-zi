@@ -177,8 +177,8 @@ test('部首附着使用同一楷体路径，提示笔画黑色，补全笔画�
       Object.assign(window, { radicalFrames: samples, radicalFinished: false });
       const started = performance.now();
       const sample = () => {
-        const group = document.querySelector('.prompt-glyph-origin .stroke-glyph-vector');
-        if (group) samples.push(Number(getComputedStyle(group).opacity));
+        const group = document.querySelector('.prompt-glyph-origin .stroke-glyph-vector g g');
+        if (group) samples.push(new DOMMatrix(getComputedStyle(group).transform).a);
         if (performance.now() - started < 1200) requestAnimationFrame(sample);
         else Reflect.set(window, 'radicalFinished', true);
       };
