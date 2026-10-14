@@ -2390,3 +2390,15 @@ These AGENTS.md instructions replace all previously provided AGENTS.md instructi
 [{"questionItemId":"[\"request_user_input_async\",\"call_b391e039b6c44932ac6d4bad3abbe744\",0]","question":"字模式进入胶着状态后，是否采用：保留一个汉字提示，另外随机选择一个位置提供一种限制（声母、韵母、音调或部首，四种等概率）；成语显示四格，其余两格为星号？","answer":"采用这个方式"},{"questionItemId":"[\"request_user_input_async\",\"call_b391e039b6c44932ac6d4bad3abbe744\",1]","question":"词库教学是否安排在完成“字”和“部首”后：引导玩家点击“成语”，随后用四字成语继续体验声母＋音调和只有音调；同时用箭头与头像动画说明当前和上一位作答玩家？","answer":"采用这个安排"}]
 </send_user_message_question_reply>
 ````
+
+## assistant 消息 362
+
+日期：2026-10-15，Asia/Shanghai。
+
+- 成语严格四个汉字，取消最短字数提示。
+- 字模式胶着时增加一个独立限制，成语其余两格为星号；纯汉字格结合后省略拼音。
+- 修正41组部首映射，涉及40个汉字，包括复、举、奥等；寝的冫使用正确笔画。
+- 光标贴近前一个汉字右侧，点击格子与输入法编辑通过验证。
+- 教学增加空白输入格、玩家颜色、箭头说明与中途成语切换；电脑提高正确率并持续尝试。
+
+已提交并发布：`d3a30e4`。85项规则与联机、61项浏览器检查及公开网页验证通过。图片、聊天和任务记录已保存，个人网站仅发布构建产物。
