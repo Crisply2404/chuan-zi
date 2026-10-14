@@ -2283,3 +2283,17 @@ These AGENTS.md instructions replace all previously provided AGENTS.md instructi
 ````text
 能不能不排除常见地名
 ````
+
+## assistant 消息 360
+
+- 点击昵称可以修改名字，旁边有编辑图标；右侧按钮切换明暗主题。
+- 部首直接移动到对应笔画位置；字模式始终只提示一个汉字。
+- 其它成语预设使用零星号或三个星号，两种各半。
+- 手机键盘上方保留完整奖励与约24px间距，真实Android检查通过。
+- 统一楷体、提交后从结合态分开、术语与聊天记录均已更新，图片已保存。
+
+词库文件是 [data/dictionary.json](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/data/dictionary.json)。搜索 `"word":"词语"` 可以核查收录；答案还需满足房间条件与本局去重。常见地名可以保留，当前“西安”尚未收录；其读音可以匹配 `x-∅`。
+
+194个未覆盖汉字包含粿、獴等，不能全部认定为生僻。Jigmo/GlyphWiki覆盖全部5,945个字符，完整部首逐笔归属仍需审核，详见[研究记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/glyph-coverage-followup-2026-10-14.md)。
+
+代码已推送并发布，产品提交为`5663cad`。72项规则与联机、51项完整浏览器及暗色专项检查通过。个人网站仅发布构建产物。

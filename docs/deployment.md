@@ -60,6 +60,8 @@ main 的每次更新触发私有仓库的 `.github/workflows/publish-personal-si
 
 ## 托管配置
 
+2026-10-14：main 5663cad 包含昵称主题、部首直接结合、字模式单格、成语零/三星号与手机键盘间距。Cloudflare 当前版本为62ece39c-2382-408d-9de8-9b1098474d04，公网创建、密码加入、草稿、自动提交、回合传递与重连通过。私有仓库run38567491319与个人网站run38567980035均成功。公开网页最新资源、明暗切换、字体映射与路径、许可资料包、创建与分享加入、默认奖励韵母、宽窗口侧栏及成语零/三星号提示通过。
+
 用户选择 Cloudflare 免费联机服务。网页通过构建时的 `VITE_WS_URL` 自动连接，玩家无需填写服务地址。部署参数、免费条件和中国大陆网络研究见 [本轮联机研究](multiplayer-hosting-research-2026-10-13.md)。
 
 Cloudflare Workers 与 SQLite Durable Objects 提供持久化房间，WebSocket Hibernation 保留连接，alarm 处理回合与电脑动作；词库索引适应 Workers 的 128 MB 内存。五项候选的研究仍保存在 [免费托管研究](multiplayer-hosting-options-2026-10-12.md)。
