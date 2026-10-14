@@ -212,6 +212,7 @@ test('自定义奖励只显示未使用类型，全部使用时关闭奖励', as
     await page.goto('./');
     await page.locator('.page-heading').getByRole('button', {name: '创建房间', exact: true}).click();
     await page.getByRole('tab', {name: '规则设置', exact: true}).click();
+    await page.getByRole('button',{name:'声母+音调',exact:true}).click();
     await page.getByRole('button', {name: '自定义', exact: true}).click();
     await expect(page.getByRole('button', {name: '奖励韵母', exact: true})).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByRole('button', {name: '奖励声母', exact: true})).toHaveCount(0);

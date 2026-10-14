@@ -166,6 +166,7 @@ test('自动连接、直接创建、分享链接和真实回合', async ({ brows
     await assertLayout(guest);
 
     await host.getByRole('tab', { name: '规则设置', exact: true }).click();
+    await host.getByRole('button', {name:'声母+音调',exact:true}).click();
     await host.getByRole('button', { name: '自定义', exact: true }).click();
     await host.getByRole('button', { name: '预览提示', exact: true }).click();
     await expect(host.getByLabel('当前提示')).toBeVisible();
@@ -560,7 +561,7 @@ test('大厅房间卡片、电脑草稿、箭头方向和单行生命', async ({
     const card = lobby.locator('.lobby-room').filter({ hasText: state.room!.name });
     await expect(card).toHaveCount(1);
     await expect(lobby.locator('.lobby-room-name small')).toHaveCount(0);
-    await expect(card.locator('.lobby-mode-tag')).toHaveText('声母+音调');
+    await expect(card.locator('.lobby-mode-tag')).toHaveText('字');
     for (const width of [320, 800, 1440]) {
       await lobby.setViewportSize({ width, height: 900 });
       await assertLayout(lobby);
@@ -591,7 +592,7 @@ test('大厅房间卡片、电脑草稿、箭头方向和单行生命', async ({
     });
     expect(arrow.distance).toBeGreaterThan(29);
     expect(arrow.distance).toBeLessThan(34);
-    await expect.poll(() => state.room?.history.length).toBe(2);
+    await expect.poll(()=>state.room?.currentPlayerId!==state.room?.players.find(player=>player.cpu)?.id,{timeout:15000}).toBe(true);
     await expect(host.getByLabel('输入答案')).toBeFocused({ timeout: 300 });
     await host.keyboard.insertText('知识');
     await expect(host.getByLabel('输入答案')).toHaveValue('知识');
@@ -641,12 +642,13 @@ test('组合提示附着后保留部首与字形部件', async ({ browser }) => 
     await expect(guest.locator('.room-heading h1')).toBeVisible();
     await host.getByRole('tab', { name: '规则设置', exact: true }).click();
     await host.getByRole('button', { name: '自定义', exact: true }).click();
-    for (const position of [1, 2]) {
+    for (const position of [1]) {
       await host.getByRole('button', {name: `提示格 ${position}`, exact: true}).click();
       await host.getByRole('group', {name: '声母', exact: true}).getByRole('button', {name: '不限', exact: true}).click();
       await host.getByLabel('声调', {exact: true}).uncheck();
     }
     await host.getByRole('button', {name: '提示格 1', exact: true}).click();
+    await host.getByLabel('汉字', {exact:true}).uncheck();
     await host.getByLabel('部首', {exact: true}).check();
     await host.getByLabel('字形部件', {exact: true}).check();
     await host.getByLabel('可用答案下限', { exact: true }).fill('1');
@@ -693,7 +695,7 @@ test('五个模式入口和移动端页面保持可用', async ({ page }) => {
       return { x: bounds.x, y: bounds.y, width: bounds.width, height: bounds.height,
         color: getComputedStyle(element.querySelector('.mode-icon')!).color };
     }));
-    expect(modes.map(mode => mode.color)).toEqual(['rgb(155, 61, 53)', 'rgb(53, 99, 95)', 'rgb(88, 112, 68)', 'rgb(76, 95, 122)', 'rgb(115, 93, 115)']);
+    expect(modes.map(mode => mode.color)).toEqual(['rgb(88, 112, 68)', 'rgb(53, 99, 95)', 'rgb(155, 61, 53)', 'rgb(76, 95, 122)', 'rgb(115, 93, 115)']);
     for (const [index, mode] of modes.entries()) {
       expect(mode.x).toBe(modes[0].x);
       expect(mode.width).toBe(modes[0].width);
@@ -703,7 +705,7 @@ test('五个模式入口和移动端页面保持可用', async ({ page }) => {
     await assertLayout(page);
   }
   await page.setViewportSize({ width: 320, height: 640 });
-  await page.getByRole('button', { name: '声母+音调', exact: true }).focus();
+  await page.getByRole('button', { name: '字', exact: true }).focus();
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: '部首', exact: true })).toBeFocused();
   await page.keyboard.press('Enter');
@@ -725,7 +727,7 @@ test('五个模式入口和移动端页面保持可用', async ({ page }) => {
   await page.getByRole('button', { name: '自定义', exact: true }).click();
   await expect(page.getByRole('group', { name: '声母', exact: true })).toBeVisible();
   const templates = page.locator('.custom-templates');
-  await expect(templates.getByRole('button')).toHaveText(['声母+音调', '部首', '字', '只有音调']);
+  await expect(templates.getByRole('button')).toHaveText(['字', '部首', '声母+音调', '只有音调']);
   await templates.getByRole('button', { name: '声母+音调', exact: true }).click();
   await expect(page.getByRole('group', { name: '声母', exact: true }).getByRole('button', { name: '提示', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByLabel('声调', {exact: true})).toBeChecked();

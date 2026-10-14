@@ -7,6 +7,8 @@ import { normalizePinyin } from '../shared/pinyin';
 import { playerColors } from '../shared/player-layout';
 import {bonusCandidates, collectBonusValues, resolveBonusType} from '../shared/bonuses';
 import {stalemateScore} from '../shared/idiom-prompts';
+import {tutorialLessons,tutorialSettings} from '../shared/tutorial';
+import {cpuPlan,type CpuPlan} from '../shared/cpu-play';
 
 const empty = z.object({}).strict();
 const nickname = z.string().trim().min(1).max(20);
@@ -15,6 +17,7 @@ const password = z.string().max(100);
 const commandSchema = z.discriminatedUnion('type', [
   z.object({id: identifier, type: z.literal('hello'), data: z.object({nickname, token: identifier.optional()}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('create'), data: z.object({name: z.string().trim().max(40), password, listed: z.boolean().optional().default(true), settings: settingsSchema}).strict()}).strict(),
+  z.object({id:identifier,type:z.literal('tutorial'),data:empty}).strict(),
   z.object({id: identifier, type: z.literal('join'), data: z.object({roomId: identifier, password}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('joinByCode'), data: z.object({code: z.string().trim().min(1).max(100), password}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('leave'), data: empty}).strict(),
@@ -75,6 +78,7 @@ interface ScheduledEvent {
   playerId?: string;
   word?: string;
   length?: number;
+  cpuPlan?:CpuPlan;
 }
 
 type StoredSession = Omit<Session, 'socket'>;
@@ -133,6 +137,7 @@ export function createGameCore(options: GameCoreOptions) {
       currentPlayerId: room.currentPlayerId, prompt: room.prompt,
       deadline: room.deadline, serverTime: Date.now(), history: room.history, previousPlayerId: room.previousPlayerId,
       chat: room.chat, lastWinnerId: room.lastWinnerId, winnerIds: room.winnerIds, draftMatch: room.draftMatch, acceptedAnswer: room.acceptedAnswer,
+      tutorial:room.tutorial,answerFeedback:room.answerFeedback,
     };
   }
 
@@ -310,6 +315,19 @@ export function createGameCore(options: GameCoreOptions) {
       acceptWord(room, player, player.draft, loadedRules);
       return;
     }
+    if(room.tutorial){
+      if(!player.cpu){resetDeadline(room);armDeadline(room);touch(room);return;}
+      player.lives--;
+      room.previousPlayerId=player.id;
+      const learner=room.players.find(item=>!item.cpu)!;
+      player.draft='';
+      if(player.lives===0){room.tutorial.completed=true;finishRound(room,learner.id);touch(room);return;}
+      room.tutorial.lesson++;
+      room.settings=tutorialSettings(room.tutorial.lesson);
+      prepareTutorialPrompt(room);
+      room.currentPlayerId=learner.id;
+      resetDeadline(room);armDeadline(room);touch(room);return;
+    }
     player.lives--;
     room.answersWithoutLifeLoss = 0;
     player.draft = '';
@@ -355,6 +373,13 @@ export function createGameCore(options: GameCoreOptions) {
     room.answersWithoutLifeLoss++;
     room.history.push({playerId: player.id, nickname: player.nickname, word, at: Date.now()});
     player.draft = '';
+    if(room.tutorial){
+      room.currentPlayerId=room.players.find(item=>item.cpu)!.id;
+      room.previousPlayerId=player.id;
+      room.draftMatch=null;
+      room.deadline=Date.now()+6000;
+      armDeadline(room);scheduleCpuTurn(room);touch(room);return;
+    }
     const bonusType = resolveBonusType(room.settings);
     if (result.reading && bonusType && player.bonusTargets.length) {
       const collected = new Set(player.collected);
@@ -411,7 +436,8 @@ export function createGameCore(options: GameCoreOptions) {
     cancel('cpu', room.id);
     const player = room.players.find(item => item.id === room.currentPlayerId);
     if (room.phase !== 'playing' || !player?.cpu) return;
-    schedule('cpu', room.id, Date.now() + 700, {promptId: room.prompt!.id, playerId: player.id, length: 1});
+    const plan=cpuPlan(loadedRules,room.prompt!,room.settings,room.used,Boolean(room.tutorial));
+    if(plan.words.length)schedule('cpu', room.id, Date.now() + 700, {promptId: room.prompt!.id, playerId: player.id, length: 1,cpuPlan:plan});
   }
 
   function scheduleAnswer(room: Room, player: Session, valid: boolean) {
@@ -432,12 +458,17 @@ export function createGameCore(options: GameCoreOptions) {
   function cpuStep(room: Room, event: ScheduledEvent) {
     const player = room.players.find(item => item.id === event.playerId);
     if (room.phase !== 'playing' || !player?.cpu || !room.prompt || room.currentPlayerId !== player.id || room.prompt.id !== event.promptId || Date.now() >= room.deadline!) return;
-    const word = event.word ?? loadedRules.cpuAnswer(room.prompt, room.settings, room.used)?.word;
+    const plan=event.cpuPlan;
+    const word = plan?.words[plan.attempt]??event.word??loadedRules.cpuAnswer(room.prompt, room.settings, room.used)?.word;
     if (!word) return;
     const characters = [...word];
     const length = event.length!;
     if (length > characters.length) {
-      acceptWord(room, player, word, loadedRules);
+      const result=loadedRules.match(word,room.prompt,room.settings,room.used);
+      if(result.valid){acceptWord(room,player,word,loadedRules);return;}
+      room.answerFeedback={id:randomUUID(),playerId:player.id,at:Date.now()};
+      penalizeInvalidAnswer(room);
+      if(plan&&plan.attempt+1<plan.words.length)schedule('cpu',room.id,Date.now()+500,{promptId:event.promptId,playerId:player.id,length:1,cpuPlan:{...plan,attempt:plan.attempt+1}});
       return;
     }
     player.draft = characters.slice(0, length).join('');
@@ -451,7 +482,7 @@ export function createGameCore(options: GameCoreOptions) {
     } : undefined;
           room.draftMatch = {word: player.draft, promptId: room.prompt.id, offset, reading, reason: draft.reason};
     broadcastRoom(room);
-    schedule('cpu', room.id, Date.now() + (length < characters.length ? 110 : 650), {promptId: event.promptId, playerId: player.id, word, length: length + 1});
+    schedule('cpu', room.id, Date.now() + (length < characters.length ? 110 : 650), {promptId: event.promptId, playerId: player.id, word, length: length + 1,cpuPlan:plan});
   }
 
   function removePlayer(session: Session) {
@@ -527,6 +558,18 @@ export function createGameCore(options: GameCoreOptions) {
     });
   }
 
+  function prepareTutorialPrompt(room:Room){
+    const lesson=tutorialLessons[room.tutorial!.lesson];
+    if(!lesson)throw new Error('教学阶段无效');
+    room.prompt={id:randomUUID(),cells:structuredClone(lesson.cells),answerCount:0};
+    room.prompt.answerCount=loadedRules.examples(room.prompt,room.settings,room.used,Infinity).length;
+    const result=loadedRules.match(lesson.word,room.prompt,room.settings,room.used);
+    if(!result.valid||result.offset===undefined||!result.reading)throw new Error('教学示例没有通过真实词库条件');
+    const offset=result.offset;
+    room.tutorial!.example={word:lesson.word,promptId:room.prompt.id,offset,reading:{syllables:result.reading.syllables.slice(offset,offset+room.prompt.cells.length),initials:result.reading.initials.slice(offset,offset+room.prompt.cells.length),finals:result.reading.finals.slice(offset,offset+room.prompt.cells.length),tones:result.reading.tones.slice(offset,offset+room.prompt.cells.length)}};
+    room.draftMatch=null;
+  }
+
   function removeCpu(room: Room) {
     if (room.phase === 'playing') throw new BusinessError('本局游戏期间不能移除电脑');
     const cpu = room.players.find(player => player.cpu);
@@ -562,6 +605,7 @@ export function createGameCore(options: GameCoreOptions) {
 
   function joinRoom(session: Session, room: Room | undefined, passwordValue: string) {
     if (!room) throw new BusinessError('房间不存在');
+    if(room.tutorial)throw new BusinessError('教学仅供当前玩家练习');
     if (room.players.filter(player => !player.cpu).length >= room.settings.maxPlayers) throw new BusinessError('房间人数已满');
     if (room.passwordHash && !timingSafeEqual(scryptSync(passwordValue, room.passwordSalt!, 64), room.passwordHash)) {
       throw new BusinessError('房间密码不正确');
@@ -594,6 +638,19 @@ export function createGameCore(options: GameCoreOptions) {
         const room = createRoom(session, request.data.name, request.data.password, request.data.listed ?? true, request.data.settings, rules);
         return {roomId: room.id};
       }
+      case 'tutorial':{
+        if(session.roomId)throw new BusinessError('请离开当前房间后进入教学');
+        const settings=tutorialSettings(0);
+        const room=createRoom(session,'玩法教学','',false,settings,await getRules());
+        addCpu(room);
+        room.tutorial={lesson:0,completed:false,example:{word:'',promptId:null,offset:null}};
+        room.phase='playing';room.round=1;room.matchDuel=true;
+        room.playOrder=room.players.map(player=>player.id);
+        room.players.forEach(player=>{player.lives=4;player.ready=true;room.matchPlayerIds.add(player.id);});
+        room.currentPlayerId=session.id;
+        prepareTutorialPrompt(room);resetDeadline(room);armDeadline(room);touch(room);
+        return {roomId:room.id};
+      }
       case 'join': {
         if (session.roomId) throw new BusinessError('请离开当前房间后加入');
         return joinRoom(session, rooms.get(request.data.roomId), request.data.password);
@@ -608,6 +665,7 @@ export function createGameCore(options: GameCoreOptions) {
       case 'hello': throw new BusinessError('当前连接已经设置昵称');
     }
     const room = requireRoom(session);
+    if(room.tutorial&&!['submit','draft','chat'].includes(request.type))throw new BusinessError('教学房间只提供练习操作');
     switch (request.type) {
       case 'ready':
         if (room.phase === 'playing') throw new BusinessError('本局结束后可以准备');

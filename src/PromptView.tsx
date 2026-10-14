@@ -21,7 +21,7 @@ function loadGlyph(character: string): Promise<Glyph> {
 function GlyphPart({ glyph, indices, original, attached, hint }: { glyph: Glyph; indices: number[]; original: boolean; attached: boolean; hint?: string }) {
   const strokes = useRef<SVGGElement>(null);
   const transform = useRef<LayoutFrame | undefined>(undefined);
-  const [hintTransform, setHintTransform] = useState('matrix(1,0,0,1,0,0)');
+  const [hintTransform, setHintTransform] = useState<string | null>(null);
   useLayoutEffect(() => {
     if (!original) return;
     const bounds = strokes.current!.getBBox();
@@ -32,12 +32,12 @@ function GlyphPart({ glyph, indices, original, attached, hint }: { glyph: Glyph;
     setHintTransform(source);
   }, [glyph, original, indices.join(':')]);
   useLayoutEffect(() => {
-    if (!original) return;
+    if (!original || hintTransform === null) return;
     transform.current = animateFlip(strokes.current!, transform.current);
   }, [attached, original, hintTransform]);
   return <span className={`stroke-glyph ${original ? 'prompt-glyph-origin' : 'prompt-glyph-supplement'}`} aria-hidden="true">
     <svg className="stroke-glyph-vector" viewBox="0 0 1024 1024" aria-label={hint}>
-      <g transform="scale(1,-1) translate(0,-900)"><g ref={strokes} style={{transform: original && !attached ? hintTransform : 'matrix(1,0,0,1,0,0)'}}>{indices.map(index => <path key={index} data-stroke-index={index} d={glyph.strokes[index]} fill="currentColor" />)}</g></g>
+      <g transform="scale(1,-1) translate(0,-900)"><g ref={strokes} style={{visibility: original && hintTransform === null ? 'hidden' : undefined, transform: original && !attached ? hintTransform ?? undefined : 'matrix(1,0,0,1,0,0)'}}>{indices.map(index => <path key={index} data-stroke-index={index} d={glyph.strokes[index]} fill="currentColor" />)}</g></g>
     </svg>
   </span>;
 }
@@ -105,10 +105,14 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
   const displayToneIndex = reading && position !== undefined ? toneIndex : hintToneIndex;
   const displayInitial = displayPinyin(initial, 0, displayToneIndex);
   const displayFinal = displayPinyin(final, initial.length, displayToneIndex);
+  const initialHintLength = cell.initial?.length ?? initial.length;
+  const finalHintStart = cell.final === undefined ? 0 : Math.max(0, final.length - cell.final.length);
   const visiblePinyin = (value: string, field: string, start: number) => pinyinTargets(value, field, start, -1, undefined);
   const parts = [
-    { field: 'initial', content: initial ? visiblePinyin(displayInitial, 'initial', 0) : null, original: cell.initial !== undefined },
-    { field: 'final', content: final ? visiblePinyin(displayFinal, 'final', initial.length) : null, original: cell.final !== undefined },
+    { field: 'initial', content: initial ? visiblePinyin(displayInitial.slice(0,initialHintLength), 'initial', 0) : null, original: cell.initial !== undefined },
+    { field: 'initial-tail', content: initial.length > initialHintLength ? visiblePinyin(displayInitial.slice(initialHintLength), 'initial-tail', initialHintLength) : null, original: false },
+    { field: 'final-head', content: finalHintStart ? visiblePinyin(displayFinal.slice(0,finalHintStart), 'final-head', initial.length) : null, original: false },
+    { field: 'final', content: final ? visiblePinyin(displayFinal.slice(finalHintStart), 'final', initial.length + finalHintStart) : null, original: cell.final !== undefined },
     { field: 'tone', content: tone !== undefined && (tone !== 5 || cell.tone === 5 && cell.final === undefined) ? <ToneMark tone={tone} /> : null, original: cell.tone !== undefined },
     { field: 'radical', content: vector && radicalStrokes.length ? <GlyphPart glyph={glyph!} indices={radicalStrokes} hint={cell.radical} original attached={attached} /> : cell.radical, original: true, vector: vector && radicalStrokes.length > 0 },
     { field: 'component', content: vector ? componentStrokes.length ? <GlyphPart glyph={glyph!} indices={componentStrokes} hint={cell.component} original attached={attached} /> : null : cell.component, original: true, vector: vector && componentStrokes.length > 0 },
@@ -188,7 +192,8 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
     {character && <div className="prompt-complete-layout" aria-hidden="true">
       <span className="prompt-input-character" data-field="character">{character}</span>
       <span className={`prompt-pinyin ${fullPinyin.length > 6 ? 'prompt-pinyin-long' : ''}`}>
-        {pinyinTargets(initial, 'initial', 0)}{pinyinTargets(final, 'final', initial.length)}
+        {pinyinTargets(initial.slice(0,initialHintLength), 'initial', 0)}{initial.length > initialHintLength && pinyinTargets(initial.slice(initialHintLength),'initial-tail',initialHintLength)}
+        {finalHintStart > 0 && pinyinTargets(final.slice(0,finalHintStart),'final-head',initial.length)}{pinyinTargets(final.slice(finalHintStart), 'final', initial.length + finalHintStart)}
         {!final && tone !== undefined && tone !== 5 && <span className="prompt-tone-source prompt-tone-complete-target" data-field="tone"><ToneMark tone={tone} /></span>}
       </span>
     </div>}
@@ -263,9 +268,13 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
   useEffect(() => {
     if (!attached) { setVisualAttached(false); return; }
     if (submitting) return;
-    let nextFrame = 0;
-    const frame = requestAnimationFrame(() => { nextFrame = requestAnimationFrame(() => setVisualAttached(true)); });
-    return () => { cancelAnimationFrame(frame); cancelAnimationFrame(nextFrame); };
+    let frame = 0;
+    const attach = () => {
+      if (flipRoot.current?.querySelector('.prompt-cell[data-glyph-ready="false"]')) {frame = requestAnimationFrame(attach); return;}
+      frame = requestAnimationFrame(() => setVisualAttached(true));
+    };
+    frame = requestAnimationFrame(attach);
+    return () => cancelAnimationFrame(frame);
   }, [attached, prompt.id, submitting]);
   const [previousMatch, setPreviousMatch] = useState<{ offset: number; reading: Reading; characters: string[]; promptId: string } | null>(null);
   useEffect(() => {

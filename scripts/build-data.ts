@@ -9,6 +9,7 @@ import { parse as parseIds, flatten, children, type IDS } from 'parse-ids';
 import { splitPinyin } from '../shared/pinyin';
 import {parse as parseTable} from 'csv-parse';
 import {z} from 'zod';
+import {bonusRadicalCandidates} from '../shared/bonus-candidates';
 import type { CharacterData, DictionaryData, Reading, WordEntry } from '../shared/types';
 
 const componentVersion = 'bddc96d41bef78427ed0e034e9f7e31d71fd1b92';
@@ -65,6 +66,17 @@ for (const item of cedict) {
       source: ['CC-CEDICT', ...(frequency.has(item.simplified) ? ['THUOCL'] : []), ...(everydayFrequency.has(item.simplified) ? ['jieba'] : [])] };
     entries.set(entry.word, entry);
   }
+  if (!entry.readings.some(value => value.syllables.join(' ') === reading.syllables.join(' '))) entry.readings.push(reading);
+}
+
+const readingSupplement = z.object({version: z.literal(1), entries: z.array(z.object({word: z.string(), syllables: z.array(z.string().regex(/^[a-zü]+[1-5]$/u)), sourceDefinition: z.string()}).strict())}).strict().parse(JSON.parse(await readFile('data/reading-supplement.json', 'utf8')));
+for (const approved of readingSupplement.entries) {
+  const entry = entries.get(approved.word);
+  if (!entry || !cedict.some(item => item.simplified === approved.word && item.english.includes(approved.sourceDefinition))) throw new Error(`补充读音缺少固定来源依据：${approved.word}`);
+  if (approved.syllables.length !== [...approved.word].length) throw new Error(`补充读音长度不符：${approved.word}`);
+  if (approved.sourceDefinition !== `also pr. [${approved.syllables.join('')}]`) throw new Error(`补充读音与来源声明不符：${approved.word}`);
+  const parts = approved.syllables.map(splitPinyin);
+  const reading: Reading = {syllables: approved.syllables, initials: parts.map(part => part.initial), finals: parts.map(part => part.final), tones: parts.map(part => part.tone)};
   if (!entry.readings.some(value => value.syllables.join(' ') === reading.syllables.join(' '))) entry.readings.push(reading);
 }
 
@@ -146,6 +158,7 @@ function expandStrokeParts(character: string, visiting = new Set<string>()): Rec
     const record = glyphRecords.get(component);
     if (!record || component === character || indices.length !== record.matches.length) continue;
     for (const [nested, mapped] of Object.entries(expandStrokeParts(component, next))) {
+      if (bonusRadicalCandidates.includes(nested) && mapped.length === record.matches.length) continue;
       parts[nested] = [...new Set([...(parts[nested] ?? []), ...mapped.map(index => indices[index])])].sort((first, second) => first - second);
     }
   }

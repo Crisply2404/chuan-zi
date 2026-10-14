@@ -20,6 +20,11 @@ test('点击昵称修改，明暗主题独立切换并保存在设备', async ({
   await expect(page.locator('.room-heading h1')).toBeVisible();
   await page.getByRole('tab', {name: '规则设置', exact: true}).click();
   await expect(page.locator('.mode-card').first()).toHaveCSS('background-color', 'rgb(27, 28, 30)');
+  await expect(page.locator('.mode-card').first()).toHaveAttribute('aria-label','字');
+  for(const card of await page.locator('.mode-card').all()){
+    const expected=await card.evaluate(element=>{const probe=document.createElement('div');probe.style.color=getComputedStyle(element).getPropertyValue('--mode-color');return probe.style.color;});
+    await expect(card).toHaveCSS('border-left-color',expected);
+  }
   await page.getByRole('button', {name: '切换亮色主题', exact: true}).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(255, 255, 255)');

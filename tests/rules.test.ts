@@ -12,6 +12,21 @@ const data = JSON.parse(readFileSync('data/dictionary.json', 'utf8')) as Diction
 const rules = new WordRules(data);
 const prompt = (cells: Prompt['cells']): Prompt => ({ id: 'public-rule-test', cells, answerCount: 0 });
 
+test('声母按开头匹配、韵母按结尾匹配，无发音字段保持空值条件', () => {
+  assert.equal(rules.match('生活', prompt([{initial:'s'}]), defaultSettings).valid,true);
+  assert.equal(rules.match('生活', prompt([{initial:'h'}]), defaultSettings).offset,1);
+  assert.equal(rules.match('生活', prompt([{initial:'h'}, {initial:'h'}]), defaultSettings).valid,false);
+  assert.equal(rules.match('影响', prompt([{final:'ang'}]), defaultSettings).valid,true);
+  assert.equal(rules.match('影响', prompt([{final:'an'}]), defaultSettings).valid,false);
+  assert.equal(rules.match('安心', prompt([{initial:''}]), defaultSettings).valid,true);
+  assert.equal(rules.match('生活', prompt([{initial:''}]), defaultSettings).valid,false);
+  for (const question of [prompt([{initial:'s'}]),prompt([{final:'ang'}])]) {
+    const examples = rules.examples(question,defaultSettings,new Set(),Infinity);
+    assert.ok(examples.length>0);
+    assert.ok(examples.every(entry=>rules.match(entry.word,question,defaultSettings).valid));
+  }
+});
+
 test('易误写表达返回正确词形，草稿与提交继续拒绝', () => {
   const question = prompt([{contains: '置'}]);
   assert.equal(rules.draft('不可置否', question, defaultSettings).reason, '这个词应写作「不置可否」');
@@ -76,6 +91,20 @@ test('官方快照收录独享，旋转遵守第三声，重复草稿返回原�
   assert.equal(rules.match('旋转', prompt([{initial: 'x'}, {initial: 'zh', tone: 3}]), defaultSettings).valid, true);
   assert.equal(rules.match('旋转', prompt([{initial: 'x'}, {initial: 'zh', tone: 4}]), defaultSettings).valid, false);
   assert.equal(rules.draft('草帽', prompt([{contains: '草'}]), defaultSettings, new Set(['草帽'])).reason, '本局已经使用这个答案');
+});
+
+test('好处接受来源记录的第四声读音，并遵守完整声调条件', () => {
+  assert.equal(rules.match('好处', prompt([{initial:'h'}, {initial:'ch'}]), defaultSettings).valid, true);
+  assert.equal(rules.match('好处', prompt([{initial:'h',tone:3}, {initial:'ch',tone:4}]), defaultSettings).valid, true);
+  assert.equal(rules.match('好处', prompt([{initial:'h',tone:1}, {initial:'ch',tone:4}]), defaultSettings).valid, false);
+});
+
+test('存及才嵌套字形不包含扌，真实扌部件与宀嵌套继续匹配', () => {
+  for (const character of ['团','在','材','财','存','茬','闭','荐','豺','鞯']) assert.equal(data.characters[character]?.strokeParts?.['扌'], undefined, character);
+  assert.equal(rules.match('存在', prompt([{radical:'扌'}]), defaultSettings).valid, false);
+  assert.equal(rules.match('打击', prompt([{radical:'扌'}]), defaultSettings).valid, true);
+  assert.equal(rules.match('秘密', prompt([{radical:'宀'}]), defaultSettings).valid, true);
+  assert.equal(rules.match('空穴来风', prompt([{radical:'宀'}]), defaultSettings).valid, true);
 });
 
 test('真实成语按隐藏位置与连续声母序列接受答案', () => {
@@ -177,7 +206,7 @@ test('声调提示只展示拼音符号', () => {
 });
 
 test('生成提示保留指定隐藏数量且开启字段覆盖其余位置', () => {
-  const settings = { ...defaultSettings, minLength: 4, promptLength: 4, hiddenCount: 1, appearance: { ...defaultSettings.appearance, tone: 'off' as const } };
+  const settings = { ...getModeSettings('initial-tone'),mode:'custom' as const, minLength: 4, promptLength: 4, hiddenCount: 1, appearance: {...getModeSettings('initial-tone').appearance,tone:'off' as const} };
   const result = rules.generate(settings);
   assert.equal(result.cells.filter(cell => !Object.keys(cell).length).length, 1);
   assert.equal(result.cells.filter(cell => cell.initial !== undefined).length, 3);
@@ -195,7 +224,7 @@ test('生成提示的可答数量与词库实际交集一致且排除已使用�
 });
 
 test('交叉条件关系同时支持同字与不同字', () => {
-  const settings = { ...defaultSettings, minAnswers: 1, appearance: { ...defaultSettings.appearance, final: 'required' as const, tone: 'required' as const },
+  const settings = { ...getModeSettings('initial-tone'),mode:'custom' as const, minAnswers: 1, appearance: { ...getModeSettings('initial-tone').appearance, final: 'required' as const, tone: 'required' as const },
     relations: [{ first: 'initial' as const, second: 'tone' as const, mode: 'same' as const }, { first: 'initial' as const, second: 'final' as const, mode: 'different' as const }] };
   const result = rules.generate(settings);
   assert.ok(result.cells.every(cell => (cell.initial === undefined) === (cell.tone === undefined)));
@@ -204,7 +233,7 @@ test('交叉条件关系同时支持同字与不同字', () => {
 });
 
 test('全部声调范围覆盖每个显示汉字并保留隐藏位置', () => {
-  const settings = { ...defaultSettings, minLength: 4, promptLength: 4, hiddenCount: 1, minAnswers: 1, toneScope: 'all' as const,
+  const settings = { ...defaultSettings,mode:'custom' as const, minLength: 4, promptLength: 4, hiddenCount: 1, minAnswers: 1, toneScope: 'all' as const,
     appearance: { initial: 'off' as const, final: 'off' as const, tone: 'required' as const, radical: 'off' as const, component: 'off' as const, contains: 'off' as const } };
   const result = rules.generate(settings);
   assert.equal(result.cells.filter(cell => cell.tone !== undefined).length, 3);
@@ -212,7 +241,7 @@ test('全部声调范围覆盖每个显示汉字并保留隐藏位置', () => {
 });
 
 test('同字关系与不同字关系矛盾时返回可读错误', () => {
-  const settings = { ...defaultSettings, appearance: { ...defaultSettings.appearance, final: 'required' as const, tone: 'required' as const },
+  const settings = { ...getModeSettings('initial-tone'),mode:'custom' as const, appearance: { ...getModeSettings('initial-tone').appearance, final: 'required' as const, tone: 'required' as const },
     relations: [{ first: 'initial' as const, second: 'tone' as const, mode: 'same' as const }, { first: 'tone' as const, second: 'final' as const, mode: 'same' as const }, { first: 'initial' as const, second: 'final' as const, mode: 'different' as const }] };
   assert.throws(() => rules.generate(settings), RuleError);
 });

@@ -14,5 +14,6 @@
 | 词库、补充词条、成语分类 | `scripts/build-data.ts`、`data/README.md`、`data/wanxiang-supplement.json`、`data/sources.json` | `tests/rules.test.ts`、`tests/glyph-font.test.ts` |
 | 易误写提醒 | `data/common-mistakes.json`、`shared/rules.ts`、`src/App.tsx` | `tests/rules.test.ts`、`tests/browser/game.spec.ts` |
 | 发布产物 | `scripts/check-pages-artifact.ts`、`docs/deployment.md` | `npm run build:pages`、`npm run check:pages` |
+| 玩法教学、电脑尝试 | `shared/tutorial.ts`、`shared/cpu-play.ts`、`server/game-core.ts`、`src/TutorialGuide.tsx` | `tests/cpu-play.test.ts`、`tests/browser/tutorial.spec.ts`、`tests/cloudflare.test.ts` |
 
 更新领域含义时，同步修改术语与当前规格。维护数据时，完整阅读来源、许可和收录要求；生成、草稿、提交与电脑答案共同使用 `data/dictionary.json`。

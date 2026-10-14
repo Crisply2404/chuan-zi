@@ -15,7 +15,7 @@ export interface PromptSlot {
   component: boolean;
   contains: boolean;
 }
-export const modeIds = ['initial-tone', 'radical', 'character', 'tone-only', 'custom'] as const;
+export const modeIds = ['character', 'radical', 'initial-tone', 'tone-only', 'custom'] as const;
 export type ModeId = typeof modeIds[number];
 export type RulePresetId = 'simple' | 'hard' | 'featured' | 'custom';
 export type BonusType = 'initial' | 'final' | 'radical';
@@ -55,9 +55,9 @@ export interface Settings {
 }
 
 export const defaultSettings: Settings = {
-  mode: 'initial-tone',
-  dictionary: 'all', minLength: 2, maxLength: 9, promptLength: 2, hiddenCount: 0,
-  appearance: { initial: 'required', final: 'off', tone: 'random', radical: 'off', component: 'off', contains: 'off' },
+  mode: 'character',
+  dictionary: 'all', minLength: 2, maxLength: 9, promptLength: 1, hiddenCount: 0,
+  appearance: { initial: 'off', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'required' },
   relations: [], toneScope: 'one', minAnswers: 2, maxAnswers: 20000,
   startingLives: 3, maxLives: 5, timerMode: 'fixed', initialSeconds: 10,
   randomMinSeconds: 10, randomMaxSeconds: 30,
@@ -104,6 +104,8 @@ export interface RoomView {
   prompt: Prompt | null; deadline: number | null; serverTime: number;
   history: HistoryItem[]; chat: ChatMessage[]; draftMatch: DraftMatch | null; acceptedAnswer: AcceptedAnswer | null;
   lastWinnerId: string | null; winnerIds: string[];
+  tutorial?: {lesson:number; completed:boolean; example:DraftMatch};
+  answerFeedback?: {id:string; playerId:string; at:number};
 }
 export interface LobbyRoom {
   id: string; roomKey: string; roomPinyin: string; name: string; createdAt: number; creator: string; mode: ModeId;
@@ -114,6 +116,7 @@ export interface LobbyRoom {
 export type ClientCommand =
   | {type: 'hello'; data: {nickname: string; token?: string}}
   | {type: 'create'; data: {name: string; password: string; listed?: boolean; settings: Settings}}
+  | {type:'tutorial';data:Record<string,never>}
   | {type: 'join'; data: {roomId: string; password: string}}
   | {type: 'joinByCode'; data: {code: string; password: string}}
   | {type: 'leave'; data: Record<string, never>}

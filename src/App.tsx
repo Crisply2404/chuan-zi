@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
-import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, Heart, LockKeyhole, LogOut, MessageCircle, Moon, Pencil, Plus, RefreshCw, Send, Sun, UserRound, Users, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Bot, Check, ChevronRight, Copy, Crown, Download, Drum, Eye, EyeOff, GraduationCap, Heart, LockKeyhole, LogOut, MessageCircle, Moon, Pencil, Plus, RefreshCw, Send, Sun, UserRound, Users, Volume2, VolumeX, Wifi, WifiOff, X } from 'lucide-react';
 import { defaultSettings, type AcceptedAnswer, type ClientCommand, type DraftMatch, type LobbyRoom, type PlayerView, type Prompt, type RoomView, type Settings } from '../shared/types';
 import { playerAngle } from '../shared/player-layout';
 import { ConnectionError, useGameConnection } from './network';
@@ -13,6 +13,7 @@ import { correctionMessage } from '../shared/word-corrections';
 import { useAnswerVisibility } from './useAnswerVisibility';
 import {resolveBonusType} from '../shared/bonuses';
 import {bonusLabels} from '../shared/bonus-candidates';
+import {TutorialGuide} from './TutorialGuide';
 
 const phaseLabels: Record<RoomView['phase'], string> = { waiting: '准备中', playing: '正在游戏', between: '本局结束', finished: '比赛结束' };
 const connectionLabels = { idle: '未连接', connecting: '正在连接', connected: '已连接', reconnecting: '正在重连' };
@@ -159,19 +160,19 @@ export default function App() {
     </div>}
     {room ? <main className="room-page">
       <div className="room-heading"><div><button type="button" className="back-button" onClick={leave} disabled={busy}><ArrowLeft size={15} />大厅</button>
-        <h1>{room.name}{room.protected && <LockKeyhole size={18} />}{isHost && <IconButton label="修改房间名称" onClick={() => setModal('metadata')}><Pencil size={15} /></IconButton>}</h1>
-      </div><div className="room-heading-tools"><IconButton label="复制邀请链接" onClick={() => {
+        <h1>{room.name}{room.protected && <LockKeyhole size={18} />}{isHost && !room.tutorial && <IconButton label="修改房间名称" onClick={() => setModal('metadata')}><Pencil size={15} /></IconButton>}</h1>
+      </div><div className="room-heading-tools">{!room.tutorial&&<IconButton label="复制邀请链接" onClick={() => {
         navigator.clipboard.writeText(location.href).catch(failure => setError(failure.message));
-      }}><Copy size={19} /></IconButton><IconButton label="离开房间" onClick={leave} disabled={busy}><LogOut size={19} /></IconButton></div></div>
-      <div className="room-tabs" role="tablist"><button type="button" role="tab" aria-selected={roomTab === 'game'} onClick={() => setRoomTab('game')}>游戏</button>
-        <button type="button" role="tab" aria-selected={roomTab === 'settings'} onClick={() => setRoomTab('settings')}>规则设置</button></div>
+      }}><Copy size={19} /></IconButton>}<IconButton label="离开房间" onClick={leave} disabled={busy}><LogOut size={19} /></IconButton></div></div>
+      {!room.tutorial&&<div className="room-tabs" role="tablist"><button type="button" role="tab" aria-selected={roomTab === 'game'} onClick={() => setRoomTab('game')}>游戏</button>
+        <button type="button" role="tab" aria-selected={roomTab === 'settings'} onClick={() => setRoomTab('settings')}>规则设置</button></div>}
       {roomTab === 'game' ? <RoomGame room={room} self={self} isHost={Boolean(isHost)} busy={busy} connected={connected} act={act} send={connection.send} setError={setError} />
         : <div className="room-settings-layout"><SettingsEditor value={settings} onChange={next => { setSettings(next); setPreview(null); }} disabled={!isHost || room.phase === 'playing'}
           fixedBestOf={room.phase === 'between'} preview={preview} busy={busy} onPreview={previewSettings}
           onSave={isHost ? (next, onSaved) => act({ type: 'settings', data: { settings: next } }, onSaved) : undefined} />
           <label className="visibility-setting"><input type="checkbox" aria-label="在大厅展示" checked={room.listed} disabled={!isHost || busy || !connected} onChange={event => act({ type: 'visibility', data: { listed: event.target.checked } })} />{room.listed ? <><Eye size={14} />在大厅展示</> : <><EyeOff size={14} />大厅隐藏</>}</label></div>}
     </main> : <main className="lobby-page"><div className="page-heading"><div><span className="eyebrow">击鼓传字</span><h1>游戏大厅</h1></div>
-      <div className="page-heading-actions"><button type="button" className="primary-button" disabled={!connected || busy} onClick={() => act({ type: 'create', data: { name: '', password: '', listed: true, settings: structuredClone(defaultSettings) } })}><Plus size={18} />创建房间</button></div></div>
+      <div className="page-heading-actions"><button type="button" className="secondary-button" disabled={!connected||busy} onClick={()=>act({type:'tutorial',data:{}})}><GraduationCap size={18}/>玩法教学</button><button type="button" className="primary-button" disabled={!connected || busy} onClick={() => act({ type: 'create', data: { name: '', password: '', listed: true, settings: structuredClone(defaultSettings) } })}><Plus size={18} />创建房间</button></div></div>
       <div className="lobby-toolbar"><span>{connection.rooms.length} 个房间</span><span className="muted">最新创建</span><IconButton label="重新连接" onClick={connection.reconnect}><RefreshCw size={16} /></IconButton></div>
       <div className="lobby-cards">
         {connection.rooms.length ? connection.rooms.map(target => <button type="button" className="lobby-room" key={target.id} style={{ '--mode-color': modeColors[target.mode] } as CSSProperties} disabled={!connected || busy || target.playerCount >= target.maxPlayers} onClick={() => join(target)}>
@@ -238,7 +239,7 @@ function PlayerTopology({ room, self, isHost, busy, connected, act, seconds }: {
   const topology = useRef<HTMLDivElement>(null);
   const [menuId, setMenuId] = useState<string | null>(null);
   const [layout, setLayout] = useState({ width: 500, height: 160, avatarSize: 48 });
-  const canAddCpu = isHost && room.phase !== 'playing' && !room.players.some(player => player.cpu);
+  const canAddCpu = isHost && room.phase !== 'playing' && !room.tutorial && !room.players.some(player => player.cpu);
   const count = Math.max(2, room.players.length + (canAddCpu ? 1 : 0));
   const dense = count > 8;
   useLayoutEffect(() => {
@@ -254,7 +255,7 @@ function PlayerTopology({ room, self, isHost, busy, connected, act, seconds }: {
   }, [count]);
   const radius = count === 2 ? Math.max(35, layout.width * .36) : count >= 8
     ? Math.min(layout.width / 2 - 18, Math.max(92, layout.height / 2 - 65))
-    : Math.max(45, Math.min(layout.width / 2 - 32, layout.height / 2 - 55));
+    : Math.max(68, Math.min(layout.width / 2 - 32, layout.height / 2 - 55));
   const [accepted, setAccepted] = useState<AcceptedAnswer | null>(null);
   const lastAccepted = useRef(room.acceptedAnswer?.id);
   useEffect(() => {
@@ -306,6 +307,12 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   const [inputValue, setInputValue] = useState('');
   const [draftMatch, setDraftMatch] = useState<DraftMatch>({ word: '', promptId: null, offset: null });
   const [feedback, setFeedback] = useState(false);
+  useEffect(()=>{
+    if(!room.answerFeedback)return;
+    setFeedback(true);
+    const timer=setTimeout(()=>setFeedback(false),360);
+    return()=>clearTimeout(timer);
+  },[room.answerFeedback?.id]);
   const [answerMessage, setAnswerMessage] = useState('');
   const answerMessageTimer = useRef<number | null>(null);
   const clearAnswerMessage = useCallback(() => {
@@ -389,7 +396,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
   }, []);
   const isTurn = room.phase === 'playing' && self?.id === room.currentPlayerId && self.role === 'player';
   const canEdit = isTurn && connected;
-  const revealAnswer = useAnswerVisibility(answerRegion, input, canEdit);
+  const revealAnswer = useAnswerVisibility(answerRegion, input, room.phase === 'playing');
   const deadlineOffset = room.serverTime - Date.now();
   const serverOffset = useRef(deadlineOffset);
   useEffect(() => { serverOffset.current = room.serverTime - Date.now(); }, [room.serverTime]);
@@ -416,9 +423,14 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
     }
   }, [audio, room.phase, seconds]);
   useEffect(() => { setWord(''); setInputValue(''); setCursor(0); setDraftMatch({ word: '', promptId: room.prompt?.id ?? null, offset: null }); setFeedback(false); composing.current = false; }, [room.prompt?.id, isTurn]);
-  useLayoutEffect(() => {
-    if (canEdit) input.current?.focus({ preventScroll: true });
-  }, [canEdit, room.prompt?.id]);
+  useEffect(() => {
+    if (!canEdit) return;
+    const frame = requestAnimationFrame(() => {
+      input.current?.focus({preventScroll: true});
+      revealAnswer();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [canEdit, room.prompt?.id, revealAnswer]);
   useEffect(clearAnswerMessage, [clearAnswerMessage, room.prompt?.id, isTurn]);
   const duplicateWord = isTurn && room.history.some(item => item.word === word);
   const wordCorrection = isTurn ? correctionMessage(word) : undefined;
@@ -490,6 +502,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
         {narrowViewport && <IconButton label="查看答案记录与聊天" onClick={() => setActivityOpen(true)}><MessageCircle size={19} /></IconButton>}
       </div></div>
       <PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} seconds={seconds} />
+      {room.tutorial&&<TutorialGuide room={room} active={Boolean(isTurn)}/>}
       {(room.phase === 'playing' || activeCompletion) && shownPrompt ? <>
         <div className="answer-region" ref={answerRegion}><div className="timer-area"><div className={`timer ${seconds <= 5 ? 'timer-urgent' : ''}`} aria-label="剩余时间"><span>{seconds.toFixed(1)}</span><small>秒</small></div>
           <div className="timer-track"><span style={{ width: `${Math.min(100, seconds / initial * 100)}%` }} /></div></div>
@@ -518,9 +531,9 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
       </> : <div className="waiting-stage">
         {room.phase === 'finished' ? <h2>{winners.length ? `${winners.map(player => player.nickname).join('、')} 获胜` : '比赛平局'}</h2>
           : room.phase === 'between' ? <h2>{lastWinner ? `${lastWinner.nickname} 获胜` : room.players.filter(player => player.role === 'player').every(player => player.lives === 0) ? '本局平局' : '本局中止'}</h2> : null}
-        <div className="ready-actions">{self && <button type="button" className={self.ready ? 'secondary-button' : 'primary-button'} disabled={busy || !connected} onClick={() => act({ type: 'ready', data: { ready: !self.ready } })}>
+        <div className="ready-actions">{room.tutorial?<button type="button" className="primary-button" onClick={()=>act({type:'leave',data:{}})}><Check size={17}/>返回大厅</button>:self && <button type="button" className={self.ready ? 'secondary-button' : 'primary-button'} disabled={busy || !connected} onClick={() => act({ type: 'ready', data: { ready: !self.ready } })}>
           <Check size={17} />{self.ready ? '取消准备' : '准备'}</button>}
-          {isHost && <button type="button" className="primary-button" disabled={busy || !connected || room.players.filter(player => player.ready && player.online).length < 2}
+          {isHost && !room.tutorial && <button type="button" className="primary-button" disabled={busy || !connected || room.players.filter(player => player.ready && player.online).length < 2}
             onClick={() => act({ type: 'start', data: {} })}><ArrowRight size={17} />{room.phase === 'between' ? '开始下一局' : room.phase === 'finished' ? '开始新比赛' : '开始比赛'}</button>}</div>
       </div>}
     </section>

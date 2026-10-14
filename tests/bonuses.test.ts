@@ -25,7 +25,7 @@ test('奖励优先选择提示中未使用的韵母、部首、声母', () => {
 test('自定义可以选择未用于提示的奖励类型，条件变化自动重新选择', () => {
   const tone = withPromptSlots(defaultSettings, [{...emptyPromptSlot(), tone: true}]);
   assert.equal(resolveBonusType({...tone, bonusType: 'initial'}), 'initial');
-  assert.equal(resolveBonusType({...defaultSettings, bonusType: 'initial'}), 'final');
+  assert.equal(resolveBonusType({...defaultSettings,appearance:{...defaultSettings.appearance,initial:'required'}, bonusType: 'initial'}), 'final');
   assert.equal(resolveBonusType({...tone, bonusEnabled: false}), null);
   assert.equal(settingsSchema.safeParse({...tone, bonusType: 'final', bonusFinals: []}).success, false);
   assert.equal(settingsSchema.safeParse({...tone, bonusType: 'radical', bonusRadicals: ['冫']}).success, true);

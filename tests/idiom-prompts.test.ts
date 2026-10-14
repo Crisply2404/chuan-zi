@@ -8,8 +8,8 @@ import type {DictionaryData} from '../shared/types';
 
 const rules = new WordRules(JSON.parse(readFileSync('data/dictionary.json', 'utf8')) as DictionaryData);
 
-test('成语预设默认零个星号或只在第一格提示', () => {
-  for (const mode of ['initial-tone', 'radical', 'tone-only'] as const) {
+test('成语声母模式默认零个星号或只在第一格提示', () => {
+  for (const mode of ['initial-tone'] as const) {
     const settings = {...getModeSettings(mode), dictionary: 'idioms' as const, minLength: 4, promptLength: 4, hiddenCount: 1};
     const shapes = new Set<string>();
     for (let index = 0; index < 36; index++) {
@@ -22,6 +22,21 @@ test('成语预设默认零个星号或只在第一格提示', () => {
     }
     assert.ok(shapes.has('0'), mode);
     assert.ok(shapes.has('0,1,2,3'), mode);
+  }
+});
+
+test('成语部首与声调默认三个或两个星号，各占一半', () => {
+  for (const mode of ['radical', 'tone-only'] as const) {
+    const settings = {...getModeSettings(mode), dictionary: 'idioms' as const, minLength: 4};
+    const shapes = new Set<number>();
+    for (let index = 0; index < 60; index++) {
+      const question = rules.generate(settings);
+      const visible = question.cells.filter(cell => Object.keys(cell).length).length;
+      assert.equal(question.cells.length, 4);
+      assert.ok(visible === 1 || visible === 2, `${mode}: ${visible}`);
+      shapes.add(visible);
+    }
+    assert.deepEqual([...shapes].sort(), [1,2]);
   }
 });
 

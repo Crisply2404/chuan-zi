@@ -175,6 +175,20 @@ test('人类人数上限之外可增加一名电脑，并保留人类加入名�
   assert.equal((await host.request({type: 'settings', data: {settings}})).ok, true);
 });
 
+test('教学房间保持隐藏并限制普通房间状态操作',async t=>{
+  const server=await createGameServer({port:0,host:'127.0.0.1'});t.after(()=>server.close());
+  const player=await Client.connect(server.address,'教学玩家');t.after(()=>player.close());
+  assert.equal((await player.request({type:'tutorial',data:{}})).ok,true);
+  assert.equal(player.room!.listed,false);
+  assert.equal(player.room!.tutorial!.lesson,0);
+  for(const command of [{type:'visibility',data:{listed:true}},{type:'metadata',data:{name:'教学',listed:true}},{type:'ready',data:{ready:true}},{type:'start',data:{}}] as ClientCommand[]){
+    assert.equal((await player.request(command)).ok,false);
+  }
+  assert.equal(player.room!.listed,false);
+  assert.equal(player.room!.phase,'playing');
+  assert.equal((await player.request({type:'leave',data:{}})).ok,true);
+});
+
 test('默认奖励韵母给每名玩家五个独立目标', async t => {
   const server = await createGameServer({port: 0, host: '127.0.0.1'});
   t.after(() => server.close());
@@ -801,10 +815,10 @@ test('公开房间编号、隐藏房间加入和房间内电脑回合', async t 
   await first.wait(message => message.type === 'state' && Boolean(message.room?.players.find(item => item.id === cpu.id)?.draft), cpuStart);
   const partial = first.room!.players.find(item => item.id === cpu.id)!.draft;
   assert.equal([...partial].length, 1);
-  await first.wait(message => message.type === 'state' && (message.room?.history.length ?? 0) >= 3, first.messages.length, 5000);
+  await first.wait(message => message.type === 'state' && message.room?.currentPlayerId !== cpu.id, first.messages.length, 15000);
   const drafts = first.messages.slice(cpuStart).flatMap(message => message.type === 'state' ? [message.room?.players.find(item => item.id === cpu.id)?.draft ?? ''] : []).filter(Boolean);
   assert.ok(new Set(drafts).size >= 2);
-  assert.equal(first.room!.history.some(item => item.nickname === '电脑'), true);
+  assert.ok(first.room!.history.some(item=>item.nickname==='电脑')||first.room!.players.find(item=>item.cpu)!.lives<settings.startingLives);
   await first.request({type: 'leave', data: {}});
   await third.request({type: 'leave', data: {}});
   assert.equal(second.room, null);

@@ -227,6 +227,20 @@ test('零声母提示显示空集符号并能附着真实答案', async ({ page 
   } finally { await page.close(); await server.close(); }
 });
 
+test('拼音片段的原提示黑色，补全字母使用玩家颜色',async({page})=>{
+  const server=await createServer({server:{host:'127.0.0.1',port:0}});await server.listen();
+  const address=server.httpServer!.address() as AddressInfo;
+  try{
+    await page.goto(`http://127.0.0.1:${address.port}/tests/browser/prompt-harness.html?case=partial`);
+    await page.getByLabel('测试答案').fill('生活');
+    await expect(page.locator('.prompt-layer-attached')).toBeVisible();
+    await expect(page.locator('.prompt-part-initial')).toHaveText('s');
+    await expect(page.locator('.prompt-part-initial-tail')).toHaveText('h');
+    await expect(page.locator('.prompt-part-initial')).toHaveCSS('color','rgb(34, 34, 34)');
+    await expect(page.locator('.prompt-part-initial-tail')).toHaveCSS('color','rgb(255, 173, 50)');
+  }finally{await page.close();await server.close();}
+});
+
 test('更换合法答案时新增韵母渐渐显现', async ({ page }) => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
   await server.listen();

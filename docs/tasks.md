@@ -61,12 +61,23 @@
 | 69：部首直接结合 | resolved | diagnosing-bugs、tdd、code-review | 同一笔画 group 从居中提示连续进入汉字对应位置，资源延迟与逐帧检查通过 |
 | 70：字模式与成语提示 | resolved | tdd、code-review | 字模式一个提示汉字；其它成语预设三个星号或零星号各半，72 项规则与联机测试通过 |
 | 71：手机键盘奖励可见 | resolved | diagnosing-bugs、tdd、code-review | 原生 Android 键盘可见高度450.3px，奖励底部426.5px，约24px间距与输入焦点通过 |
+| 72：连续回合自动聚焦与奖励可见 | resolved | diagnosing-bugs、tdd、code-review | Android连续三次自动聚焦450px视口/426px奖励，保持24px间距与焦点 |
+| 73：部首笔画直接移动 | resolved | diagnosing-bugs、tdd、code-review | 等待字形与起点准备，冷热资源与逐帧笔画位置通过 |
+| 74：成语部首与声调分布 | resolved | tdd、code-review | 成语部首与声调三个或两个星号各半，全部词语保持长度，真实生成通过 |
+| 75：存与扌匹配核查 | resolved | research、diagnosing-bugs、tdd、code-review | 才嵌套不继承全部三笔扌，十个字符与密/空正确映射测试通过 |
+| 76：页面顶栏高度 | resolved | diagnosing-bugs、tdd、code-review | 三页顶栏等高，游戏与规则第二栏等高，1440px与390px通过 |
+| 77：成语默认回合时间 | resolved | tdd、code-review | 成语十五秒、全部十秒、自定义时长与真实回合截止时间通过 |
+| 78：好处匹配核查 | resolved | diagnosing-bugs | 固定来源hao3 chu4补齐，h-ch草稿与提交及声调条件通过 |
+| 79：拼音片段匹配 | resolved | tdd、code-review | 声母前缀、韵母后缀、∅空字段、相同索引与补全颜色通过 |
+| 80：多人电脑席位 | resolved | diagnosing-bugs、tdd、code-review | 两真人准备房间可见加号与额外电脑，拓扑间距通过 |
+| 81：互动教学与电脑行为 | resolved | tdd、code-review | 四模式真实作答、动画示例、八次电脑错误与最终获胜通过；持久教学状态检查 |
+| 82：默认字模式与暗色条带 | resolved | tdd、code-review | 默认字模式及模式/模板顺序、暗色对应条带通过 |
 
 ## 用户已经确定的要求
 
 - 拼音完整位于方格内，汉字在上，拼音在下。
 - 鼓遮盖箭头的中心，双指针联系上一位与当前作答玩家，连续旋转。
-- 独立回合计时默认为 10 秒，无效提交仍减少一秒。
+- 独立回合计时全部词语默认10秒、成语默认15秒，无效提交减少一秒。
 - 播放 CC0 录音素材，打鼓使用独立鼓声音效。
 - 平台减少动态效果设置不改变游戏动画。后台冻结、浏览器停用脚本等运行限制需要按实际能力说明。
 - 词库继续调查日常词语范围，用户指出的示例保存收录检查依据。

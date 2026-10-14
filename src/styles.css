@@ -34,7 +34,7 @@ h2 { font-size: 17px; font-weight: 600; }
 h3 { font-size: 13px; font-weight: 600; }
 .muted { color: var(--muted); }
 .app-shell { min-height: 100dvh; display: flex; flex-direction: column; }
-.site-header { height: 80px; width: 100%; padding: 0 36px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }
+.site-header { height: 56px; min-height: 56px; flex-shrink: 0; width: 100%; padding: 0 36px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-bottom: 1px solid var(--line); }
 .brand { display: inline-flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .brand > span { font: 700 24px 'Noto Serif SC', 'Songti SC', SimSun, serif; }
 .drum-mark { flex-shrink: 0; }
@@ -82,14 +82,14 @@ h3 { font-size: 13px; font-weight: 600; }
 .site-footer { width: calc(100% - 72px); margin: auto auto 0; padding: 20px 0 26px; display: flex; justify-content: flex-end; align-items: center; color: #a0a0a0; font-size: 11px; border-top: 1px solid var(--line); }
 .site-footer button { font-size: 11px; color: #999; padding: 0; }
 .site-footer button:hover { color: #333; }
-.room-page { padding-top: 24px; display: flex; flex-direction: column; }
-.room-heading { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.room-page { padding: 12px 0; display: flex; flex-direction: column; }
+.room-heading { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 20px; min-height: 58px; margin-bottom: 8px; }
 .back-button { display: inline-flex; align-items: center; gap: 5px; padding: 0; font-size: 11px; color: #8a8a8a; margin-bottom: 11px; }
 .room-heading h1 { font-size: 22px; display: flex; align-items: center; gap: 10px; overflow-wrap: anywhere; }
 .room-heading > div:first-child { min-width: 0; }
 .room-heading-tools { display: flex; gap: 8px; }
-.room-tabs { display: flex; gap: 27px; border-bottom: 1px solid #ddd; margin-bottom: 26px; }
-.room-tabs button { min-height: 37px; border-radius: 0; font-size: 12px; padding: 0 2px 12px; color: #8d8d8d; }
+.room-tabs { display: flex; flex-shrink: 0; gap: 27px; border-bottom: 1px solid #ddd; margin-bottom: 10px; }
+.room-tabs button { min-height: 30px; border-radius: 0; font-size: 12px; padding: 0 2px 6px; color: #8d8d8d; }
 .room-tabs button[aria-selected='true'] { color: #222; border-bottom: 2px solid #222; }
 .room-layout { display: flex; flex-direction: column; gap: 0; align-items: stretch; }
 .topology-area { min-width: 0; min-height: 130px; flex: 1; display: flex; align-items: center; }
@@ -216,7 +216,7 @@ h3 { font-size: 13px; font-weight: 600; }
 .prompt-complete { position: absolute; inset: 0; }
 .prompt-part { position: absolute; left: 0; top: 0; transform: translate(var(--hint-x, 0px), var(--hint-y, 0px)); white-space: nowrap; font-size: var(--hint-font-size); line-height: var(--hint-line-height); will-change: transform; }
 .prompt-part-character, .prompt-part-radical, .prompt-part-component { font-family: 'Chuan Zi Kai'; }
-.prompt-part-initial, .prompt-part-final { display: inline-flex; align-items: center; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.prompt-part-initial, .prompt-part-final, .prompt-part-initial-tail, .prompt-part-final-head { display: inline-flex; align-items: center; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .prompt-part-tone { width: var(--hint-width); height: var(--hint-height); aspect-ratio: 1; }
 .prompt-part-tone .prompt-tone { width: 100%; height: 100%; display: block; }
 .prompt-complete .prompt-supplement { opacity: 0; }
@@ -395,7 +395,7 @@ h3 { font-size: 13px; font-weight: 600; }
 }
 @media (max-width: 700px) {
   .mode-card { min-height: 72px; gap: 12px; padding: 12px; }
-  .site-header { height: 68px; padding: 0 20px; gap: 12px; }
+  .site-header { height: 48px; min-height: 48px; padding: 0 14px; gap: 12px; }
   .brand { gap: 9px; }
   .brand > span { font-size: 21px; }
   .brand svg { width: 29px; height: 29px; }
@@ -417,10 +417,11 @@ h3 { font-size: 13px; font-weight: 600; }
   .lobby-toolbar { font-size: 11px; }
   .empty-lobby { min-height: 320px; }
   .site-footer { width: calc(100% - 40px); }
-  .room-heading { gap: 10px; margin-bottom: 21px; }
-  .room-heading h1 { font-size: 20px; }
+  .room-page { width: calc(100% - 28px); padding: 12px 0; }
+  .room-heading { gap: 6px; margin-bottom: 8px; }
+  .room-heading h1 { font-size: 17px; gap: 4px; }
   .room-heading-tools { gap: 3px; }
-  .room-tabs { margin-bottom: 20px; }
+  .room-tabs { margin-bottom: 10px; }
   .room-layout { display: flex; flex-direction: column; gap: 22px; }
   .game-area { order: 1; border: 0; border-bottom: 1px solid var(--line); padding: 0 0 23px; min-height: 380px; }
   .activity-area { order: 2; border-top: 0; padding-top: 0; max-height: 290px; }
@@ -452,12 +453,10 @@ h3 { font-size: 13px; font-weight: 600; }
 .room-game-shell { height: var(--visible-height, 100dvh); min-height: 0; }
 .room-game-shell[data-keyboard-visible='true'] { height: auto; min-height: var(--visible-height, 100dvh); padding-bottom: 24px; }
 .room-game-shell[data-keyboard-visible='true'] .room-page { flex: 1 0 auto; }
-.room-game-shell .site-header { height: 56px; min-height: 56px; }
+@media (max-width:700px), (pointer:coarse) {
+  .room-game-shell[data-keyboard-visible='true'] .answer-region { position:fixed;top:var(--answer-top);left:14px;right:14px;z-index:4;background:var(--background); }
+}
 .room-game-shell .room-page { display: flex; flex-direction: column; min-height: 0; padding: 12px 0; }
-.room-game-shell .room-heading { margin-bottom: 8px; }
-.room-game-shell .back-button { margin-bottom: 3px; }
-.room-game-shell .room-tabs { margin-bottom: 10px; }
-.room-game-shell .room-tabs button { min-height: 30px; padding-bottom: 6px; }
 .room-game-shell .room-layout { flex: 1; min-height: 0; }
 .room-game-shell .activity-area { max-height: none; min-height: 0; }
 .room-game-shell .history-list, .room-game-shell .chat-list { min-height: 0; max-height: none; }
@@ -496,7 +495,6 @@ h3 { font-size: 13px; font-weight: 600; }
   .room-game-shell .modal .history-row > span, .room-game-shell .modal .chat-message p { font-size: 14px; }
 }
 @media (max-width: 700px) {
-  .room-game-shell .site-header { height: 48px; min-height: 48px; padding-inline: 14px; }
   .room-game-shell .room-page, .room-game-shell .site-footer { width: calc(100% - 28px); }
   .room-game-shell .room-heading h1 { font-size: 17px; }
   .room-game-shell .room-heading { gap: 6px; }
@@ -565,3 +563,16 @@ h3 { font-size: 13px; font-weight: 600; }
 :root[data-theme='dark'] .answer-message { color: #e38c80; }
 :root[data-theme='dark'] .prompt-feedback .answer-cell-surface, :root[data-theme='dark'] .prompt-feedback .prompt-cell { background: #4a2928; border-color: #e38c80; }
 :root[data-theme='dark'] .answer-cell-caret::after { background: var(--ink); }
+:root[data-theme='dark'] .mode-card { border-left-color: var(--mode-color); }
+.tutorial-guide { display:flex; flex-direction:column; align-items:center; gap:8px; padding:8px 0 12px; flex-shrink:0; }
+.tutorial-progress { display:flex; gap:14px; align-items:center; }
+.tutorial-progress > span { display:flex; justify-content:center; align-items:center; width:28px; height:28px; opacity:.35; border:1px solid currentColor; border-radius:50%; }
+.tutorial-progress > span[aria-current='step'], .tutorial-progress > .tutorial-step-complete { opacity:1; }
+.tutorial-progress > span[aria-current='step'] { animation:tutorial-pulse 1.5s ease-in-out infinite; }
+.tutorial-caption { font-size:12px; color:var(--muted); }
+.tutorial-demo { width:200px; container-type:inline-size; pointer-events:none; opacity:.7; }
+.tutorial-demo .prompt { --cell-size:36px; --row-gap:8px; }
+.tutorial-demo .prompt-input-character, .tutorial-demo .answer-character { font-size:17px; }
+.tutorial-demo .prompt-cell { --pinyin-font-size:12px; }
+.tutorial-complete { display:flex; gap:8px; align-items:center; font-size:15px; }
+@keyframes tutorial-pulse { 50% { transform:scale(1.13); opacity:.7; } }

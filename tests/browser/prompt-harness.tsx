@@ -18,6 +18,7 @@ const cases: Record<string, { cells: PromptCell[]; word: string }> = {
   hidden: { cells: [{ initial: 'sh' }, {}, { initial: 'b' }], word: '生生不息' },
   zeroInitial: { cells: [{ initial: '' }], word: '安心' },
   radical: { cells: [{ radical: '冫' }], word: '冰凉' },
+  partial: {cells:[{initial:'s',final:'eng'}],word:'生活'},
   combined: { cells: [{ radical: '冫', initial: 'b' }], word: '冰凉' },
   neutral: { cells: [{initial: 'd'}], word: '使得' },
   all: {cells: [{initial: 'zh', final: 'ua', tone: 1, radical: '扌', component: '爪', contains: '抓'}, {initial: 'b', final: 'ing', tone: 3, radical: '饣', component: '并', contains: '饼'}], word: '抓饼'},

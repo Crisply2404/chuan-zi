@@ -43,8 +43,12 @@ export class WordRules {
     const keys = new Set<string>();
     const letters = [...entry.word];
     for (const reading of entry.readings) for (let position = 0; position < letters.length; position++) {
-      keys.add(`initial:${reading.initials[position]}`);
-      keys.add(`final:${reading.finals[position]}`);
+      const initial = reading.initials[position];
+      const final = reading.finals[position];
+      if (!initial) keys.add('initial:');
+      else for (let length = 1; length <= initial.length; length++) keys.add(`initial:${initial.slice(0,length)}`);
+      if (!final) keys.add('final:');
+      else for (let start = 0; start < final.length; start++) keys.add(`final:${final.slice(start)}`);
       keys.add(`tone:${reading.tones[position]}`);
     }
     for (const letter of letters) {
@@ -105,8 +109,8 @@ export class WordRules {
         if (prompt.cells.every((cell, index) => {
           const position = offset + index;
           const character = this.data.characters[letters[position]];
-          return (cell.initial === undefined || reading.initials[position] === cell.initial)
-            && (cell.final === undefined || reading.finals[position] === cell.final)
+          return (cell.initial === undefined || cell.initial === '' ? cell.initial === undefined || reading.initials[position] === '' : reading.initials[position].startsWith(cell.initial))
+            && (cell.final === undefined || cell.final === '' ? cell.final === undefined || reading.finals[position] === '' : reading.finals[position].endsWith(cell.final))
             && (cell.tone === undefined || reading.tones[position] === cell.tone)
             && (cell.radical === undefined || this.radicalsFor(letters[position]).includes(cell.radical))
             && (cell.component === undefined || Boolean(character?.strokeParts?.[cell.component]?.length))
@@ -153,7 +157,7 @@ export class WordRules {
   generate(settings: Settings, used = new Set<string>(), context: {stalemateScore?: number} = {}): Prompt {
     validateSettings(settings);
     if (settings.mode === 'character') settings = {...settings, promptLength: 1, hiddenCount: 0};
-    const idiomPositions = settings.dictionary === 'idioms' && settings.mode !== 'custom' && settings.mode !== 'character' ? idiomVisiblePositions(context.stalemateScore ?? 0) : null;
+    const idiomPositions = settings.dictionary === 'idioms' && settings.mode !== 'custom' && settings.mode !== 'character' ? idiomVisiblePositions(context.stalemateScore ?? 0, settings.mode) : null;
     if (idiomPositions) settings = {...settings, promptLength: 4, hiddenCount: 4 - idiomPositions.length};
     else if (settings.mode === 'radical') {
       const count = Math.random() < .5 ? 1 : 2;

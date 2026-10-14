@@ -159,13 +159,14 @@ test('Cloudflare 真实词库、草稿自动提交与 alarm 电脑输入在 Hibe
   assert.equal(recovered.room!.acceptedAnswer!.id, automatic.id);
 });
 
-test('Cloudflare alarm 广播电脑逐字输入与提交', async t => {
+test('Cloudflare alarm 广播电脑逐字输入与作答结果', async t => {
   const worker = createWorker();
   t.after(() => worker.dispose());
   const rules = new WordRules(JSON.parse(await readFile('data/dictionary.json', 'utf8')) as DictionaryData);
   const player = await Client.connect(worker, '玩家');
   t.after(() => player.close());
-  await player.request({type: 'create', data: {name: '', password: '', settings: defaultSettings}});
+  const settings={...defaultSettings,initialSeconds:4};
+  await player.request({type: 'create', data: {name: '', password: '', settings}});
   await player.request({type: 'addCpu', data: {}});
   await player.request({type: 'ready', data: {ready: true}});
   await player.request({type: 'start', data: {}});
@@ -176,14 +177,30 @@ test('Cloudflare alarm 广播电脑逐字输入与提交', async t => {
   await worker.unsafeEvictDurableObject('chuan-zi-online', 'GameHub', {name: 'chuan-zi', webSockets: 'hibernate'});
   await player.wait(message => message.type === 'state' && message.room?.players.some(candidate => candidate.cpu && [...candidate.draft].length === 1) === true, start);
   await worker.unsafeEvictDurableObject('chuan-zi-online', 'GameHub', {name: 'chuan-zi', webSockets: 'hibernate'});
-  await player.wait(message => message.type === 'state' && message.room?.acceptedAnswer?.playerId === cpu.id, start);
+  await player.wait(message => message.type === 'state' && message.room?.currentPlayerId === player.playerId, start);
   const states = player.messages.slice(start).filter((message): message is Extract<ServerMessage, {type: 'state'}> => message.type === 'state');
   const lengths = states.map(message => [...(message.room?.players.find(candidate => candidate.cpu)?.draft ?? '')].length).filter(Boolean);
   assert.ok(lengths.includes(1));
   assert.ok(lengths.includes(2));
-  const completed = states.find(message => message.room?.draftMatch?.offset !== null && message.room?.currentPlayerId === cpu.id && message.room?.draftMatch?.word);
-  assert.ok(completed?.room?.draftMatch?.reading);
+  assert.ok(states.some(message=>message.room?.acceptedAnswer?.playerId===cpu.id)||player.room!.players.find(item=>item.id===cpu.id)!.lives<cpu.lives);
   assert.equal(player.room!.currentPlayerId, player.playerId);
+});
+
+test('Cloudflare教学状态与电脑错误尝试在Hibernation后继续',async t=>{
+  const worker=createWorker();t.after(()=>worker.dispose());
+  const player=await Client.connect(worker,'教学');t.after(()=>player.close());
+  assert.equal((await player.request({type:'tutorial',data:{}})).ok,true);
+  const tutorial=player.room!.tutorial!;
+  const prompt=player.room!.prompt!;
+  assert.equal((await player.request({type:'submit',data:{word:tutorial.example.word,promptId:prompt.id}})).ok,true);
+  const start=player.messages.length;
+  await worker.unsafeEvictDurableObject('chuan-zi-online','GameHub',{name:'chuan-zi',webSockets:'hibernate'});
+  await player.wait(message=>message.type==='state'&&Boolean(message.room?.answerFeedback),start);
+  await worker.unsafeEvictDurableObject('chuan-zi-online','GameHub',{name:'chuan-zi',webSockets:'hibernate'});
+  await player.wait(message=>message.type==='state'&&message.room?.tutorial?.lesson===1,start);
+  assert.equal(player.room!.currentPlayerId,player.playerId);
+  assert.equal(player.room!.players.find(item=>item.cpu)!.lives,3);
+  assert.equal(player.room!.listed,false);
 });
 
 test('Cloudflare idle 隐藏、恢复展示与断线身份期限使用持久 alarm', async t => {

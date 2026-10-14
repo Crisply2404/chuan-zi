@@ -2297,3 +2297,57 @@ These AGENTS.md instructions replace all previously provided AGENTS.md instructi
 194个未覆盖汉字包含粿、獴等，不能全部认定为生僻。Jigmo/GlyphWiki覆盖全部5,945个字符，完整部首逐笔归属仍需审核，详见[研究记录](/Users/hco/Documents/Crisply2404.github.io/chuan-zi/docs/glyph-coverage-followup-2026-10-14.md)。
 
 代码已推送并发布，产品提交为`5663cad`。72项规则与联机、51项完整浏览器及暗色专项检查通过。个人网站仅发布构建产物。
+
+## 用户消息 90
+
+````text
+1.虽然你点击输入框后安卓键盘不会挡住奖励，但是你一局过后轮到你的时候的自动聚焦输入框安卓键盘还是挡住奖励了，我要求什么时候都不能挡住奖励。
+2.部首模式的结合动画还是有问题，我发现部首会向着整个格子正中间抽动一下然后再去到它对应汉字里的正确的位置，能不能直奔汉字正确的位置，不要有抽动？
+3.“只有声调“以及“部首“模式下，我觉得默认应该是出现3或2个星号格，因为声调和部首是越多限制越难的，
+4.为什么存在的“存“能匹配“扌“，你确定这个没出错吗？
+5.ui一致性不强，游戏和规则设置的顶栏和第二栏的高度有变化，而且和大厅的也不匹配，我要求顶栏什么时候都一样，然后第二栏的话游戏和规则设置的要一样，高度。
+````
+
+附件：[图1](../reference-assets/user-attachments/2026-10-14/header-consistency-1.png)、[图2](../reference-assets/user-attachments/2026-10-14/header-consistency-2.png)、[图3](../reference-assets/user-attachments/2026-10-14/header-consistency-3.png)。
+
+## 用户消息 91
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_19c5b71f3e63479db2259002a5d82325\",0]","question":"“部首”和“只有声调”默认使用三个或两个星号，是只针对成语词库的四格提示，还是全部词语也统一使用四格提示？","answer":"只针对成语词库；全部词语保留现有提示长度"}]
+</send_user_message_question_reply>
+````
+
+## 用户消息 92
+
+````text
+6.词库为成语时，默认给每个人的时间是15s
+````
+
+## 用户消息 93
+
+````text
+7.“h ch”匹配不上“好处”怎么回事
+````
+
+## 用户消息 94
+
+````text
+8.我认为声母不必严格要求，比如说s的提示格你填声母是sh的也可以，韵母也是，ang的提示格你填韵母是iang的也可以，请确认你明白我是什么意思。
+9.我们之前说好了无论玩家这边人数是多少要保留一个席位可以加电脑，结果我跟朋友两个人的时候没法再加电脑。
+10.在主页增加一个玩法教学的按钮，进入后就是跟电脑打，玩中教学，然后教学避免用过多文字，尽量用形象且直观的动画。然后在里面可以每回合切换不同的模式教学，最后介绍完模式电脑被打赢了，教学完毕（教学的时候电脑要故意输入多次错误答案，给玩家自信心，且电脑在教学以外也不能百分百每题都答对，要像人，可以答几次错误但接近的再答对，然后也可以一直输不对答案。）
+````
+
+## 用户消息 95
+
+````text
+<send_user_message_question_reply>
+[{"questionItemId":"[\"request_user_input_async\",\"call_e569175c5871475180ca8a28adc9a96e\",0]","question":"拼音片段是否允许出现在任意位置？例如声母提示 h 接受 sh/ch/zh，韵母提示 an 接受 ang/ian/uang。","answer":"声母只匹配开头，韵母只匹配结尾"},{"questionItemId":"[\"request_user_input_async\",\"call_e569175c5871475180ca8a28adc9a96e\",1]","question":"教学是否依次体验声母＋音调、部首、字、只有音调和自定义组合，每种完成一次正确作答后进入下一种，最后让电脑耗尽生命结束？","answer":"只介绍前四种模式"}]
+</send_user_message_question_reply>
+````
+
+## 用户消息 96
+
+````text
+11.字模式应该放在第一个模式，即默认模式，和声母+音调模式对调。还有dark mode下模式选项卡最左侧的条带没有颜色，希望跟正常主题一样是对应模式自己的颜色
+````

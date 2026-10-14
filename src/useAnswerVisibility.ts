@@ -21,40 +21,46 @@ export function useAnswerVisibility(region: RefObject<HTMLElement | null>, input
   }, [enabled, input, region]);
   useLayoutEffect(() => {
     if (!enabled) return;
-    const element = region.current;
-    const editor = input.current;
-    if (!element || !editor) return;
     const viewport = window.visualViewport;
     if (!viewport) throw new Error('浏览器缺少 VisualViewport');
     const update = () => {
-      const shell = element.closest<HTMLElement>('.room-game-shell');
+      const shell = region.current?.closest<HTMLElement>('.room-game-shell');
       expandedHeight.current = Math.max(expandedHeight.current, viewport.height);
       if (shell) {
         shell.style.setProperty('--visible-height', `${viewport.height}px`);
-        shell.dataset.keyboardVisible = String(document.activeElement === editor && expandedHeight.current - viewport.height > 100);
+        shell.dataset.keyboardVisible = String(expandedHeight.current - viewport.height > 100);
+        const answer=region.current;
+        if(answer)shell.style.setProperty('--answer-top',`${viewport.offsetTop+viewport.height-24-answer.offsetHeight}px`);
       }
       reveal();
     };
     const observer = new ResizeObserver(update);
-    observer.observe(element);
+    if (region.current) observer.observe(region.current);
     viewport.addEventListener('resize', update);
-    viewport.addEventListener('scroll', reveal);
+    viewport.addEventListener('scroll', update);
     window.addEventListener('resize', update);
-    editor.addEventListener('focus', update);
-    editor.addEventListener('blur', update);
-    editor.addEventListener('pointerup', reveal);
+    window.addEventListener('focusin', update);
+    window.addEventListener('focusout', update);
+    window.addEventListener('pointerup', reveal);
     update();
+    let tracking = 0;
+    const track = () => {
+      update();tracking = requestAnimationFrame(track);
+    };
+    tracking = requestAnimationFrame(track);
     return () => {
+      cancelAnimationFrame(tracking);
       cancelAnimationFrame(frame.current);
       observer.disconnect();
       viewport.removeEventListener('resize', update);
-      viewport.removeEventListener('scroll', reveal);
+      viewport.removeEventListener('scroll', update);
       window.removeEventListener('resize', update);
-      editor.removeEventListener('focus', update);
-      editor.removeEventListener('blur', update);
-      editor.removeEventListener('pointerup', reveal);
-      element.closest<HTMLElement>('.room-game-shell')?.style.removeProperty('--visible-height');
-      element.closest<HTMLElement>('.room-game-shell')?.removeAttribute('data-keyboard-visible');
+      window.removeEventListener('focusin', update);
+      window.removeEventListener('focusout', update);
+      window.removeEventListener('pointerup', reveal);
+      region.current?.closest<HTMLElement>('.room-game-shell')?.style.removeProperty('--visible-height');
+      region.current?.closest<HTMLElement>('.room-game-shell')?.removeAttribute('data-keyboard-visible');
+      region.current?.closest<HTMLElement>('.room-game-shell')?.style.removeProperty('--answer-top');
     };
   }, [enabled, input, region, reveal]);
   return reveal;
