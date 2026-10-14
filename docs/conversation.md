@@ -2351,3 +2351,9 @@ These AGENTS.md instructions replace all previously provided AGENTS.md instructi
 ````text
 11.字模式应该放在第一个模式，即默认模式，和声母+音调模式对调。还有dark mode下模式选项卡最左侧的条带没有颜色，希望跟正常主题一样是对应模式自己的颜色
 ````
+
+## 用户消息 97
+
+````text
+继续
+````

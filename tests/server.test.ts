@@ -811,14 +811,22 @@ test('公开房间编号、隐藏房间加入和房间内电脑回合', async t 
     assert.equal((await third.request({type: 'submit', data: {word: secondAnswer.word, promptId: first.room!.prompt!.id}})).ok, true);
   }
   const cpu = first.room!.players.find(item => item.cpu)!;
+  const cpuHistoryLength = first.room!.history.length;
   const cpuStart = first.messages.length;
   await first.wait(message => message.type === 'state' && Boolean(message.room?.players.find(item => item.id === cpu.id)?.draft), cpuStart);
   const partial = first.room!.players.find(item => item.id === cpu.id)!.draft;
   assert.equal([...partial].length, 1);
-  await first.wait(message => message.type === 'state' && message.room?.currentPlayerId !== cpu.id, first.messages.length, 15000);
+  const remainingTurn = Math.max(0, first.room!.deadline! - Date.now());
+  await first.wait(message => message.type === 'state' && Boolean(message.room && message.room.currentPlayerId !== cpu.id), first.messages.length, remainingTurn + 5000);
   const drafts = first.messages.slice(cpuStart).flatMap(message => message.type === 'state' ? [message.room?.players.find(item => item.id === cpu.id)?.draft ?? ''] : []).filter(Boolean);
   assert.ok(new Set(drafts).size >= 2);
-  assert.ok(first.room!.history.some(item=>item.nickname==='电脑')||first.room!.players.find(item=>item.cpu)!.lives<settings.startingLives);
+  const cpuAnswers = first.room!.history.slice(cpuHistoryLength).filter(item => item.playerId === cpu.id);
+  if (cpuAnswers.length) {
+    assert.equal(cpuAnswers.length, 1);
+    assert.equal(first.room!.acceptedAnswer!.playerId, cpu.id);
+  } else {
+    assert.equal(first.room!.players.find(item => item.id === cpu.id)!.lives, cpu.lives - 1);
+  }
   await first.request({type: 'leave', data: {}});
   await third.request({type: 'leave', data: {}});
   assert.equal(second.room, null);
