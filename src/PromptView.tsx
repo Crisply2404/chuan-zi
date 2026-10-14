@@ -75,6 +75,7 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
   const [geometry, setGeometry] = useState<Record<string, CSSProperties>>({});
   const transforms = useRef(new Map<string, LayoutFrame>());
   const hidden = Object.keys(cell).length === 0;
+  const characterOnly=cell.contains!==undefined&&Object.keys(cell).length===1;
   const zeroInitial = cell.initial === '';
   const emptyPhonetic = zeroInitial || cell.final === '';
   const combinedHint = [cell.radical, cell.component, cell.contains].some(value => value !== undefined)
@@ -118,7 +119,7 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
     { field: 'component', content: vector ? componentStrokes.length ? <GlyphPart glyph={glyph!} indices={componentStrokes} hint={cell.component} original attached={attached} /> : null : cell.component, original: true, vector: vector && componentStrokes.length > 0 },
     { field: 'character', content: vector && cell.contains === undefined ? <GlyphPart glyph={glyph!} indices={supplementStrokes} original={false} attached={attached} /> : cell.contains ?? character, original: cell.contains !== undefined, vector },
     { field: 'zero', content: emptyPhonetic ? '∅' : null, original: true },
-  ].filter(part => part.content !== undefined && part.content !== null && part.content !== '');
+  ].filter(part => (!characterOnly||!['initial','initial-tail','final-head','final','tone'].includes(part.field))&&part.content !== undefined && part.content !== null && part.content !== '');
 
   useLayoutEffect(() => {
     const root = element.current!;
@@ -175,7 +176,7 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
       </span>)}
     </span>;
   }
-  return <div ref={element} data-cell-index={cellIndex} data-glyph-ready={!character || (cell.radical === undefined && cell.component === undefined) || glyph !== null} style={{ '--pinyin-length': Math.max(initial.length + final.length, 3), '--hint-glyph-count': hintGlyphCount } as CSSProperties} className={`prompt-cell ${hidden ? 'prompt-hidden' : ''} ${character ? 'prompt-attached-cell' : ''}`} aria-label={character ? `${character} ${fullPinyin}` : hidden ? '不限条件' : zeroInitial ? '零声母' : emptyPhonetic ? '无韵母' : '提示位置'}>
+  return <div ref={element} data-cell-index={cellIndex} data-glyph-ready={!character || (cell.radical === undefined && cell.component === undefined) || glyph !== null} style={{ '--pinyin-length': Math.max(initial.length + final.length, 3), '--hint-glyph-count': hintGlyphCount } as CSSProperties} className={`prompt-cell ${hidden ? 'prompt-hidden' : ''} ${characterOnly?'prompt-character-only':''} ${character ? 'prompt-attached-cell' : ''}`} aria-label={character ? `${character}${characterOnly?'':` ${fullPinyin}`}` : hidden ? '不限条件' : zeroInitial ? '零声母' : emptyPhonetic ? '无韵母' : '提示位置'}>
     <div className={`prompt-hint-layout ${combinedHint ? 'prompt-hint-combined' : ''}`} aria-hidden="true">
       <span className="prompt-hint-character">
         {cell.radical !== undefined && <span data-field="radical">{cell.radical}</span>}
@@ -191,11 +192,11 @@ function PromptCellView({ cell, character, reading, position, cellIndex, attache
     </div>
     {character && <div className="prompt-complete-layout" aria-hidden="true">
       <span className="prompt-input-character" data-field="character">{character}</span>
-      <span className={`prompt-pinyin ${fullPinyin.length > 6 ? 'prompt-pinyin-long' : ''}`}>
+      {!characterOnly&&<span className={`prompt-pinyin ${fullPinyin.length > 6 ? 'prompt-pinyin-long' : ''}`}>
         {pinyinTargets(initial.slice(0,initialHintLength), 'initial', 0)}{initial.length > initialHintLength && pinyinTargets(initial.slice(initialHintLength),'initial-tail',initialHintLength)}
         {finalHintStart > 0 && pinyinTargets(final.slice(0,finalHintStart),'final-head',initial.length)}{pinyinTargets(final.slice(finalHintStart), 'final', initial.length + finalHintStart)}
         {!final && tone !== undefined && tone !== 5 && <span className="prompt-tone-source prompt-tone-complete-target" data-field="tone"><ToneMark tone={tone} /></span>}
-      </span>
+      </span>}
     </div>}
     <div className="prompt-complete">
       {parts.map(part => <span key={part.field} data-field={part.field}
@@ -291,7 +292,7 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
     '--slot-count': Math.max(prompt.cells.length, answerCount),
     '--answer-count': answerCount,
     '--prompt-shift': attached ? match.offset + prompt.cells.length / 2 - answerCount / 2 : 0,
-    '--input-index': Math.min(cursor, Math.max(0, answerCount - 1)),
+    '--input-index': Math.max(0, Math.min(cursor - 1, answerCount - 1)),
     '--supplement-color': supplementColor,
   } as CSSProperties;
   const flipRoot = useRef<HTMLDivElement>(null);
@@ -362,16 +363,15 @@ export function PromptView({ prompt, compact = false, draft = '', draftMatch, fe
       {Array.from({ length: answerCount }, (_, index) => {
         const character = characters[index];
         const inWindow = attached && visualAttached && index >= match!.offset && index < match!.offset + prompt.cells.length;
-        return <div className={`answer-cell ${inWindow ? 'answer-cell-attached' : 'answer-cell-outline'} ${focused && (cursor === index || cursor === answerCount && index === cursor - 1) ? 'answer-cell-caret' : ''} ${!character ? 'answer-cell-empty' : ''}`} key={index}
+        const caret = focused && index === Math.max(0, cursor - 1);
+        return <div className={`answer-cell ${inWindow ? 'answer-cell-attached' : 'answer-cell-outline'} ${caret ? 'answer-cell-caret' : ''} ${!character ? 'answer-cell-empty' : ''}`} key={index} data-caret-placement={!character ? 'empty' : cursor === 0 ? 'start' : 'end'}
           onPointerDown={event => { event.preventDefault(); onSelectCharacter?.(Math.min(index + 1, characters.length)); }}>
           <span className="answer-cell-surface" aria-hidden="true" />
           {character && <span className="answer-character">{character}</span>}
         </div>;
       })}
       </div>
-      {answerInput && <div className="answer-input-anchor" onPointerDown={event => {
-        event.preventDefault(); onSelectCharacter?.(Math.min(cursor + 1, characters.length));
-      }}>{answerInput}</div>}
+      {answerInput && <div className="answer-input-anchor">{answerInput}</div>}
     </div>}
     {compact && <span className="prompt-count">可用答案 {prompt.answerCount.toLocaleString()}</span>}
   </div>;

@@ -14,17 +14,35 @@ test('玩法教学逐项体验四种模式，电脑错误尝试后败北',async(
   const captions=['输入包含这个字的词','找带这个部首的字','声母和声调一起满足','按声调寻找词语'];
   for(let lesson=0;lesson<4;lesson++){
     await expect.poll(()=>room?.tutorial?.lesson).toBe(lesson);
+    if(lesson===2){
+      await expect(page.getByRole('button',{name:'成语',exact:true})).toBeVisible();
+      await page.getByRole('button',{name:'成语',exact:true}).click();
+      await expect.poll(()=>room?.settings.dictionary).toBe('idioms');
+      expect(room!.settings.maxLength).toBe(4);
+    }
     await expect(page.getByLabel('输入答案')).toBeEnabled();
     await expect(page.getByText(captions[lesson],{exact:true})).toBeVisible();
     const current=room as RoomView|null;
     expect(current?.tutorial).toBeTruthy();
-    await page.getByLabel('输入答案').fill(current!.tutorial!.example.word);
-    await page.getByLabel('输入答案').press('Enter');
+    await expect(page.getByLabel('作答示范').locator('.answer-editor')).toBeVisible();
+    const color=current!.players.find(player=>!player.cpu)!.color;
+    const demoColor=await page.getByLabel('作答示范').locator('.prompt').evaluate(element=>getComputedStyle(element).getPropertyValue('--supplement-color').trim());
+    expect(demoColor.toLowerCase()).toBe(color.toLowerCase());
+    await expect(page.getByLabel('传鼓说明')).toContainText('当前作答');
+    for(let attempt=0;attempt<2;attempt++){
+      const example=room!.tutorial!.example.word;
+      await page.getByLabel('输入答案').fill(example);
+      await page.getByLabel('输入答案').press('Enter');
+      if(lesson===0&&attempt===0){
+        await expect.poll(()=>room!.history.filter(item=>item.playerId===room!.players.find(player=>player.cpu)!.id).length,{timeout:10000}).toBe(1);
+        await expect(page.getByLabel('输入答案')).toBeEnabled();
+      }else break;
+    }
     await expect(page.getByText('看看电脑怎样尝试',{exact:true})).toBeVisible();
     if(lesson<3)await expect.poll(()=>room?.tutorial?.lesson,{timeout:10000}).toBe(lesson+1);
     else await expect(page.getByText('教学完成',{exact:true})).toBeVisible({timeout:10000});
   }
-  expect(feedbacks.size).toBeGreaterThanOrEqual(8);
+  expect(feedbacks.size).toBeGreaterThanOrEqual(12);
   expect(room!.tutorial!.completed).toBe(true);
   expect(room!.players.find(player=>player.cpu)!.lives).toBe(0);
   await page.getByRole('button',{name:'返回大厅',exact:true}).click();

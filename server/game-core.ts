@@ -18,6 +18,7 @@ const commandSchema = z.discriminatedUnion('type', [
   z.object({id: identifier, type: z.literal('hello'), data: z.object({nickname, token: identifier.optional()}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('create'), data: z.object({name: z.string().trim().max(40), password, listed: z.boolean().optional().default(true), settings: settingsSchema}).strict()}).strict(),
   z.object({id:identifier,type:z.literal('tutorial'),data:empty}).strict(),
+  z.object({id:identifier,type:z.literal('tutorialDictionary'),data:empty}).strict(),
   z.object({id: identifier, type: z.literal('join'), data: z.object({roomId: identifier, password}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('joinByCode'), data: z.object({code: z.string().trim().min(1).max(100), password}).strict()}).strict(),
   z.object({id: identifier, type: z.literal('leave'), data: empty}).strict(),
@@ -323,6 +324,12 @@ export function createGameCore(options: GameCoreOptions) {
       player.draft='';
       if(player.lives===0){room.tutorial.completed=true;finishRound(room,learner.id);touch(room);return;}
       room.tutorial.lesson++;
+      room.tutorial.cpuAnswers=0;
+      if(room.tutorial.lesson===2){
+        room.tutorial.awaitingDictionary=true;
+        room.currentPlayerId=learner.id;
+        room.deadline=null;room.prompt=null;room.draftMatch=null;touch(room);return;
+      }
       room.settings=tutorialSettings(room.tutorial.lesson);
       prepareTutorialPrompt(room);
       room.currentPlayerId=learner.id;
@@ -374,10 +381,16 @@ export function createGameCore(options: GameCoreOptions) {
     room.history.push({playerId: player.id, nickname: player.nickname, word, at: Date.now()});
     player.draft = '';
     if(room.tutorial){
+      if(player.cpu){
+        room.tutorial.cpuAnswers=(room.tutorial.cpuAnswers??0)+1;
+        room.currentPlayerId=room.players.find(item=>!item.cpu)!.id;
+        room.previousPlayerId=player.id;
+        prepareTutorialPrompt(room);resetDeadline(room);armDeadline(room);touch(room);return;
+      }
       room.currentPlayerId=room.players.find(item=>item.cpu)!.id;
       room.previousPlayerId=player.id;
       room.draftMatch=null;
-      room.deadline=Date.now()+6000;
+      room.deadline=Date.now()+9000;
       armDeadline(room);scheduleCpuTurn(room);touch(room);return;
     }
     const bonusType = resolveBonusType(room.settings);
@@ -436,7 +449,7 @@ export function createGameCore(options: GameCoreOptions) {
     cancel('cpu', room.id);
     const player = room.players.find(item => item.id === room.currentPlayerId);
     if (room.phase !== 'playing' || !player?.cpu) return;
-    const plan=cpuPlan(loadedRules,room.prompt!,room.settings,room.used,Boolean(room.tutorial));
+    const plan=cpuPlan(loadedRules,room.prompt!,room.settings,room.used,Boolean(room.tutorial),Boolean(room.tutorial&&room.tutorial.lesson===0&&!room.tutorial.cpuAnswers));
     if(plan.words.length)schedule('cpu', room.id, Date.now() + 700, {promptId: room.prompt!.id, playerId: player.id, length: 1,cpuPlan:plan});
   }
 
@@ -563,10 +576,12 @@ export function createGameCore(options: GameCoreOptions) {
     if(!lesson)throw new Error('教学阶段无效');
     room.prompt={id:randomUUID(),cells:structuredClone(lesson.cells),answerCount:0};
     room.prompt.answerCount=loadedRules.examples(room.prompt,room.settings,room.used,Infinity).length;
-    const result=loadedRules.match(lesson.word,room.prompt,room.settings,room.used);
+    const example=loadedRules.match(lesson.word,room.prompt,room.settings,room.used).valid?lesson.word:loadedRules.cpuAnswer(room.prompt,room.settings,room.used)?.word;
+    if(!example)throw new Error('教学没有可用示例');
+    const result=loadedRules.match(example,room.prompt,room.settings,room.used);
     if(!result.valid||result.offset===undefined||!result.reading)throw new Error('教学示例没有通过真实词库条件');
     const offset=result.offset;
-    room.tutorial!.example={word:lesson.word,promptId:room.prompt.id,offset,reading:{syllables:result.reading.syllables.slice(offset,offset+room.prompt.cells.length),initials:result.reading.initials.slice(offset,offset+room.prompt.cells.length),finals:result.reading.finals.slice(offset,offset+room.prompt.cells.length),tones:result.reading.tones.slice(offset,offset+room.prompt.cells.length)}};
+    room.tutorial!.example={word:example,promptId:room.prompt.id,offset,reading:{syllables:result.reading.syllables.slice(offset,offset+room.prompt.cells.length),initials:result.reading.initials.slice(offset,offset+room.prompt.cells.length),finals:result.reading.finals.slice(offset,offset+room.prompt.cells.length),tones:result.reading.tones.slice(offset,offset+room.prompt.cells.length)}};
     room.draftMatch=null;
   }
 
@@ -665,6 +680,13 @@ export function createGameCore(options: GameCoreOptions) {
       case 'hello': throw new BusinessError('当前连接已经设置昵称');
     }
     const room = requireRoom(session);
+    if(request.type==='tutorialDictionary'){
+      if(!room.tutorial?.awaitingDictionary||room.currentPlayerId!==session.id)throw new BusinessError('当前没有词库教学操作');
+      room.tutorial.awaitingDictionary=false;
+      room.settings=tutorialSettings(room.tutorial.lesson);
+      prepareTutorialPrompt(room);resetDeadline(room);armDeadline(room);touch(room);return {};
+    }
+    if(room.tutorial?.awaitingDictionary&&['submit','draft'].includes(request.type))throw new BusinessError('请完成教学词库选择');
     if(room.tutorial&&!['submit','draft','chat'].includes(request.type))throw new BusinessError('教学房间只提供练习操作');
     switch (request.type) {
       case 'ready':
@@ -960,7 +982,7 @@ export function createGameCore(options: GameCoreOptions) {
     }));
     for (const session of allSessions.values()) if (!session.cpu) sessions.set(session.token, session);
     for (const room of options.state.rooms) rooms.set(room.id, {
-      ...room, answersWithoutLifeLoss: room.answersWithoutLifeLoss ?? 0, players: room.players.map(token => {
+      ...room, settings:settingsSchema.parse(room.settings), answersWithoutLifeLoss: room.answersWithoutLifeLoss ?? 0, players: room.players.map(token => {
         const player = allSessions.get(token);
         if (!player) throw new Error('持久房间中的玩家身份不存在');
         return player;

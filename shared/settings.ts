@@ -34,10 +34,9 @@ export const settingsSchema = z.object({
   bonusType: z.enum(['auto', 'initial', 'final', 'radical']).optional(),
   bonusFinals: z.array(z.string().refine(value => bonusFinalCandidates.includes(value))).max(bonusFinalCandidates.length).optional(),
   bonusRadicals: z.array(z.string().refine(value => bonusRadicalCandidates.includes(value))).max(bonusRadicalCandidates.length).optional(),
-}).strict().superRefine((value, context) => {
+}).strict().transform(value => value.dictionary === 'idioms' ? {...value, minLength: 4, maxLength: 4} : value).superRefine((value, context) => {
   const invalid = (message: string) => context.addIssue({code: z.ZodIssueCode.custom, message});
   if (value.minLength > value.maxLength) invalid('最短答案长度超过最长答案长度');
-  if (value.dictionary === 'idioms' && value.minLength < 4) invalid('成语答案至少四个汉字');
   if (value.promptLength > value.minLength) invalid('提示长度不能超过最短答案长度');
   if (value.hiddenCount >= value.promptLength) invalid('至少保留一个提示位置');
   if (value.minAnswers > value.maxAnswers) invalid('答案数量下限超过上限');

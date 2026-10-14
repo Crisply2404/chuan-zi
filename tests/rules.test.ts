@@ -154,6 +154,32 @@ test('空穴来风属于成语，实际宀部件可以匹配部首模式', () =>
   assert.equal(rules.match('连接', prompt([{ component: '立' }]), defaultSettings).valid, false);
 });
 
+test('成语词库的草稿、提交和候选仅接受四个汉字', () => {
+  const settings = {...defaultSettings, dictionary: 'idioms' as const, minLength: 4, maxLength: 9};
+  const challenge = prompt([{contains: '不'}]);
+  assert.equal(rules.match('不置可否', challenge, settings).valid, true);
+  const longer = data.words.find(entry => entry.idiom && [...entry.word].length > 4)!;
+  assert.ok(longer);
+  const longerPrompt = prompt([{contains: [...longer.word][0]}]);
+  assert.equal(rules.match(longer.word, longerPrompt, settings).valid, false);
+  assert.equal(rules.draft(longer.word, longerPrompt, settings).valid, false);
+  assert.ok(rules.examples(longerPrompt, settings, new Set(), Infinity).every(entry => [...entry.word].length === 4));
+});
+
+test('来源审核的部首形态保持笔画归属与词语判定一致',()=>{
+  const excluded:{radical:string;characters:string[]}[]=[
+    {radical:'亻',characters:['复','气','氧','氮','氟','氯','氰','腹','覆','氨','氢','拖','施','汽','履','愎','忾','暆','氘','氛','氤','氲','氦','氪','氩','蝮','饩','馥']},
+    {radical:'扌',characters:['举','榉']},
+    {radical:'宀',characters:['奥','噢','懊','澳']},
+    {radical:'艹',characters:['奔','蹼','卉','幞','璞']},
+    {radical:'刂',characters:['氘']},
+  ];
+  for(const {radical,characters} of excluded)for(const character of characters)assert.equal(data.characters[character]?.strokeParts?.[radical],undefined,`${character} ${radical}`);
+  assert.deepEqual(data.characters['寝'].strokeParts?.['冫'],[4,5]);
+  for(const [word,radical] of [['气氛','亻'],['重复','亻'],['拖延','亻'],['举例','扌'],['奥妙','宀'],['奔跑','艹']])assert.equal(rules.match(word,prompt([{radical}]),defaultSettings).valid,false,word);
+  for(const [word,radical] of [['拖延','扌'],['懊悔','忄'],['愤怒','艹'],['喷泉','艹'],['寝室','冫'],['空穴来风','宀'],['密封','宀'],['冰凉','冫'],['提起','扌']])assert.equal(rules.match(word,prompt([{radical}]),defaultSettings).valid,true,word);
+});
+
 test('游戏词库按日常使用范围保留名称并排除专业词语', () => {
   assert.equal(rules.match('边缘性人格障碍', prompt([{ initial: 'b' }]), defaultSettings).valid, false);
   for (const word of ['乙酰胆碱', '二甲基亚砜', '精索静脉曲张', '苯丙酮尿症', '氰化钾', '乙二醇', '胰腺炎', '躁郁症']) assert.equal(data.words.some(entry => entry.word === word), false, word);

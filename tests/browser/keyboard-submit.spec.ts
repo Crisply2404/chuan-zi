@@ -29,7 +29,7 @@ test('手机可见高度缩小时答案和奖励目标都保持可见', async ({
     const page = await context.newPage();
     await start(page);
     await page.setViewportSize({width: 390, height: 400});
-    await page.getByLabel('输入答案').tap();
+    await page.locator('.answer-region .answer-cell-empty').tap();
     await page.getByLabel('输入答案').fill('不置可否');
     await expect.poll(() => page.locator('.bonus-progress').evaluate(element => {
       const viewport = visualViewport!;

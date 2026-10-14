@@ -394,7 +394,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
-  const isTurn = room.phase === 'playing' && self?.id === room.currentPlayerId && self.role === 'player';
+  const isTurn = room.phase === 'playing' && !room.tutorial?.awaitingDictionary && self?.id === room.currentPlayerId && self.role === 'player';
   const canEdit = isTurn && connected;
   const revealAnswer = useAnswerVisibility(answerRegion, input, room.phase === 'playing');
   const deadlineOffset = room.serverTime - Date.now();
@@ -502,7 +502,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
         {narrowViewport && <IconButton label="查看答案记录与聊天" onClick={() => setActivityOpen(true)}><MessageCircle size={19} /></IconButton>}
       </div></div>
       <PlayerTopology room={room} self={self} isHost={isHost} busy={busy} connected={connected} act={act} seconds={seconds} />
-      {room.tutorial&&<TutorialGuide room={room} active={Boolean(isTurn)}/>}
+      {room.tutorial&&<TutorialGuide room={room} active={Boolean(isTurn)} supplementColor={self?.color??inputColor} onDictionary={()=>act({type:'tutorialDictionary',data:{}})}/>}
       {(room.phase === 'playing' || activeCompletion) && shownPrompt ? <>
         <div className="answer-region" ref={answerRegion}><div className="timer-area"><div className={`timer ${seconds <= 5 ? 'timer-urgent' : ''}`} aria-label="剩余时间"><span>{seconds.toFixed(1)}</span><small>秒</small></div>
           <div className="timer-track"><span style={{ width: `${Math.min(100, seconds / initial * 100)}%` }} /></div></div>
@@ -524,7 +524,7 @@ function RoomGame({ room, self, isHost, busy, connected, act, send, setError }: 
           }} onKeyUp={event => {if (event.key === 'Enter' || event.keyCode === 229) confirmingEnter.current = false;}} />} />
           <button type="submit" className="submit-button" title="提交答案" aria-label="提交答案" disabled={!isTurn || !connected || busy || !word.trim()}><ArrowRight size={23} /></button>
           <div className="answer-message" role="status" aria-live="polite">{duplicateWord ? '这个词之前输入过了' : wordCorrection ?? answerMessage}</div>
-          {room.settings.minLength !== shownPrompt.cells.length && <div className="answer-length-hint">答案最短为 {room.settings.minLength} 个字</div>}
+          {room.settings.dictionary !== 'idioms' && room.settings.minLength !== shownPrompt.cells.length && <div className="answer-length-hint">答案最短为 {room.settings.minLength} 个字</div>}
         </form>
         {self && resolveBonusType(room.settings) && <div className="bonus-progress"><div><span>奖励{bonusLabels[resolveBonusType(room.settings)!]}</span><Heart size={13} /></div><div className="bonus-letters">{self.bonusTargets.map(initial =>
           <span className={self.collected.includes(initial) ? 'bonus-collected' : ''} key={initial}>{initial}</span>)}</div></div>}</div>

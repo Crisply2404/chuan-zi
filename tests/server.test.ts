@@ -581,10 +581,10 @@ test('真实答案全部使用后中止本局，接受最终答案并允许修�
   const {WordRules} = await import('../shared/rules');
   const dictionary: DictionaryData = JSON.parse(await readFile(new URL('../data/dictionary.json', import.meta.url), 'utf8'));
   const rules = new WordRules(dictionary);
-  const idioms = dictionary.words.filter(entry => entry.idiom && [...entry.word].length === 9);
-  assert.equal(idioms.length, 9);
+  const answers = dictionary.words.filter(entry => [...entry.word].length === 9);
+  assert.ok(answers.length > 0);
   const settings: Settings = {
-    ...structuredClone(defaultSettings), dictionary: 'idioms', minLength: 9, maxLength: 9, promptLength: 1, minAnswers: 1,
+    ...structuredClone(defaultSettings), dictionary: 'all', minLength: 9, maxLength: 9, promptLength: 1, minAnswers: 1,
     initialSeconds: 20, bonusType: 'initial', bonusInitials: ['b'],
     appearance: {initial: 'off', final: 'off', tone: 'off', radical: 'off', component: 'off', contains: 'required'},
   };
@@ -601,10 +601,10 @@ test('真实答案全部使用后中止本局，接受最终答案并允许修�
   await host.request({type: 'start', data: {}});
   const used = new Set<string>();
   const noticeStart = host.messages.length;
-  for (let turn = 0; turn < idioms.length; turn++) {
+  for (let turn = 0; turn < answers.length; turn++) {
     const room = host.room!;
     const player = room.currentPlayerId === host.playerId ? host : guest;
-    const answer = idioms.find(entry => rules.match(entry.word, room.prompt!, settings, used).valid);
+    const answer = answers.find(entry => rules.match(entry.word, room.prompt!, settings, used).valid);
     assert.ok(answer, '真实词库提供尚未使用的有效答案');
     used.add(answer.word);
     assert.equal((await player.request({type: 'submit', data: {word: answer.word, promptId: room.prompt!.id}})).ok, true);
@@ -617,7 +617,7 @@ test('真实答案全部使用后中止本局，接受最终答案并允许修�
   assert.equal(host.room!.prompt, null);
   assert.equal(host.room!.currentPlayerId, null);
   assert.equal(host.room!.lastWinnerId, null);
-  assert.equal(host.room!.history.length, 9);
+  assert.equal(host.room!.history.length, answers.length);
   assert.ok(host.room!.players.every(player => !player.ready && player.wins === 0 && player.collected.length === 0 && player.draft === ''));
   const revised = {...settings, minLength: 4, maxLength: 8};
   assert.equal((await host.request({type: 'settings', data: {settings: revised}})).ok, true);

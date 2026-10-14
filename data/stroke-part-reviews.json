@@ -1,0 +1,17 @@
+{
+  "sourceVersion": "bddc96d41bef78427ed0e034e9f7e31d71fd1b92",
+  "audit": "docs/radical-shape-audit-2026-10-15.md",
+  "records": [
+    {"character":"㐌","decomposition":"⿱亻也","strokeCount":5,"replacements":[{"component":"亻","indices":[0,1],"parts":[{"component":"𠂉","indices":[0,1]}]}]},
+    {"character":"气","decomposition":"⿱亻？","strokeCount":4,"replacements":[{"component":"亻","indices":[0,1],"parts":[{"component":"𠂉","indices":[0,1]}]}]},
+    {"character":"复","decomposition":"⿱亻⿱日夂","strokeCount":9,"replacements":[{"component":"亻","indices":[0,1],"parts":[{"component":"𠂉","indices":[0,1]}]}]},
+    {"character":"拖","decomposition":"⿰扌⿱亻也","strokeCount":8,"replacements":[{"component":"亻","indices":[3,4],"parts":[{"component":"𠂉","indices":[3,4]}]}]},
+    {"character":"举","decomposition":"⿱兴扌","strokeCount":9,"replacements":[{"component":"扌","indices":[6,7,8],"parts":[{"component":"一","indices":[6]},{"component":"十","indices":[7,8]}]}]},
+    {"character":"奥","decomposition":"⿱⿵宀米大","strokeCount":12,"replacements":[{"component":"宀","indices":[0,1,2],"parts":[{"component":"丿","indices":[0]},{"component":"冂","indices":[1,2]}]}]},
+    {"character":"菐","decomposition":"⿳业艹？","strokeCount":12,"replacements":[{"component":"艹","indices":[5,6,7],"parts":[{"component":"䒑","indices":[5,6,7]}]}]},
+    {"character":"氘","decomposition":"⿹气刂","strokeCount":6,"replacements":[{"component":"刂","indices":[4,5],"parts":[{"component":"丿","indices":[4]},{"component":"丨","indices":[5]}]}]},
+    {"character":"寝","decomposition":"⿱宀⿰丬⿳彐冖又","strokeCount":13,"replacements":[{"component":"丬","indices":[3,4,5],"parts":[{"component":"丬","indices":[4,5,3]}]}]},
+    {"character":"卉","decomposition":"⿱十艹","strokeCount":5,"finalParts":{"廾":[2,3,4]},"excludedFinalParts":["艹"]},
+    {"character":"奔","decomposition":"⿱大卉","strokeCount":8,"finalParts":{"廾":[5,6,7]},"excludedFinalParts":["艹"]}
+  ]
+}

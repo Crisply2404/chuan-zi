@@ -13,6 +13,13 @@ import {bonusRadicalCandidates} from '../shared/bonus-candidates';
 import type { CharacterData, DictionaryData, Reading, WordEntry } from '../shared/types';
 
 const componentVersion = 'bddc96d41bef78427ed0e034e9f7e31d71fd1b92';
+const reviewedPartSchema=z.object({component:z.string().min(1),indices:z.array(z.number().int().nonnegative()).min(1)}).strict();
+const strokeReviews=z.object({sourceVersion:z.literal(componentVersion),audit:z.string(),records:z.array(z.object({
+  character:z.string().min(1),decomposition:z.string().min(1),strokeCount:z.number().int().positive(),
+  replacements:z.array(reviewedPartSchema.extend({parts:z.array(reviewedPartSchema).min(1)})).optional(),
+  finalParts:z.record(z.array(z.number().int().nonnegative()).min(1)).optional(),excludedFinalParts:z.array(z.string()).optional(),
+}).strict())}).strict().parse(JSON.parse(await readFile('data/stroke-part-reviews.json','utf8')));
+const strokeReviewMap=new Map(strokeReviews.records.map(review=>[review.character,review]));
 const hanWord = /^\p{Script=Han}+$/u;
 const provenance = [
   { name: 'CC-CEDICT contributors / MDBG 2026-10-12', license: 'CC-BY-SA-4.0', url: 'https://cc-cedict.org/wiki/' },
@@ -146,9 +153,26 @@ for await (const raw of parser) {
     children(node).forEach((child, index) => collect(child, [...path, index]));
   };
   collect(ids, []);
+  const review=strokeReviewMap.get(glyph.character);
+  if(review){
+    if(review.decomposition!==glyph.decomposition||review.strokeCount!==glyph.matches.length)throw new Error(`部件审核来源不符：${glyph.character}`);
+    for(const replacement of review.replacements??[]){
+      const occurrence=leaves.findIndex(item=>item.component===replacement.component&&JSON.stringify(item.indices)===JSON.stringify(replacement.indices));
+      if(occurrence<0)throw new Error(`部件审核笔画不符：${glyph.character} ${replacement.component}`);
+      for(const part of replacement.parts){
+        if(new Set(part.indices).size!==part.indices.length||part.indices.some(index=>!replacement.indices.includes(index)))throw new Error(`部件审核索引无效：${glyph.character}`);
+      }
+      if(new Set(replacement.parts.flatMap(part=>part.indices)).size!==replacement.indices.length)throw new Error(`部件审核笔画覆盖不完整：${glyph.character}`);
+      leaves.splice(occurrence,1,...replacement.parts);
+    }
+    for(const key of Object.keys(parts))delete parts[key];
+    for(const {component,indices} of leaves)parts[component]=[...new Set([...(parts[component]??[]),...indices])].sort((first,second)=>first-second);
+    componentMap.set(glyph.character,[...new Set(leaves.map(item=>item.component))]);
+  }
   strokeParts.set(glyph.character, parts);
   occurrences.set(glyph.character, leaves);
 }
+for(const review of strokeReviews.records)if(!glyphRecords.has(review.character))throw new Error(`部件审核字符缺失：${review.character}`);
 const expanded = new Set<string>();
 function expandStrokeParts(character: string, visiting = new Set<string>()): Record<string, number[]> {
   const parts = strokeParts.get(character) ?? {};
@@ -175,13 +199,23 @@ for (const [character, info] of Object.entries(characters)) {
   info.components = [...allComponents(character)].filter(item => item !== character).sort();
   const glyphRadical = glyphRadicals.get(character);
   if (glyphRadical && info.radicals.length) info.radicals = [...new Set([...info.radicals, glyphRadical])];
-  info.strokeParts = expandStrokeParts(character);
+  info.strokeParts = {...expandStrokeParts(character)};
+  const review=strokeReviewMap.get(character);
+  for(const part of review?.excludedFinalParts??[]){
+    if(!info.strokeParts[part]?.length)throw new Error(`部件审核目标缺失：${character} ${part}`);
+    delete info.strokeParts[part];
+  }
+  for(const [part,indices] of Object.entries(review?.finalParts??{})){
+    if(new Set(indices).size!==indices.length||indices.some(index=>index>=review!.strokeCount))throw new Error(`部件审核最终索引无效：${character}`);
+    info.strokeParts[part]=indices;
+    info.components=[...new Set([...info.components,part])].sort();
+  }
   info.strokeCount = glyphRecords.get(character)?.matches.length;
 }
 
 const words = [...entries.values()].filter(entry => [...entry.word].every(character => glyphRecords.has(character))).sort((first, second) => first.word.localeCompare(second.word, 'zh-Hans'));
 const usableCharacters = new Set(words.flatMap(entry => [...entry.word]));
-const data: DictionaryData = { words, characters, metadata: { version: '2026-10-14', wordCount: words.length, idiomCount: words.filter(entry => entry.idiom).length, sources: provenance } };
+const data: DictionaryData = { words, characters, metadata: { version: '2026-10-15', wordCount: words.length, idiomCount: words.filter(entry => entry.idiom).length, sources: provenance } };
 await mkdir('data/sources', { recursive: true });
 await writeFile('data/dictionary.json', `${JSON.stringify(data)}\n`);
 await writeFile('data/components.json', `${JSON.stringify(Object.fromEntries([...componentMap]), null, 2)}\n`);

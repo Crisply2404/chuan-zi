@@ -4,12 +4,13 @@ import type {WordRules} from './rules';
 export interface CpuPlan {words:string[]; attempt:number; succeed:boolean}
 const commonCache=new WeakMap<WordRules,Map<number,WordEntry[]>>();
 
-export function cpuPlan(rules:WordRules,prompt:Prompt,settings:Settings,used:Set<string>,tutorial=false):CpuPlan {
+export function cpuPlan(rules:WordRules,prompt:Prompt,settings:Settings,used:Set<string>,tutorial=false,tutorialSuccess=false):CpuPlan {
   const solution=rules.cpuAnswer(prompt,settings,used);
   if(!solution) return {words:[],attempt:0,succeed:false};
   const roll=Math.random();
-  const succeed=!tutorial&&roll>=.2;
-  const count=tutorial?2:roll<.2?2:roll<.65?1+Math.floor(Math.random()*2):0;
+  const succeed=tutorial?tutorialSuccess:roll>=.08;
+  const seconds=settings.timerMode==='fixed'?settings.initialSeconds:settings.randomMaxSeconds;
+  const count=!succeed?Math.max(8,Math.ceil(seconds)):tutorial?1:roll<.5?1+Math.floor(Math.random()*2):0;
   if(!count)return {words:[solution.word],attempt:0,succeed:true};
   let groups=commonCache.get(rules);
   if(!groups){
@@ -22,13 +23,17 @@ export function cpuPlan(rules:WordRules,prompt:Prompt,settings:Settings,used:Set
     for(const group of groups.values())group.sort((first,second)=>(second.frequency??0)-(first.frequency??0));
     commonCache.set(rules,groups);
   }
-  const common=(groups.get([...solution.word].length)??[]).slice(0,2000).filter(entry=>!used.has(entry.word)&&entry.word!==solution.word&&!rules.match(entry.word,prompt,settings,used).valid);
+  const knownCharacter=prompt.cells.some(cell=>cell.contains!==undefined)?{...prompt,cells:prompt.cells.map(cell=>cell.contains===undefined?{}:{contains:cell.contains})}:null;
+  const common=(groups.get([...solution.word].length)??[]).filter(entry=>settings.dictionary==='all'||(settings.dictionary==='idioms'?entry.idiom:!entry.idiom)).slice(0,2000)
+    .filter(entry=>!used.has(entry.word)&&entry.word!==solution.word&&!rules.match(entry.word,prompt,settings,used).valid);
+  const partials=prompt.cells.flatMap((cell,index)=>Object.entries(cell).map(([field,value])=>({...prompt,cells:prompt.cells.map((_,position)=>position===index?{[field]:value}:{})})));
+  const scores=new Map(common.map(entry=>[entry.word,(knownCharacter&&rules.match(entry.word,knownCharacter,settings).valid?20:0)+partials.reduce((score,partial)=>score+(rules.match(entry.word,partial,settings).valid?1:0),0)]));
   const letters=[...solution.word];
   common.sort((first,second)=>{
     const similarity=(word:string)=>[...word].reduce((score,letter,index)=>score+(letters[index]===letter?3:letters.includes(letter)?1:0),0);
-    return similarity(second.word)-similarity(first.word)||(second.frequency??0)-(first.frequency??0);
+    return scores.get(second.word)!-scores.get(first.word)!||similarity(second.word)-similarity(first.word)||(second.frequency??0)-(first.frequency??0);
   });
-  const errors=common.slice(0,8);
+  const errors=common.slice(0,count);
   const words=Array.from({length:Math.min(count,errors.length)},(_,index)=>errors[index].word);
   if(succeed) words.push(solution.word);
   return {words,attempt:0,succeed};

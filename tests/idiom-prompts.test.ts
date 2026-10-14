@@ -68,3 +68,24 @@ test('字模式全部词语与成语始终只给一个汉字提示', () => {
     }
   }
 });
+
+test('胶着字模式增加一个独立条件，成语保留两个星号', () => {
+  for(const dictionary of ['all','idioms'] as const){
+    const settings={...getModeSettings('character'),dictionary,minLength:dictionary==='idioms'?4:2};
+    const types=new Set<string>();
+    for(let index=0;index<100;index++){
+      const question=rules.generate(settings,new Set(),{stalemateScore:1});
+      if(question.cells.length===1)continue;
+      assert.equal(question.cells.length,dictionary==='idioms'?4:2);
+      const character=question.cells.find(cell=>cell.contains!==undefined)!;
+      assert.deepEqual(Object.keys(character),['contains']);
+      const extra=question.cells.find(cell=>Object.keys(cell).length&&cell.contains===undefined)!;
+      assert.equal(Object.keys(extra).length,1);
+      const type=Object.keys(extra)[0];
+      assert.ok(['initial','final','tone','radical'].includes(type));types.add(type);
+      if(dictionary==='idioms')assert.equal(question.cells.filter(cell=>!Object.keys(cell).length).length,2);
+      assert.ok(rules.examples(question,settings).length>=settings.minAnswers);
+    }
+    assert.deepEqual([...types].sort(),['final','initial','radical','tone']);
+  }
+});

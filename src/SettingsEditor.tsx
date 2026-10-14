@@ -31,7 +31,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   const update = <K extends keyof Settings>(key: K, next: Settings[K]) => onChange({ ...value, [key]: next });
   const updateDictionary = (next: Settings['dictionary']) => {
     const length = value.mode === 'character' ? 1 : next === 'idioms' ? 4 : Math.min(value.promptLength, 2);
-    const settings = { ...value, dictionary: next, initialSeconds: next === 'idioms' ? 15 : 10, minLength: next === 'idioms' ? 4 : 2, maxLength: Math.max(value.maxLength, next === 'idioms' ? 4 : 2), promptLength: length,
+    const settings = { ...value, dictionary: next, initialSeconds: next === 'idioms' ? 15 : 10, minLength: next === 'idioms' ? 4 : 2, maxLength: next === 'idioms' ? 4 : 9, promptLength: length,
       hiddenCount: next === 'idioms' && value.mode !== 'custom' && value.mode !== 'character' ? 0 : Math.max(0, Math.min(length - 1, value.hiddenCount + length - value.promptLength)) };
     const nextSettings = settings.promptSlots ? withPromptSlots(settings, [...settings.promptSlots.slice(0, length), ...Array.from({length: Math.max(0, length - settings.promptSlots.length)}, emptyPromptSlot)]) : settings;
     onChange(nextSettings);
@@ -59,7 +59,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
   const applyTemplate = (template: Exclude<ModeId, 'custom'>) => {
     const next = getModeSettings(template);
     if (value.dictionary === 'idioms' && template !== 'character') {next.hiddenCount += 4 - next.promptLength; next.promptLength = 4;}
-    const configured = {...next, dictionary: value.dictionary, initialSeconds: value.dictionary === 'idioms' ? 15 : 10, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers};
+    const configured = {...next, dictionary: value.dictionary, initialSeconds: value.dictionary === 'idioms' ? 15 : 10, minLength: value.dictionary === 'idioms' ? 4 : 2, maxLength: value.dictionary === 'idioms' ? 4 : 9, bestOf: value.bestOf, maxPlayers: value.maxPlayers};
     onChange(withPromptSlots(configured, slotsFromSettings(configured)));
     setSelectedSlot(0);
   };
@@ -68,7 +68,7 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
     setMode(next);
     setEditingCustom(next === 'custom');
     const settings = next === 'custom' ? withPromptSlots(value, slotsFromSettings(value)) : {
-      ...getModeSettings(next), dictionary: value.dictionary, initialSeconds: value.dictionary === 'idioms' ? 15 : 10, minLength: value.dictionary === 'idioms' ? 4 : 2, bestOf: value.bestOf, maxPlayers: value.maxPlayers,
+      ...getModeSettings(next), dictionary: value.dictionary, initialSeconds: value.dictionary === 'idioms' ? 15 : 10, minLength: value.dictionary === 'idioms' ? 4 : 2, maxLength: value.dictionary === 'idioms' ? 4 : 9, bestOf: value.bestOf, maxPlayers: value.maxPlayers,
     };
     if (next !== 'custom' && next !== 'character' && value.dictionary === 'idioms') {settings.hiddenCount = 0; settings.promptLength = 4;}
     onChange(settings);
@@ -119,8 +119,8 @@ export function SettingsEditor({ value, onChange, disabled, preview, onPreview, 
         <section className="settings-section">
           <h3>词库与难度</h3>
           <div className="number-grid">
-            <NumberField label="答案最短字数" value={value.minLength} min={2} max={9} onChange={next => update('minLength', next)} />
-            <NumberField label="答案最长字数" value={value.maxLength} min={2} max={9} onChange={next => update('maxLength', next)} />
+            <NumberField label="答案最短字数" value={value.minLength} min={2} max={9} disabled={value.dictionary === 'idioms'} onChange={next => update('minLength', next)} />
+            <NumberField label="答案最长字数" value={value.maxLength} min={2} max={9} disabled={value.dictionary === 'idioms'} onChange={next => update('maxLength', next)} />
             <NumberField label="可用答案下限" value={value.minAnswers} min={1} max={100000} onChange={next => update('minAnswers', next)} />
             <NumberField label="可用答案上限" value={value.maxAnswers} min={1} max={100000} onChange={next => update('maxAnswers', next)} />
           </div>

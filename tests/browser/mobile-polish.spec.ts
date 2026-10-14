@@ -126,7 +126,7 @@ test('手机可见高度缩小时仍能看见提示与全部答案格', async ({
     await page.getByRole('button', {name: '准备', exact: true}).click();
     await page.getByRole('button', {name: '开始比赛', exact: true}).click();
     await page.setViewportSize({width: 390, height: 400});
-    await page.getByLabel('输入答案').tap();
+    await page.locator('.answer-region .answer-cell-empty').tap();
     await page.getByLabel('输入答案').fill('不置可否');
     await expect.poll(() => page.locator('.answer-form').evaluate(element => {
       const viewport = window.visualViewport!;
@@ -169,7 +169,8 @@ test('逐格编辑保存无声母和星号，并按成语最短长度显示四�
   await page.getByRole('button', {name: '添加电脑', exact: true}).click();
   await page.getByRole('button', {name: '准备', exact: true}).click();
   await page.getByRole('button', {name: '开始比赛', exact: true}).click();
-  await expect(page.locator('.answer-length-hint')).toHaveText('答案最短为 4 个字');
+  await expect(page.locator('.answer-length-hint')).toHaveCount(0);
+  expect(state.room!.settings.maxLength).toBe(4);
   await expect(page.locator('.answer-form .prompt-cell')).toHaveCount(2);
   expect(state.errors).toEqual([]);
 });

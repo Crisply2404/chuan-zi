@@ -104,7 +104,7 @@ export interface RoomView {
   prompt: Prompt | null; deadline: number | null; serverTime: number;
   history: HistoryItem[]; chat: ChatMessage[]; draftMatch: DraftMatch | null; acceptedAnswer: AcceptedAnswer | null;
   lastWinnerId: string | null; winnerIds: string[];
-  tutorial?: {lesson:number; completed:boolean; example:DraftMatch};
+  tutorial?: {lesson:number; completed:boolean; example:DraftMatch; awaitingDictionary?:boolean; cpuAnswers?:number};
   answerFeedback?: {id:string; playerId:string; at:number};
 }
 export interface LobbyRoom {
@@ -117,6 +117,7 @@ export type ClientCommand =
   | {type: 'hello'; data: {nickname: string; token?: string}}
   | {type: 'create'; data: {name: string; password: string; listed?: boolean; settings: Settings}}
   | {type:'tutorial';data:Record<string,never>}
+  | {type:'tutorialDictionary';data:Record<string,never>}
   | {type: 'join'; data: {roomId: string; password: string}}
   | {type: 'joinByCode'; data: {code: string; password: string}}
   | {type: 'leave'; data: Record<string, never>}

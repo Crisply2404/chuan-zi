@@ -2,6 +2,22 @@ import type { AddressInfo } from 'node:net';
 import { createServer } from 'vite';
 import { test, expect } from '@playwright/test';
 
+test('纯汉字提示结合后居中显示原汉字，不增加拼音',async({page})=>{
+  const server=await createServer({server:{host:'127.0.0.1',port:0}});await server.listen();
+  const address=server.httpServer!.address() as AddressInfo;
+  try{
+    await page.goto(`http://127.0.0.1:${address.port}/tests/browser/prompt-harness.html?case=character`);
+    await page.getByLabel('测试答案').fill('天空');
+    await expect(page.locator('.prompt-layer-attached')).toBeVisible();
+    await expect(page.locator('.prompt-part-character')).toHaveText('天');
+    await expect(page.locator('.prompt-part-initial,.prompt-part-final,.prompt-part-tone')).toHaveCount(0);
+    await expect.poll(()=>page.locator('.prompt-cell').evaluate(element=>{
+      const cell=element.getBoundingClientRect();const character=element.querySelector('.prompt-part-character')!.getBoundingClientRect();
+      return Math.abs(character.y+character.height/2-cell.y-cell.height/2);
+    })).toBeLessThan(2);
+  }finally{await server.close();}
+});
+
 test('部件与拼音提示采用汉字在上拼音在下的布局', async ({ page }) => {
   const server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
   await server.listen();

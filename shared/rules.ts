@@ -95,7 +95,7 @@ export class WordRules {
 
   private allowed(entry: WordEntry, settings: Settings): boolean {
     const length = [...entry.word].length;
-    return !correctionFor(entry.word) && length >= settings.minLength && length <= settings.maxLength && (settings.dictionary === 'all' || (settings.dictionary === 'idioms' ? entry.idiom : !entry.idiom));
+    return !correctionFor(entry.word) && (settings.dictionary === 'idioms' ? entry.idiom && length === 4 : length >= settings.minLength && length <= settings.maxLength && (settings.dictionary === 'all' || !entry.idiom));
   }
 
   private radicalsFor(letter: string): string[] {
@@ -155,7 +155,8 @@ export class WordRules {
   }
 
   generate(settings: Settings, used = new Set<string>(), context: {stalemateScore?: number} = {}): Prompt {
-    validateSettings(settings);
+    settings = validateSettings(settings);
+    if(settings.mode==='character'&&(context.stalemateScore??0)>0&&Math.random()<(context.stalemateScore??0)*.5)return this.generateCharacterCombination(settings,used);
     if (settings.mode === 'character') settings = {...settings, promptLength: 1, hiddenCount: 0};
     const idiomPositions = settings.dictionary === 'idioms' && settings.mode !== 'custom' && settings.mode !== 'character' ? idiomVisiblePositions(context.stalemateScore ?? 0, settings.mode) : null;
     if (idiomPositions) settings = {...settings, promptLength: 4, hiddenCount: 4 - idiomPositions.length};
@@ -237,6 +238,38 @@ export class WordRules {
       }
     }
     throw new RuleError('无法根据当前设置生成符合答案数量范围的提示');
+  }
+
+  private generateCharacterCombination(settings:Settings,used:Set<string>):Prompt{
+    const types=['initial','final','tone','radical'] as const;
+    const type=types[Math.floor(Math.random()*types.length)];
+    const span=settings.dictionary==='idioms'?4:2;
+    const candidates=this.shuffle(this.data.words.filter(entry=>this.allowed(entry,settings)&&!used.has(entry.word)));
+    for(const entry of candidates){
+      const letters=[...entry.word];
+      const offsets=this.shuffle(Array.from({length:letters.length-span+1},(_,index)=>index));
+      for(const offset of offsets){
+        const positions=this.shuffle(Array.from({length:span},(_,index)=>index));
+        const characterPosition=positions[0];
+        const extraPosition=positions[1];
+        const reading=entry.readings[Math.floor(Math.random()*entry.readings.length)];
+        const absolute=offset+extraPosition;
+        const cells=Array.from({length:span},()=>({} as Prompt['cells'][number]));
+        cells[characterPosition].contains=letters[offset+characterPosition];
+        if(type==='tone'){
+          if(reading.tones[absolute]===5)continue;
+          cells[extraPosition].tone=reading.tones[absolute];
+        }else if(type==='radical'){
+          const radicals=this.radicalsFor(letters[absolute]);
+          if(!radicals.length)continue;
+          cells[extraPosition].radical=radicals[Math.floor(Math.random()*radicals.length)];
+        }else cells[extraPosition][type]=type==='initial'?reading.initials[absolute]:reading.finals[absolute];
+        const proposed={id:'',cells,answerCount:0};
+        const answerCount=this.examples(proposed,settings,used,Infinity).length;
+        if(answerCount>=settings.minAnswers&&answerCount<=settings.maxAnswers)return {...proposed,id:globalThis.crypto.randomUUID(),answerCount};
+      }
+    }
+    throw new RuleError('当前词库没有符合字模式组合条件的提示');
   }
 
   examples(prompt: Prompt, settings: Settings, used = new Set<string>(), limit = 5): WordEntry[] {

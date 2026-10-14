@@ -197,10 +197,26 @@ test('Cloudflare教学状态与电脑错误尝试在Hibernation后继续',async 
   await worker.unsafeEvictDurableObject('chuan-zi-online','GameHub',{name:'chuan-zi',webSockets:'hibernate'});
   await player.wait(message=>message.type==='state'&&Boolean(message.room?.answerFeedback),start);
   await worker.unsafeEvictDurableObject('chuan-zi-online','GameHub',{name:'chuan-zi',webSockets:'hibernate'});
+  await player.wait(message=>message.type==='state'&&message.room?.currentPlayerId===player.playerId,start);
+  assert.equal(player.room!.tutorial!.cpuAnswers,1);
+  assert.equal((await player.request({type:'submit',data:{word:player.room!.tutorial!.example.word,promptId:player.room!.prompt!.id}})).ok,true);
+  await worker.unsafeEvictDurableObject('chuan-zi-online','GameHub',{name:'chuan-zi',webSockets:'hibernate'});
   await player.wait(message=>message.type==='state'&&message.room?.tutorial?.lesson===1,start);
   assert.equal(player.room!.currentPlayerId,player.playerId);
   assert.equal(player.room!.players.find(item=>item.cpu)!.lives,3);
   assert.equal(player.room!.listed,false);
+});
+
+test('Cloudflare成语设置在读取与Hibernation重连后保持四个汉字',async t=>{
+  const worker=createWorker();t.after(()=>worker.dispose());
+  const player=await Client.connect(worker,'成语设置');t.after(()=>player.close());
+  const settings={...defaultSettings,dictionary:'idioms' as const,minLength:4,maxLength:9};
+  assert.equal((await player.request({type:'create',data:{name:'',password:'',settings}})).ok,true);
+  assert.equal(player.room!.settings.maxLength,4);
+  await worker.unsafeEvictDurableObject('chuan-zi-online','GameHub',{name:'chuan-zi',webSockets:'hibernate'});
+  const restored=await Client.connect(worker,'成语设置',player.token);t.after(()=>restored.close());
+  assert.equal(restored.room!.settings.minLength,4);
+  assert.equal(restored.room!.settings.maxLength,4);
 });
 
 test('Cloudflare idle 隐藏、恢复展示与断线身份期限使用持久 alarm', async t => {

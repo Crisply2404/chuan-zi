@@ -73,6 +73,11 @@
 | 81：互动教学与电脑行为 | resolved | tdd、code-review | 四模式真实作答、动画示例、八次电脑错误与最终获胜通过；持久教学状态检查 |
 | 82：默认字模式与暗色条带 | resolved | tdd、code-review | 默认字模式及模式/模板顺序、暗色对应条带通过 |
 | 83：发布验证与真实电脑回合 | resolved | diagnosing-bugs、tdd、code-review | 80 项规则与真实联机测试、类型检查及双维度审查通过；私有 CI 38604420394 与 Pages 38605060124 成功，公开教学、默认模式、暗色条带、成语分布、资料包与联机通过 |
+| 84：四个汉字成语与字模式胶着提示 | in-progress | tdd、code-review | 四个汉字草稿、提交、候选、读取与Hibernation通过；胶着独立条件与纯汉字显示通过，继续公开验证 |
+| 85：部首映射完整核查 | in-progress | research、tdd、code-review | 来源确认41组映射、40个汉字；来源审核、生成、词语与逐笔索引检查通过 |
+| 86：汉字右侧编辑光标 | in-progress | diagnosing-bugs、tdd、code-review | 原生方向键、Home与右侧距离检查通过，继续输入法完整流程 |
+| 87：教学图示、箭头与词库切换 | in-progress | tdd、code-review | 空白输入格、玩家颜色、箭头含义与暂停选择已实现，继续完整教学检查 |
+| 88：电脑连续作答 | in-progress | tdd、code-review | 92%正确机会、近似候选与持续尝试，教学首次正确与后续多次尝试；85项规则/真实联机通过 |
 
 ## 用户已经确定的要求
 

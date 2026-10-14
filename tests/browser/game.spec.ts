@@ -771,8 +771,8 @@ test('原生 IME 组合文本保持可编辑，确认汉字后更新答案', asy
     expect(await active.locator('.answer-cell-surface').nth(4).evaluate(element => getComputedStyle(element).animationName)).toBe('cell-appear');
     await active.locator('.answer-cell').nth(1).click();
     expect(await input.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(2);
-    await input.click();
-    expect(await input.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(3);
+    await active.locator('.answer-cell').nth(1).click();
+    expect(await input.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(2);
     await active.locator('.answer-cell').nth(1).click();
     expect(await input.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(2);
     await input.press('Backspace');
